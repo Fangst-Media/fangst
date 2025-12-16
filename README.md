@@ -4,12 +4,10 @@
 
 Jæger (Danish for "hunter") is a unified media management system that consolidates the fragmented \*arr ecosystem into a single, modern application — without forcing you to abandon your existing setup.
 
----
 
 ## Why Jæger?
 
 The self-hosted media stack is powerful but fragmented. Running Sonarr, Radarr, Prowlarr, and Overseerr means managing 4+ separate apps, each with their own database, configuration, and quirks.
----
 
 ## Philosophy
 
