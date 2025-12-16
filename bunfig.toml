@@ -1,0 +1,8 @@
+[install]
+auto = "fallback"
+
+[install.cache]
+dir = ".bun-cache"
+
+[test]
+preload = []
