@@ -1,0 +1,883 @@
+{
+  "version": "1.0",
+  "description": "Mock filesystem structure for Jaeger media scanning tests",
+  "root": "/media",
+  "structure": {
+    "Movies": {
+      "type": "directory",
+      "children": {
+        "The Matrix (1999)": {
+          "type": "directory",
+          "children": {
+            "The.Matrix.1999.2160p.UHD.BluRay.x265.HDR.DTS-HD.MA.7.1-TERMINAL.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "The Matrix Reloaded (2003)": {
+          "type": "directory",
+          "children": {
+            "The.Matrix.Reloaded.2003.2160p.UHD.BluRay.x265.HDR.DTS-HD.MA.7.1-TERMINAL.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "The Matrix Revolutions (2003)": {
+          "type": "directory",
+          "children": {
+            "The.Matrix.Revolutions.2003.2160p.UHD.BluRay.x265.HDR.TrueHD.7.1.Atmos-FGT.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "Dune (2021)": {
+          "type": "directory",
+          "children": {
+            "Dune.2021.2160p.UHD.BluRay.x265.HDR.DV.TrueHD.7.1.Atmos-SURFINBIRD.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "Dune Part Two (2024)": {
+          "type": "directory",
+          "children": {
+            "Dune.Part.Two.2024.2160p.WEB-DL.DDP5.1.Atmos.DV.HDR10Plus.HEVC-FLUX.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "Blade Runner (1982)": {
+          "type": "directory",
+          "children": {
+            "Blade.Runner.1982.Final.Cut.2160p.UHD.BluRay.x265.HDR.DTS-HD.MA.5.1-SURFINBIRD.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "Blade Runner 2049 (2017)": {
+          "type": "directory",
+          "children": {
+            "Blade.Runner.2049.2017.2160p.UHD.BluRay.x265.HDR.DV.TrueHD.7.1.Atmos-BEATRIX.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "Hackers (1995)": {
+          "type": "directory",
+          "children": {
+            "Hackers.1995.1080p.BluRay.x264.DTS-FGT.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "The Social Network (2010)": {
+          "type": "directory",
+          "children": {
+            "The.Social.Network.2010.2160p.UHD.BluRay.x265.HDR.DTS-HD.MA.5.1-SWTYBLZ.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "Tron Legacy (2010)": {
+          "type": "directory",
+          "children": {
+            "Tron.Legacy.2010.2160p.UHD.BluRay.x265.HDR.DV.TrueHD.7.1.Atmos-SURFINBIRD.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "Ex Machina (2014)": {
+          "type": "directory",
+          "children": {
+            "Ex.Machina.2014.2160p.UHD.BluRay.x265.HDR.DTS-HD.MA.7.1-RARBG.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "Ghost in the Shell (1995)": {
+          "type": "directory",
+          "children": {
+            "Ghost.in.the.Shell.1995.2160p.UHD.BluRay.x265.HDR.DTS-HD.MA.2.0-SURFINBIRD.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "Akira (1988)": {
+          "type": "directory",
+          "children": {
+            "Akira.1988.2160p.UHD.BluRay.x265.HDR.TrueHD.5.1-SURFINBIRD.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "WarGames (1983)": {
+          "type": "directory",
+          "children": {
+            "WarGames.1983.1080p.BluRay.x264.DTS-FGT.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "Sneakers (1992)": {
+          "type": "directory",
+          "children": {
+            "Sneakers.1992.1080p.BluRay.x264.DTS-FGT.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "Swordfish (2001)": {
+          "type": "directory",
+          "children": {
+            "Swordfish.2001.1080p.BluRay.x264.DTS-FGT.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "The Net (1995)": {
+          "type": "directory",
+          "children": {
+            "The.Net.1995.1080p.BluRay.x264.DTS-FGT.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "Antitrust (2001)": {
+          "type": "directory",
+          "children": {
+            "Antitrust.2001.1080p.WEB-DL.DD5.1.x264-NOGRP.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "The Fifth Estate (2013)": {
+          "type": "directory",
+          "children": {
+            "The.Fifth.Estate.2013.1080p.BluRay.x264.DTS-SPARKS.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "Blackhat (2015)": {
+          "type": "directory",
+          "children": {
+            "Blackhat.2015.Directors.Cut.1080p.BluRay.x264.DTS-FGT.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "Who Am I (2014)": {
+          "type": "directory",
+          "children": {
+            "Who.Am.I.Kein.System.ist.sicher.2014.1080p.BluRay.x264.DTS-RARBG.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "The Imitation Game (2014)": {
+          "type": "directory",
+          "children": {
+            "The.Imitation.Game.2014.2160p.UHD.BluRay.x265.HDR.DTS-HD.MA.5.1-RARBG.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "Her (2013)": {
+          "type": "directory",
+          "children": {
+            "Her.2013.2160p.UHD.BluRay.x265.HDR.DTS-HD.MA.5.1-RARBG.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "2001 A Space Odyssey (1968)": {
+          "type": "directory",
+          "children": {
+            "2001.A.Space.Odyssey.1968.2160p.UHD.BluRay.x265.HDR.DTS-HD.MA.5.1-SURFINBIRD.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "Interstellar (2014)": {
+          "type": "directory",
+          "children": {
+            "Interstellar.2014.2160p.UHD.BluRay.x265.HDR.DV.TrueHD.7.1.Atmos-SURFINBIRD.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "Arrival (2016)": {
+          "type": "directory",
+          "children": {
+            "Arrival.2016.2160p.UHD.BluRay.x265.HDR.DV.TrueHD.7.1.Atmos-FLUX.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "Everything Everywhere All at Once (2022)": {
+          "type": "directory",
+          "children": {
+            "Everything.Everywhere.All.at.Once.2022.2160p.UHD.BluRay.x265.HDR.DV.TrueHD.7.1.Atmos-BEATRIX.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "Oppenheimer (2023)": {
+          "type": "directory",
+          "children": {
+            "Oppenheimer.2023.2160p.UHD.BluRay.x265.HDR.DV.TrueHD.7.1.Atmos-SURFINBIRD.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "The Terminator (1984)": {
+          "type": "directory",
+          "children": {
+            "The.Terminator.1984.2160p.UHD.BluRay.x265.HDR.DTS-HD.MA.5.1-RARBG.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "Terminator 2 Judgment Day (1991)": {
+          "type": "directory",
+          "children": {
+            "Terminator.2.Judgment.Day.1991.2160p.UHD.BluRay.x265.HDR.DV.TrueHD.7.1.Atmos-SURFINBIRD.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "Office Space (1999)": {
+          "type": "directory",
+          "children": {
+            "Office.Space.1999.1080p.BluRay.x264.DTS-FGT.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "The Pirates of Silicon Valley (1999)": {
+          "type": "directory",
+          "children": {
+            "Pirates.of.Silicon.Valley.1999.720p.WEB-DL.DD5.1.x264-NOGRP.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "Revolution OS (2001)": {
+          "type": "directory",
+          "children": {
+            "Revolution.OS.2001.720p.WEB-DL.x264-LINUS.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "The Code (2001)": {
+          "type": "directory",
+          "children": {
+            "The.Code.Linux.2001.DVDRip.x264-FOSS.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "Ubuntu Studio of Disaster (2019)": {
+          "type": "directory",
+          "children": {
+            "Ubuntu.Studio.of.Disaster.2019.1080p.WEB-DL.x264-CANONICAL.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "Arch Enemy The Installation (2020)": {
+          "type": "directory",
+          "children": {
+            "Arch.Enemy.The.Installation.2020.2160p.WEB-DL.x265.HDR-BTW.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "Fedora The Hat Chronicles (2018)": {
+          "type": "directory",
+          "children": {
+            "Fedora.The.Hat.Chronicles.2018.1080p.BluRay.x264-REDHAT.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "Gentoo A Tale of Compilation (2017)": {
+          "type": "directory",
+          "children": {
+            "Gentoo.A.Tale.of.Compilation.2017.1080p.WEB-DL.x264-EMERGE.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "Debian The Universal Operating System (2015)": {
+          "type": "directory",
+          "children": {
+            "Debian.The.Universal.Operating.System.2015.1080p.BluRay.x264-STABLE.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "Mint Condition (2021)": {
+          "type": "directory",
+          "children": {
+            "Mint.Condition.2021.2160p.WEB-DL.x265.HDR-CINNAMON.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "The Manjaro Incident (2022)": {
+          "type": "directory",
+          "children": {
+            "The.Manjaro.Incident.2022.2160p.WEB-DL.x265.HDR.DV-PACMAN.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "Kernel Panic (2016)": {
+          "type": "directory",
+          "children": {
+            "Kernel.Panic.2016.1080p.BluRay.x264.DTS-OOPS.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "Sudo Make Me a Sandwich (2018)": {
+          "type": "directory",
+          "children": {
+            "Sudo.Make.Me.a.Sandwich.2018.1080p.WEB-DL.x264-XKCD.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "rm -rf The Movie (2023)": {
+          "type": "directory",
+          "children": {
+            "rm.rf.The.Movie.2023.2160p.WEB-DL.x265.HDR-OOPS.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "I Use Arch BTW (2024)": {
+          "type": "directory",
+          "children": {
+            "I.Use.Arch.BTW.2024.2160p.WEB-DL.x265.HDR.DV.Atmos-BTWIUSEARCH.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "chmod 777 (2019)": {
+          "type": "directory",
+          "children": {
+            "chmod.777.2019.1080p.BluRay.x264.DTS-INSECURE.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "The Vim Escape Room (2020)": {
+          "type": "directory",
+          "children": {
+            "The.Vim.Escape.Room.2020.1080p.WEB-DL.x264-HJKL.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "Emacs vs Vim Civil War (2021)": {
+          "type": "directory",
+          "children": {
+            "Emacs.vs.Vim.Civil.War.2021.2160p.WEB-DL.x265.HDR-EDITOR.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "grep A Love Story (2017)": {
+          "type": "directory",
+          "children": {
+            "grep.A.Love.Story.2017.1080p.BluRay.x264-REGEX.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "The Man Page (2022)": {
+          "type": "directory",
+          "children": {
+            "The.Man.Page.2022.1080p.WEB-DL.x264-RTFM.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "Segmentation Fault (2018)": {
+          "type": "directory",
+          "children": {
+            "Segmentation.Fault.2018.1080p.BluRay.x264.DTS-COREDUMP.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "Free as in Freedom (2002)": {
+          "type": "directory",
+          "children": {
+            "Free.as.in.Freedom.2002.DVDRip.x264-GNU.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "The Cathedral and the Bazaar (2004)": {
+          "type": "directory",
+          "children": {
+            "The.Cathedral.and.the.Bazaar.2004.720p.WEB-DL.x264-ESR.mkv": {
+              "type": "file"
+            }
+          }
+        },
+        "Bugonia (2025)": {
+          "type": "directory",
+          "children": {
+            "Bugonia.2025.Hybrid.2160p.UHD.Blu-ray.Remux.DV.HDR10P.HEVC.TrueHD.Atmos.7.1-CiNEPHiLES.mkv": {
+              "type": "file"
+            }
+          }
+        }
+      }
+    },
+    "TV": {
+      "type": "directory",
+      "children": {
+        "Breaking Bad": {
+          "type": "directory",
+          "children": {
+            "Season 01": {
+              "type": "directory",
+              "children": {
+                "Breaking.Bad.S01E01.Pilot.2160p.UHD.BluRay.x265.HDR.DTS-HD.MA.5.1-SURFINBIRD.mkv": {
+                  "type": "file"
+                },
+                "Breaking.Bad.S01E02.Cats.in.the.Bag.2160p.UHD.BluRay.x265.HDR.DTS-HD.MA.5.1-SURFINBIRD.mkv": {
+                  "type": "file"
+                },
+                "Breaking.Bad.S01E03.And.the.Bags.in.the.River.2160p.UHD.BluRay.x265.HDR.DTS-HD.MA.5.1-SURFINBIRD.mkv": {
+                  "type": "file"
+                },
+                "Breaking.Bad.S01E04.Cancer.Man.2160p.UHD.BluRay.x265.HDR.DTS-HD.MA.5.1-SURFINBIRD.mkv": {
+                  "type": "file"
+                },
+                "Breaking.Bad.S01E05.Gray.Matter.2160p.UHD.BluRay.x265.HDR.DTS-HD.MA.5.1-SURFINBIRD.mkv": {
+                  "type": "file"
+                },
+                "Breaking.Bad.S01E06.Crazy.Handful.of.Nothin.2160p.UHD.BluRay.x265.HDR.DTS-HD.MA.5.1-SURFINBIRD.mkv": {
+                  "type": "file"
+                },
+                "Breaking.Bad.S01E07.A.No.Rough.Stuff.Type.Deal.2160p.UHD.BluRay.x265.HDR.DTS-HD.MA.5.1-SURFINBIRD.mkv": {
+                  "type": "file"
+                }
+              }
+            }
+          }
+        },
+        "The Bear": {
+          "type": "directory",
+          "children": {
+            "Season 01": {
+              "type": "directory",
+              "children": {
+                "The.Bear.S01E01.System.2160p.HULU.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "The.Bear.S01E02.Hands.2160p.HULU.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "The.Bear.S01E03.Brigade.2160p.HULU.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "The.Bear.S01E04.Dogs.2160p.HULU.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "The.Bear.S01E05.Sheridan.2160p.HULU.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "The.Bear.S01E06.Ceres.2160p.HULU.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "The.Bear.S01E07.Review.2160p.HULU.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "The.Bear.S01E08.Braciole.2160p.HULU.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                }
+              }
+            },
+            "Season 02": {
+              "type": "directory",
+              "children": {
+                "The.Bear.S02E01.Beef.2160p.HULU.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "The.Bear.S02E02.Pasta.2160p.HULU.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "The.Bear.S02E03.Sundae.2160p.HULU.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "The.Bear.S02E04.Honeydew.2160p.HULU.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "The.Bear.S02E05.Pop.2160p.HULU.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "The.Bear.S02E06.Fishes.2160p.HULU.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "The.Bear.S02E07.Forks.2160p.HULU.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "The.Bear.S02E08.Bolognese.2160p.HULU.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "The.Bear.S02E09.Omelette.2160p.HULU.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "The.Bear.S02E10.The.Bear.2160p.HULU.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                }
+              }
+            }
+          }
+        },
+        "Fallout": {
+          "type": "directory",
+          "children": {
+            "Season 01": {
+              "type": "directory",
+              "children": {
+                "Fallout.S01E01.The.End.2160p.AMZN.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "Fallout.S01E02.The.Target.2160p.AMZN.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "Fallout.S01E03.The.Head.2160p.AMZN.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "Fallout.S01E04.The.Ghouls.2160p.AMZN.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "Fallout.S01E05.The.Past.2160p.AMZN.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "Fallout.S01E06.The.Trap.2160p.AMZN.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "Fallout.S01E07.The.Radio.2160p.AMZN.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "Fallout.S01E08.The.Beginning.2160p.AMZN.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                }
+              }
+            }
+          }
+        },
+        "Severance": {
+          "type": "directory",
+          "children": {
+            "Season 01": {
+              "type": "directory",
+              "children": {
+                "Severance.S01E01.Good.News.About.Hell.2160p.ATVP.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "Severance.S01E02.Half.Loop.2160p.ATVP.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "Severance.S01E03.In.Perpetuity.2160p.ATVP.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "Severance.S01E04.The.You.You.Are.2160p.ATVP.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "Severance.S01E05.The.Grim.Barbarity.of.Optics.and.Design.2160p.ATVP.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "Severance.S01E06.Hide.and.Seek.2160p.ATVP.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "Severance.S01E07.Defiant.Jazz.2160p.ATVP.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "Severance.S01E08.What's.for.Dinner.2160p.ATVP.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "Severance.S01E09.The.We.We.Are.2160p.ATVP.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                }
+              }
+            },
+            "Season 02": {
+              "type": "directory",
+              "children": {
+                "Severance.S02E01.Hello.Ms.Cobel.2160p.ATVP.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "Severance.S02E02.Goodbye.Mrs.Selvig.2160p.ATVP.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "Severance.S02E03.Who.Is.Alive.2160p.ATVP.WEB-DL.DDP5.1.Atmos.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                }
+              }
+            }
+          }
+        },
+        "Silicon Valley": {
+          "type": "directory",
+          "children": {
+            "Season 01": {
+              "type": "directory",
+              "children": {
+                "Silicon.Valley.S01E01.Minimum.Viable.Product.1080p.BluRay.x264.DTS-FGT.mkv": {
+                  "type": "file"
+                },
+                "Silicon.Valley.S01E02.The.Cap.Table.1080p.BluRay.x264.DTS-FGT.mkv": {
+                  "type": "file"
+                },
+                "Silicon.Valley.S01E03.Articles.of.Incorporation.1080p.BluRay.x264.DTS-FGT.mkv": {
+                  "type": "file"
+                },
+                "Silicon.Valley.S01E04.Fiduciary.Duties.1080p.BluRay.x264.DTS-FGT.mkv": {
+                  "type": "file"
+                },
+                "Silicon.Valley.S01E05.Signaling.Risk.1080p.BluRay.x264.DTS-FGT.mkv": {
+                  "type": "file"
+                },
+                "Silicon.Valley.S01E06.Third.Party.Insourcing.1080p.BluRay.x264.DTS-FGT.mkv": {
+                  "type": "file"
+                },
+                "Silicon.Valley.S01E07.Proof.of.Concept.1080p.BluRay.x264.DTS-FGT.mkv": {
+                  "type": "file"
+                },
+                "Silicon.Valley.S01E08.Optimal.Tip.to.Tip.Efficiency.1080p.BluRay.x264.DTS-FGT.mkv": {
+                  "type": "file"
+                }
+              }
+            }
+          }
+        },
+        "Mr Robot": {
+          "type": "directory",
+          "children": {
+            "Season 01": {
+              "type": "directory",
+              "children": {
+                "Mr.Robot.S01E01.eps1.0_hellofriend.mov.2160p.UHD.BluRay.x265.HDR.DTS-HD.MA.5.1-SURFINBIRD.mkv": {
+                  "type": "file"
+                },
+                "Mr.Robot.S01E02.eps1.1_ones-and-zer0es.mpeg.2160p.UHD.BluRay.x265.HDR.DTS-HD.MA.5.1-SURFINBIRD.mkv": {
+                  "type": "file"
+                },
+                "Mr.Robot.S01E03.eps1.2_d3bug.mkv.2160p.UHD.BluRay.x265.HDR.DTS-HD.MA.5.1-SURFINBIRD.mkv": {
+                  "type": "file"
+                },
+                "Mr.Robot.S01E04.eps1.3_da3m0ns.mp4.2160p.UHD.BluRay.x265.HDR.DTS-HD.MA.5.1-SURFINBIRD.mkv": {
+                  "type": "file"
+                },
+                "Mr.Robot.S01E05.eps1.4_3xpl0its.wmv.2160p.UHD.BluRay.x265.HDR.DTS-HD.MA.5.1-SURFINBIRD.mkv": {
+                  "type": "file"
+                },
+                "Mr.Robot.S01E06.eps1.5_br4ve-trave1er.asf.2160p.UHD.BluRay.x265.HDR.DTS-HD.MA.5.1-SURFINBIRD.mkv": {
+                  "type": "file"
+                },
+                "Mr.Robot.S01E07.eps1.6_v1ew-s0urce.flv.2160p.UHD.BluRay.x265.HDR.DTS-HD.MA.5.1-SURFINBIRD.mkv": {
+                  "type": "file"
+                },
+                "Mr.Robot.S01E08.eps1.7_wh1ter0se.m4v.2160p.UHD.BluRay.x265.HDR.DTS-HD.MA.5.1-SURFINBIRD.mkv": {
+                  "type": "file"
+                },
+                "Mr.Robot.S01E09.eps1.8_m1rr0r1ng.qt.2160p.UHD.BluRay.x265.HDR.DTS-HD.MA.5.1-SURFINBIRD.mkv": {
+                  "type": "file"
+                },
+                "Mr.Robot.S01E10.eps1.9_zer0-day.avi.2160p.UHD.BluRay.x265.HDR.DTS-HD.MA.5.1-SURFINBIRD.mkv": {
+                  "type": "file"
+                }
+              }
+            }
+          }
+        },
+        "Black Mirror": {
+          "type": "directory",
+          "children": {
+            "Season 01": {
+              "type": "directory",
+              "children": {
+                "Black.Mirror.S01E01.The.National.Anthem.1080p.BluRay.x264.DTS-FGT.mkv": {
+                  "type": "file"
+                },
+                "Black.Mirror.S01E02.Fifteen.Million.Merits.1080p.BluRay.x264.DTS-FGT.mkv": {
+                  "type": "file"
+                },
+                "Black.Mirror.S01E03.The.Entire.History.of.You.1080p.BluRay.x264.DTS-FGT.mkv": {
+                  "type": "file"
+                }
+              }
+            },
+            "Season 02": {
+              "type": "directory",
+              "children": {
+                "Black.Mirror.S02E01.Be.Right.Back.1080p.BluRay.x264.DTS-FGT.mkv": {
+                  "type": "file"
+                },
+                "Black.Mirror.S02E02.White.Bear.1080p.BluRay.x264.DTS-FGT.mkv": {
+                  "type": "file"
+                },
+                "Black.Mirror.S02E03.The.Waldo.Moment.1080p.BluRay.x264.DTS-FGT.mkv": {
+                  "type": "file"
+                }
+              }
+            }
+          }
+        },
+        "Halt and Catch Fire": {
+          "type": "directory",
+          "children": {
+            "Season 01": {
+              "type": "directory",
+              "children": {
+                "Halt.and.Catch.Fire.S01E01.I.O.1080p.BluRay.x264.DTS-FGT.mkv": {
+                  "type": "file"
+                },
+                "Halt.and.Catch.Fire.S01E02.FUD.1080p.BluRay.x264.DTS-FGT.mkv": {
+                  "type": "file"
+                },
+                "Halt.and.Catch.Fire.S01E03.High.Plains.Hardware.1080p.BluRay.x264.DTS-FGT.mkv": {
+                  "type": "file"
+                },
+                "Halt.and.Catch.Fire.S01E04.Close.to.the.Metal.1080p.BluRay.x264.DTS-FGT.mkv": {
+                  "type": "file"
+                },
+                "Halt.and.Catch.Fire.S01E05.Adventure.1080p.BluRay.x264.DTS-FGT.mkv": {
+                  "type": "file"
+                },
+                "Halt.and.Catch.Fire.S01E06.Landfall.1080p.BluRay.x264.DTS-FGT.mkv": {
+                  "type": "file"
+                },
+                "Halt.and.Catch.Fire.S01E07.Giant.1080p.BluRay.x264.DTS-FGT.mkv": {
+                  "type": "file"
+                },
+                "Halt.and.Catch.Fire.S01E08.The.214s.1080p.BluRay.x264.DTS-FGT.mkv": {
+                  "type": "file"
+                },
+                "Halt.and.Catch.Fire.S01E09.Up.Helly.Aa.1080p.BluRay.x264.DTS-FGT.mkv": {
+                  "type": "file"
+                },
+                "Halt.and.Catch.Fire.S01E10.1984.1080p.BluRay.x264.DTS-FGT.mkv": {
+                  "type": "file"
+                }
+              }
+            }
+          }
+        },
+        "The IT Crowd": {
+          "type": "directory",
+          "children": {
+            "Season 01": {
+              "type": "directory",
+              "children": {
+                "The.IT.Crowd.S01E01.Yesterdays.Jam.720p.BluRay.x264-DEMAND.mkv": {
+                  "type": "file"
+                },
+                "The.IT.Crowd.S01E02.Calamity.Jen.720p.BluRay.x264-DEMAND.mkv": {
+                  "type": "file"
+                },
+                "The.IT.Crowd.S01E03.Fifty.Fifty.720p.BluRay.x264-DEMAND.mkv": {
+                  "type": "file"
+                },
+                "The.IT.Crowd.S01E04.The.Red.Door.720p.BluRay.x264-DEMAND.mkv": {
+                  "type": "file"
+                },
+                "The.IT.Crowd.S01E05.The.Haunting.of.Bill.Crouse.720p.BluRay.x264-DEMAND.mkv": {
+                  "type": "file"
+                },
+                "The.IT.Crowd.S01E06.Aunt.Irma.Visits.720p.BluRay.x264-DEMAND.mkv": {
+                  "type": "file"
+                }
+              }
+            }
+          }
+        },
+        "Devs": {
+          "type": "directory",
+          "children": {
+            "Season 01": {
+              "type": "directory",
+              "children": {
+                "Devs.S01E01.2160p.HULU.WEB-DL.DDP5.1.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "Devs.S01E02.2160p.HULU.WEB-DL.DDP5.1.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "Devs.S01E03.2160p.HULU.WEB-DL.DDP5.1.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "Devs.S01E04.2160p.HULU.WEB-DL.DDP5.1.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "Devs.S01E05.2160p.HULU.WEB-DL.DDP5.1.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "Devs.S01E06.2160p.HULU.WEB-DL.DDP5.1.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "Devs.S01E07.2160p.HULU.WEB-DL.DDP5.1.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                },
+                "Devs.S01E08.2160p.HULU.WEB-DL.DDP5.1.DV.HEVC-FLUX.mkv": {
+                  "type": "file"
+                }
+              }
+            }
+          }
+        },
+        "Westworld": {
+          "type": "directory",
+          "children": {
+            "Season 01": {
+              "type": "directory",
+              "children": {
+                "Westworld.S01E01.The.Original.2160p.UHD.BluRay.x265.HDR.DV.TrueHD.7.1.Atmos-SURFINBIRD.mkv": {
+                  "type": "file"
+                },
+                "Westworld.S01E02.Chestnut.2160p.UHD.BluRay.x265.HDR.DV.TrueHD.7.1.Atmos-SURFINBIRD.mkv": {
+                  "type": "file"
+                },
+                "Westworld.S01E03.The.Stray.2160p.UHD.BluRay.x265.HDR.DV.TrueHD.7.1.Atmos-SURFINBIRD.mkv": {
+                  "type": "file"
+                },
+                "Westworld.S01E04.Dissonance.Theory.2160p.UHD.BluRay.x265.HDR.DV.TrueHD.7.1.Atmos-SURFINBIRD.mkv": {
+                  "type": "file"
+                },
+                "Westworld.S01E05.Contrapasso.2160p.UHD.BluRay.x265.HDR.DV.TrueHD.7.1.Atmos-SURFINBIRD.mkv": {
+                  "type": "file"
+                },
+                "Westworld.S01E06.The.Adversary.2160p.UHD.BluRay.x265.HDR.DV.TrueHD.7.1.Atmos-SURFINBIRD.mkv": {
+                  "type": "file"
+                },
+                "Westworld.S01E07.Trompe.LOeil.2160p.UHD.BluRay.x265.HDR.DV.TrueHD.7.1.Atmos-SURFINBIRD.mkv": {
+                  "type": "file"
+                },
+                "Westworld.S01E08.Trace.Decay.2160p.UHD.BluRay.x265.HDR.DV.TrueHD.7.1.Atmos-SURFINBIRD.mkv": {
+                  "type": "file"
+                },
+                "Westworld.S01E09.The.Well.Tempered.Clavier.2160p.UHD.BluRay.x265.HDR.DV.TrueHD.7.1.Atmos-SURFINBIRD.mkv": {
+                  "type": "file"
+                },
+                "Westworld.S01E10.The.Bicameral.Mind.2160p.UHD.BluRay.x265.HDR.DV.TrueHD.7.1.Atmos-SURFINBIRD.mkv": {
+                  "type": "file"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

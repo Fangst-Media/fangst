@@ -3,9 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "bun run dev:css & bun run dev:server",
-    "dev:server": "bun run server.ts",
-    "dev:css": "tailwindcss -i ./src/index.css -o ./dist/index.css --watch",
+    "dev": "bun run server.ts",
     "build": "bun run build:css && bun build src/main.tsx --outdir ./dist --target browser --minify --sourcemap",
     "build:css": "tailwindcss -i ./src/index.css -o ./dist/index.css --minify",
     "typecheck": "tsc --noEmit",

@@ -97,12 +97,21 @@ jaeger/
 
 Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) before submitting a PR.
 
+## Alternatives
+
+Looking for something different? Check out these projects:
+
+- **[MediaManager](https://github.com/maxdorninger/MediaManager/)**
+- **[Cinephage](https://github.com/MoldyTaint/Cinephage)**
+
 ## Acknowledgments
 
 Jæger stands on the shoulders of giants:
 
 - [Sonarr](https://sonarr.tv) / [Radarr](https://radarr.video) — The originals
 - [Prowlarr](https://prowlarr.com) — Indexer management
+- [The Movie Database (TMDB)](https://www.themoviedb.org/) — Movie and TV show metadata
+- This product uses the TMDB API but is not endorsed or certified by TMDB
 - The entire \*arr community
 
 ---

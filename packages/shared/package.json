@@ -5,7 +5,12 @@
   "exports": {
     "./schemas": "./src/schemas/index.ts",
     "./types": "./src/types/index.ts",
-    "./utils": "./src/utils/index.ts"
+    "./utils": "./src/utils/index.ts",
+    "./clients/tmdb": "./src/clients/tmdb.ts",
+    "./clients/tvdb": "./src/clients/tvdb.ts",
+    "./clients/metadata-relay": "./src/clients/metadata-relay.ts",
+    "./clients/metadata-provider": "./src/clients/metadata-provider.ts",
+    "./clients/jellyfin": "./src/clients/jellyfin.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

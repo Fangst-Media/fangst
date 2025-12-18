@@ -1,7 +1,18 @@
 import { watch } from 'node:fs'
+import { resolve } from 'node:path'
+import { $ } from 'bun'
 import type { ServerWebSocket } from 'bun'
 
 const clients = new Set<ServerWebSocket<unknown>>()
+
+const srcDir = resolve(import.meta.dir, 'src')
+
+async function buildCSS() {
+  await $`bunx tailwindcss -i ./src/index.css -o ./dist/index.css`.quiet()
+  console.log('CSS built')
+}
+
+await buildCSS()
 
 Bun.serve({
   port: 5173,
@@ -29,7 +40,22 @@ Bun.serve({
         const transpiled = await Bun.build({
           entrypoints: [filePath],
           format: 'esm',
+          plugins: [
+            {
+              name: 'resolve-tilde',
+              setup(build) {
+                build.onResolve({ filter: /^~\// }, (args) => {
+                  const resolved = args.path.replace(/^~\//, `${srcDir}/`)
+                  return { path: resolved }
+                })
+              },
+            },
+          ],
         })
+        if (!transpiled.success) {
+          console.error('Build errors:', transpiled.logs)
+          return new Response(`Build failed: ${transpiled.logs.join('\n')}`, { status: 500 })
+        }
         const output = await transpiled.outputs[0]?.text()
         return new Response(output, {
           headers: { 'Content-Type': 'application/javascript' },
@@ -63,11 +89,14 @@ Bun.serve({
   },
 })
 
-console.log('🎨 Frontend dev server running on http://localhost:5173')
+console.log('Frontend dev server running on http://localhost:5173')
 
-watch('./src', { recursive: true }, (eventType, filename) => {
+watch('./src', { recursive: true }, async (eventType, filename) => {
   if (filename) {
-    console.log(`📝 File changed: ${filename}`)
+    console.log(`File changed: ${filename}`)
+    if (filename.endsWith('.css')) {
+      await buildCSS()
+    }
     for (const client of clients) {
       client.send('reload')
     }
