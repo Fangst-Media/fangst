@@ -36,61 +36,14 @@ Bun, Hono, React. In the future we might add some rust services to keep things s
 
 > ⚠️ Jæger is in early development. Not ready for general use.
 
-## API
-
-Jæger is API-first. Every feature available in the UI is available via the API.
-
-```bash
-# List all media
-curl http://localhost:3000/api/media
-
-# Search
-curl http://localhost:3000/api/search?q=the+bear
-
-# Add movie
-curl -X POST http://localhost:3000/api/media \
-  -H "Content-Type: application/json" \
-  -d '{"tmdbId": 603, "qualityProfile": "HD"}'
-```
-
-Full API documentation available at `http://localhost:3000/api/docs` when running.
-
-### Sonarr/Radarr Compatibility
-
-Existing tools work out of the box:
-
-```bash
-# These endpoints are compatible with LunaSea, nzb360, etc.
-GET /api/v3/series
-GET /api/v3/movie
-GET /api/v3/queue
-```
-
 ## Development
 
 ```bash
-# Clone
-git clone https://github.com/jaeger-media/jaeger.git
-cd jaeger
-
 # Install dependencies
 pnpm install
 
 # Start development servers
 pnpm dev
-```
-
-### Project Structure
-
-```
-jaeger/
-├── packages/
-│   ├── api/          # Hono backend
-│   ├── web/          # React SPA
-│   ├── shared/       # Shared types and schemas
-│   └── parser/       # Release name parser
-├── docker/
-└── docs/
 ```
 
 ## Contributing
