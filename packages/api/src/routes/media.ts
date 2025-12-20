@@ -6,6 +6,7 @@ import { TvdbClient } from '@jaeger/shared/clients/tvdb'
 import { MetadataRelayClient } from '@jaeger/shared/clients/metadata-relay'
 import { MetadataProvider } from '@jaeger/shared/clients/metadata-provider'
 import { RealFilesystem, MockFilesystem } from '../services/filesystem'
+import { configService } from '../services/config'
 
 const media = new Hono()
 
@@ -15,11 +16,8 @@ media.get('/', async (c) => {
 })
 
 media.post('/scan', async (c) => {
-  const mockFilesystem = process.env.MOCK_FILESYSTEM === 'true'
-
-  const providers = (process.env.METADATA_PROVIDERS || 'relay,tmdb,tvdb').split(',') as Array<
-    'relay' | 'tmdb' | 'tvdb'
-  >
+  const mockFilesystem = configService.isMockFilesystem()
+  const providers = configService.getMetadataProviders()
 
   const clients: {
     tmdb?: TmdbClient
@@ -27,22 +25,26 @@ media.post('/scan', async (c) => {
     relay?: MetadataRelayClient
   } = {}
 
+  const relayUrl = configService.getMetadataRelayUrl()
+  const tmdbApiKey = configService.getTmdbApiKey()
+  const tvdbApiKey = configService.getTvdbApiKey()
+
   if (providers.includes('relay')) {
-    clients.relay = new MetadataRelayClient(process.env.METADATA_RELAY_URL)
+    clients.relay = new MetadataRelayClient(relayUrl)
   }
-  if (providers.includes('tmdb') && process.env.TMDB_API_KEY) {
-    clients.tmdb = new TmdbClient(process.env.TMDB_API_KEY)
+  if (providers.includes('tmdb') && tmdbApiKey) {
+    clients.tmdb = new TmdbClient(tmdbApiKey)
   }
-  if (providers.includes('tvdb') && process.env.TVDB_API_KEY) {
-    clients.tvdb = new TvdbClient(process.env.TVDB_API_KEY)
+  if (providers.includes('tvdb') && tvdbApiKey) {
+    clients.tvdb = new TvdbClient(tvdbApiKey)
   }
 
   const metadataProvider = new MetadataProvider(
     {
       providers,
-      tmdbApiKey: process.env.TMDB_API_KEY,
-      tvdbApiKey: process.env.TVDB_API_KEY,
-      relayUrl: process.env.METADATA_RELAY_URL,
+      tmdbApiKey,
+      tvdbApiKey,
+      relayUrl,
     },
     clients
   )
@@ -50,7 +52,7 @@ media.post('/scan', async (c) => {
   const filesystem = mockFilesystem ? new MockFilesystem() : new RealFilesystem()
   const scanner = new MediaScanner(metadataProvider, filesystem)
 
-  const scanPath = mockFilesystem ? '/media' : process.env.MEDIA_PATH || '/media'
+  const scanPath = mockFilesystem ? '/media' : configService.getMediaPath()
 
   try {
     const scannedFiles = await scanner.scanDirectory(scanPath)

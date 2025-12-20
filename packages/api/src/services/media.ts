@@ -1,4 +1,4 @@
-import { eq, isNull, isNotNull } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { db } from '../db'
 import { metadata, mediaItems } from '../db/schema'
 import type { ScannedFile } from './scanner'

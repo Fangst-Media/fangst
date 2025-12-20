@@ -2,6 +2,7 @@ import { eq, and } from 'drizzle-orm'
 import { db } from '../db'
 import { users, sessions } from '../db/schema'
 import { JellyfinClient, type JellyfinUser } from '@jaeger/shared/clients/jellyfin'
+import { configService } from './config'
 
 export type UserRole = 'member' | 'admin'
 
@@ -27,20 +28,19 @@ function generateId(): string {
 
 export class AuthService {
   private jellyfinClient: JellyfinClient | null = null
-  private syncAdminFromProvider: boolean
-  private sessionExpiryDays: number
-  private mockAuth: boolean
+  private initialized = false
 
-  constructor() {
-    this.mockAuth = process.env.MOCK_AUTH === 'true'
+  private ensureInitialized(): void {
+    if (this.initialized) return
 
-    const jellyfinUrl = process.env.JELLYFIN_URL
-    if (jellyfinUrl && !this.mockAuth) {
-      this.jellyfinClient = new JellyfinClient(jellyfinUrl)
+    // Initialize Jellyfin client if not in mock mode
+    if (!configService.isMockAuth()) {
+      const jellyfinUrl = configService.getJellyfinUrl()
+      if (jellyfinUrl) {
+        this.jellyfinClient = new JellyfinClient(jellyfinUrl)
+      }
     }
-
-    this.syncAdminFromProvider = process.env.SYNC_ADMIN_FROM_PROVIDER !== 'false'
-    this.sessionExpiryDays = Number.parseInt(process.env.SESSION_EXPIRY_DAYS || '30', 10)
+    this.initialized = true
   }
 
   async loginWithJellyfin(
@@ -49,7 +49,9 @@ export class AuthService {
     ipAddress: string,
     userAgent?: string
   ): Promise<{ user: User; session: Session }> {
-    if (this.mockAuth) {
+    this.ensureInitialized()
+
+    if (configService.isMockAuth()) {
       return this.loginWithMock(username, ipAddress, userAgent)
     }
 
@@ -85,6 +87,7 @@ export class AuthService {
 
   private async upsertUser(jellyfinUser: JellyfinUser, provider: 'jellyfin' | 'plex'): Promise<User> {
     const now = new Date()
+    const syncAdminFromProvider = configService.getSyncAdminFromProvider()
 
     const existing = await db
       .select()
@@ -95,7 +98,7 @@ export class AuthService {
     if (existing) {
       let role = existing.role as UserRole
 
-      if (this.syncAdminFromProvider && jellyfinUser.isAdmin && role !== 'admin') {
+      if (syncAdminFromProvider && jellyfinUser.isAdmin && role !== 'admin') {
         role = 'admin'
       }
 
@@ -122,7 +125,7 @@ export class AuthService {
     const isFirstUser = await this.isFirstUser()
     let role: UserRole = 'member'
 
-    if (isFirstUser || (this.syncAdminFromProvider && jellyfinUser.isAdmin)) {
+    if (isFirstUser || (syncAdminFromProvider && jellyfinUser.isAdmin)) {
       role = 'admin'
     }
 
@@ -157,7 +160,8 @@ export class AuthService {
   private async createSession(userId: string, ipAddress: string, userAgent?: string): Promise<Session> {
     const id = generateId()
     const now = new Date()
-    const expiresAt = new Date(now.getTime() + this.sessionExpiryDays * 24 * 60 * 60 * 1000)
+    const sessionExpiryDays = configService.getSessionExpiryDays()
+    const expiresAt = new Date(now.getTime() + sessionExpiryDays * 24 * 60 * 60 * 1000)
 
     await db.insert(sessions).values({
       id,
@@ -211,7 +215,8 @@ export class AuthService {
   }
 
   getEnabledProviders(): string[] {
-    if (this.mockAuth) return ['mock']
+    this.ensureInitialized()
+    if (configService.isMockAuth()) return ['mock']
     const providers: string[] = []
     if (this.jellyfinClient) providers.push('jellyfin')
     return providers

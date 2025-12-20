@@ -9,6 +9,10 @@ import Login from './routes/login'
 import Dashboard from './routes/dashboard'
 import Library from './routes/library'
 import Requests from './routes/requests'
+import Activity from './routes/activity'
+import Indexers from './routes/indexers'
+import Downloaders from './routes/downloaders'
+import Settings from './routes/settings'
 
 const queryClient = new QueryClient()
 
@@ -112,7 +116,47 @@ const requestsRoute = createRoute({
   ),
 })
 
-const routeTree = rootRoute.addChildren([indexRoute, loginRoute, dashboardRoute, libraryRoute, requestsRoute])
+const activityRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/activity',
+  component: () => (
+    <ProtectedRoute>
+      <Activity />
+    </ProtectedRoute>
+  ),
+})
+
+const indexersRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/indexers',
+  component: () => (
+    <ProtectedRoute adminOnly>
+      <Indexers />
+    </ProtectedRoute>
+  ),
+})
+
+const downloadersRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/downloaders',
+  component: () => (
+    <ProtectedRoute adminOnly>
+      <Downloaders />
+    </ProtectedRoute>
+  ),
+})
+
+const settingsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/settings',
+  component: () => (
+    <ProtectedRoute adminOnly>
+      <Settings />
+    </ProtectedRoute>
+  ),
+})
+
+const routeTree = rootRoute.addChildren([indexRoute, loginRoute, dashboardRoute, libraryRoute, requestsRoute, activityRoute, indexersRoute, downloadersRoute, settingsRoute])
 
 const router = createRouter({
   routeTree,

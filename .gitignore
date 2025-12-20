@@ -35,6 +35,9 @@ logs
 *.sqlite-shm
 *.sqlite-wal
 
+# Settings
+**/data/settings.yaml
+
 # Testing
 coverage
 .nyc_output
@@ -42,3 +45,7 @@ coverage
 # Misc
 .cache
 .temp
+
+# Dev docker volumes
+dev-downloads/
+dev-media/

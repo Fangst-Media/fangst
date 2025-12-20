@@ -3,7 +3,17 @@ import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import media from './routes/media'
 import auth from './routes/auth'
+import settings from './routes/settings'
+import downloaders from './routes/downloaders'
+import indexers from './routes/indexers'
+import search from './routes/search'
+import metadata from './routes/metadata'
+import activity from './routes/activity'
 import { authMiddleware } from './middleware/auth'
+import { configService } from './services/config'
+
+// Initialize config before starting server
+await configService.initialize()
 
 const app = new Hono()
 
@@ -11,7 +21,7 @@ app.use('*', logger())
 app.use(
   '*',
   cors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+    origin: configService.getCorsOrigin(),
     credentials: true,
   })
 )
@@ -19,9 +29,10 @@ app.use('*', authMiddleware)
 
 app.get('/', (c) => {
   return c.json({
-    message: 'Jæger API',
+    message: 'Jaeger API',
     version: '0.1.0',
-    mockMode: process.env.MOCK_MODE === 'true',
+    mockFilesystem: configService.isMockFilesystem(),
+    mockAuth: configService.isMockAuth(),
   })
 })
 
@@ -31,11 +42,20 @@ app.get('/health', (c) => {
 
 app.route('/api/auth', auth)
 app.route('/api/media', media)
+app.route('/api/settings', settings)
+app.route('/api/downloaders', downloaders)
+app.route('/api/indexers', indexers)
+app.route('/api/search', search)
+app.route('/api/metadata', metadata)
+app.route('/api/activity', activity)
 
-const port = process.env.PORT || 5001
+const port = configService.getPort()
 console.log(`Server running on http://localhost:${port}`)
-if (process.env.MOCK_FILESYSTEM === 'true') {
+if (configService.isMockFilesystem()) {
   console.log('[MOCK] Filesystem: loaded from mock-filesystem.json')
+}
+if (configService.isMockAuth()) {
+  console.log('[MOCK] Auth: enabled')
 }
 
 export default {
