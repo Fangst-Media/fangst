@@ -22,7 +22,7 @@ services:
     volumes:
       - jellyfin-config:/config
       - jellyfin-cache:/cache
-      - ./dev-data/media:/media:ro
+      - ./dev-data/downloads:/media:ro
     ports:
       - "8096:8096"
     restart: unless-stopped
