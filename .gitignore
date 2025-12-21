@@ -50,3 +50,5 @@ coverage
 # Dev docker volumes
 dev-downloads/
 dev-media/
+dev-data/
+
