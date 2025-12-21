@@ -65,6 +65,7 @@ Jæger stands on the shoulders of giants:
 - [Prowlarr](https://prowlarr.com) — Indexer management
 - [The Movie Database (TMDB)](https://www.themoviedb.org/) — Movie and TV show metadata
 - This product uses the TMDB API but is not endorsed or certified by TMDB
+- [Dictionarry](https://dictionarry.dev/) — Quality scoring and release group tier data
 - The entire \*arr community
 
 ---
