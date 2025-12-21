@@ -8,7 +8,8 @@ services:
       - TZ=Europe/Copenhagen
     volumes:
       - sabnzbd-config:/config
-      - ./dev-downloads:/downloads
+      - ./dev-data/incomplete:/incomplete
+      - ./dev-data/media:/media
     ports:
       - "8080:8080"
     restart: unless-stopped
@@ -21,10 +22,21 @@ services:
     volumes:
       - jellyfin-config:/config
       - jellyfin-cache:/cache
-      - ./dev-media:/media:ro
+      - ./dev-data/media:/media:ro
     ports:
       - "8096:8096"
     restart: unless-stopped
+
+  # jaeger:
+  #   build: .
+  #   container_name: jaeger
+  #   environment:
+  #     - TZ=Europe/Copenhagen
+  #   volumes:
+  #     - ./dev-data/media:/media
+  #   ports:
+  #     - "5001:5001"
+  #   restart: unless-stopped
 
 volumes:
   sabnzbd-config:

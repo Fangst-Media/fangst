@@ -71,6 +71,7 @@ async function testConnection(data: {
   protocol: string
   url: string
   apiKey: string
+  apiPath?: string
 }): Promise<TestResult> {
   const response = await fetch(`${API_BASE_URL}/api/indexers/test`, {
     method: 'POST',
@@ -92,6 +93,10 @@ type IndexerFormData = {
     movies?: number[]
     tv?: number[]
   }
+  apiPath: string
+  priority: number
+  queryLimit: string
+  grabLimit: string
 }
 
 const defaultFormData: IndexerFormData = {
@@ -100,6 +105,10 @@ const defaultFormData: IndexerFormData = {
   url: '',
   apiKey: '',
   enabled: true,
+  apiPath: '/api',
+  priority: 50,
+  queryLimit: '',
+  grabLimit: '',
 }
 
 type IndexerModalProps = {
@@ -128,10 +137,15 @@ function IndexerModal({
           apiKey: '',
           enabled: initialData.enabled,
           categories: initialData.categories,
+          apiPath: initialData.apiPath ?? '/api',
+          priority: initialData.priority ?? 50,
+          queryLimit: initialData.queryLimit?.toString() ?? '',
+          grabLimit: initialData.grabLimit?.toString() ?? '',
         }
       : defaultFormData
   )
   const [showApiKey, setShowApiKey] = useState(false)
+  const [showAdvanced, setShowAdvanced] = useState(false)
   const [testResult, setTestResult] = useState<TestResult | null>(null)
   const [isTesting, setIsTesting] = useState(false)
   const [selectedRegistry, setSelectedRegistry] = useState<string>('')
@@ -165,6 +179,7 @@ function IndexerModal({
         protocol: formData.protocol,
         url: formData.url,
         apiKey: formData.apiKey,
+        apiPath: formData.apiPath !== '/api' ? formData.apiPath : undefined,
       })
       setTestResult(result)
     } catch (error) {
@@ -185,6 +200,10 @@ function IndexerModal({
       url: formData.url,
       apiKey: formData.apiKey,
       enabled: formData.enabled,
+      apiPath: formData.apiPath,
+      priority: formData.priority,
+      queryLimit: formData.queryLimit ? Number.parseInt(formData.queryLimit, 10) : null,
+      grabLimit: formData.grabLimit ? Number.parseInt(formData.grabLimit, 10) : null,
     }
     if (formData.categories) {
       data.categories = formData.categories
@@ -304,6 +323,91 @@ function IndexerModal({
             <label htmlFor="enabled" className="text-sm text-foreground">
               Enabled
             </label>
+          </div>
+
+          {/* Advanced Options */}
+          <div className="border-t border-border pt-4">
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="flex items-center gap-2 text-sm text-muted hover:text-foreground transition-colors"
+            >
+              <svg
+                className={`w-4 h-4 transition-transform ${showAdvanced ? 'rotate-90' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+              Advanced Options
+            </button>
+
+            {showAdvanced && (
+              <div className="mt-3 space-y-3 pl-6 border-l border-border">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">
+                    API Path
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full rounded-md bg-background border border-border px-3 py-2 text-foreground text-sm font-mono"
+                    value={formData.apiPath}
+                    onChange={(e) => setFormData({ ...formData, apiPath: e.target.value })}
+                    placeholder="/api"
+                  />
+                  <p className="text-xs text-muted mt-1">Custom API path for non-standard indexers</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">
+                    Priority
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    className="w-24 rounded-md bg-background border border-border px-3 py-2 text-foreground text-sm"
+                    value={formData.priority}
+                    onChange={(e) =>
+                      setFormData({ ...formData, priority: Number.parseInt(e.target.value, 10) || 50 })
+                    }
+                  />
+                  <p className="text-xs text-muted mt-1">Lower = higher priority (1-100)</p>
+                </div>
+
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
+                      Query Limit
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      className="w-full rounded-md bg-background border border-border px-3 py-2 text-foreground text-sm"
+                      value={formData.queryLimit}
+                      onChange={(e) => setFormData({ ...formData, queryLimit: e.target.value })}
+                      placeholder="Unlimited"
+                    />
+                    <p className="text-xs text-muted mt-1">Max queries/day</p>
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
+                      Grab Limit
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      className="w-full rounded-md bg-background border border-border px-3 py-2 text-foreground text-sm"
+                      value={formData.grabLimit}
+                      onChange={(e) => setFormData({ ...formData, grabLimit: e.target.value })}
+                      placeholder="Unlimited"
+                    />
+                    <p className="text-xs text-muted mt-1">Max downloads/day</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {testResult && (
@@ -577,6 +681,7 @@ export default function Indexers() {
       </div>
 
       <IndexerModal
+        key={editingIndexer?.id ?? 'new'}
         isOpen={isModalOpen}
         onClose={() => {
           setIsModalOpen(false)

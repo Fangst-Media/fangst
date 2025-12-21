@@ -17,6 +17,7 @@ export const users = sqliteTable('users', {
   provider: text('provider', { enum: ['jellyfin', 'plex'] }).notNull(),
   name: text('name').notNull(),
   role: text('role', { enum: ['member', 'admin'] }).notNull().default('member'),
+  preferredRequestMode: text('preferred_request_mode', { enum: ['simple', 'detailed'] }).default('simple'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   lastSeenAt: integer('last_seen_at', { mode: 'timestamp' }),
 })
@@ -72,4 +73,49 @@ export const mediaItems = sqliteTable('media_items', {
   metadataId: text('metadata_id').references(() => metadata.id),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+})
+
+export const requests = sqliteTable('requests', {
+  id: text('id').primaryKey(),
+
+  // Media identification
+  title: text('title').notNull(),
+  year: integer('year'),
+  type: text('type', { enum: ['movie', 'tv'] }).notNull(),
+
+  // External IDs for searching
+  tmdbId: text('tmdb_id'),
+  imdbId: text('imdb_id'),
+  tvdbId: text('tvdb_id'),
+
+  // TV-specific
+  season: integer('season'),
+
+  // Display
+  posterPath: text('poster_path'),
+  overview: text('overview'),
+
+  // Request tracking - kept for backwards compatibility, primary user
+  requestedBy: text('requested_by').notNull().references(() => users.id),
+  status: text('status', {
+    enum: ['pending_approval', 'approved', 'searching', 'downloading', 'completed', 'rejected'],
+  }).notNull(),
+
+  // Timestamps
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  approvedAt: integer('approved_at', { mode: 'timestamp' }),
+  approvedBy: text('approved_by').references(() => users.id),
+  lastSearchedAt: integer('last_searched_at', { mode: 'timestamp' }),
+  completedAt: integer('completed_at', { mode: 'timestamp' }),
+
+  // Search preferences
+  minQuality: text('min_quality'),
+})
+
+// Join table for multiple users requesting the same media
+export const requestUsers = sqliteTable('request_users', {
+  id: text('id').primaryKey(),
+  requestId: text('request_id').notNull().references(() => requests.id),
+  userId: text('user_id').notNull().references(() => users.id),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 })

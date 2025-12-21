@@ -405,8 +405,8 @@ class ConfigService {
 
   private saveDownloaders(): void {
     const yamlConfig = this.loadYamlConfig()
-    const { downloaders: _, indexers, ...yamlSettings } = yamlConfig
-    this.saveToYaml({ ...yamlSettings, downloaders: this.downloaders, indexers })
+    const { downloaders: _, indexers: __, ...yamlSettings } = yamlConfig
+    this.saveToYaml({ ...yamlSettings, downloaders: this.downloaders, indexers: this.indexers })
   }
 
   // Indexer CRUD methods
@@ -461,8 +461,8 @@ class ConfigService {
 
   private saveIndexers(): void {
     const yamlConfig = this.loadYamlConfig()
-    const { indexers: _, downloaders, ...yamlSettings } = yamlConfig
-    this.saveToYaml({ ...yamlSettings, downloaders, indexers: this.indexers })
+    const { indexers: _, downloaders: __, ...yamlSettings } = yamlConfig
+    this.saveToYaml({ ...yamlSettings, downloaders: this.downloaders, indexers: this.indexers })
   }
 }
 

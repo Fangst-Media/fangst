@@ -6,12 +6,15 @@ import { configService } from './config'
 
 export type UserRole = 'member' | 'admin'
 
+export type PreferredRequestMode = 'simple' | 'detailed'
+
 export type User = {
   id: string
   providerId: string
   provider: 'jellyfin' | 'plex'
   name: string
   role: UserRole
+  preferredRequestMode: PreferredRequestMode
   createdAt: Date
   lastSeenAt: Date | null
 }
@@ -117,6 +120,7 @@ export class AuthService {
         provider: existing.provider as 'jellyfin' | 'plex',
         name: jellyfinUser.name,
         role,
+        preferredRequestMode: (existing.preferredRequestMode ?? 'simple') as PreferredRequestMode,
         createdAt: existing.createdAt,
         lastSeenAt: now,
       }
@@ -147,6 +151,7 @@ export class AuthService {
       provider,
       name: jellyfinUser.name,
       role,
+      preferredRequestMode: 'simple' as PreferredRequestMode,
       createdAt: now,
       lastSeenAt: now,
     }
@@ -201,6 +206,7 @@ export class AuthService {
       provider: user.provider as 'jellyfin' | 'plex',
       name: user.name,
       role: user.role as UserRole,
+      preferredRequestMode: (user.preferredRequestMode ?? 'simple') as PreferredRequestMode,
       createdAt: user.createdAt,
       lastSeenAt: new Date(),
     }

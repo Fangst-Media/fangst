@@ -5,4 +5,3 @@ auto = "fallback"
 dir = ".bun-cache"
 
 [test]
-preload = []

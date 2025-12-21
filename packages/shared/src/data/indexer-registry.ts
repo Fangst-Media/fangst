@@ -30,6 +30,15 @@ export const INDEXER_REGISTRY: Record<string, IndexerRegistryEntry> = {
     protocol: 'newznab',
     defaultUrl: 'https://api.althub.co.za',
   },
+  'ninjacentral.co.za': {
+    name: 'NinjaCentral',
+    protocol: 'newznab',
+    defaultUrl: 'https://ninjacentral.co.za',
+    categories: {
+      movies: [2000, 2010, 2020, 2030, 2040, 2050, 2060],
+      tv: [5000, 5020, 5030, 5040, 5050, 5060, 5070, 5080],
+    },
+  },
   'nzbfinder.ws': {
     name: 'NZBFinder',
     protocol: 'newznab',

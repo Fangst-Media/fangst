@@ -76,3 +76,23 @@ export function getPosterUrl(posterPath?: string, size: 'w185' | 'w342' | 'w500'
 
   return `https://image.tmdb.org/t/p/${size}${posterPath}`
 }
+
+export function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+
+export function getMediaSlug(item: MediaItem): string {
+  const title = item.metadata?.title || item.parsed.title
+  const year = item.metadata?.year || item.parsed.year
+  const slug = slugify(year ? `${title}-${year}` : title)
+  const id = item.metadata?.id || btoa(item.path).slice(0, 12)
+  return `${id}-${slug}`
+}
+
+export function parseMediaSlug(slug: string): string {
+  const dashIndex = slug.indexOf('-')
+  return dashIndex > 0 ? slug.slice(0, dashIndex) : slug
+}

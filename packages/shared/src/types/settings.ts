@@ -68,6 +68,28 @@ export const uiSettingsSchema = z.object({
   defaultLibraryView: z.enum(['grid', 'list', 'table']).default('grid'),
 })
 
+// Request mode permission options
+export const requestModePermissionSchema = z.enum([
+  'simple_only',   // User can only use simple quality picker
+  'detailed_only', // User can only use detailed release browser
+  'user_choice',   // User can toggle between modes
+])
+
+// Request settings
+export const requestSettingsSchema = z.object({
+  memberRequestMode: requestModePermissionSchema.default('simple_only'),
+  adminRequestMode: requestModePermissionSchema.default('detailed_only'),
+  defaultSimpleQuality: z.enum(['2160p', '1080p', '720p', 'any']).default('1080p'),
+})
+
+// Size filter settings (based on TRaSH Guides recommendations)
+export const sizeFilterSettingsSchema = z.object({
+  enabled: z.boolean().default(true),
+  minMbPerMin720p: z.number().default(12.5),
+  minMbPerMin1080p: z.number().default(12.5),
+  minMbPerMin2160p: z.number().default(34.5),
+})
+
 // Downloader categories schema
 export const downloaderCategoriesSchema = z.object({
   movies: z.string().optional(),
@@ -100,6 +122,8 @@ export const settingsSchema = z.object({
   media: mediaSettingsSchema.default({}),
   metadata: metadataSettingsSchema.default({}),
   ui: uiSettingsSchema.default({}),
+  requests: requestSettingsSchema.default({}),
+  sizeFilter: sizeFilterSettingsSchema.default({}),
 })
 
 // Inferred types
@@ -111,6 +135,9 @@ export type AuthSettings = z.infer<typeof authSettingsSchema>
 export type MediaSettings = z.infer<typeof mediaSettingsSchema>
 export type MetadataSettings = z.infer<typeof metadataSettingsSchema>
 export type UISettings = z.infer<typeof uiSettingsSchema>
+export type RequestSettings = z.infer<typeof requestSettingsSchema>
+export type RequestModePermission = z.infer<typeof requestModePermissionSchema>
+export type SizeFilterSettings = z.infer<typeof sizeFilterSettingsSchema>
 export type Downloader = z.infer<typeof downloaderSchema>
 export type DownloaderCategories = z.infer<typeof downloaderCategoriesSchema>
 export type CreateDownloader = z.infer<typeof createDownloaderSchema>
@@ -137,4 +164,6 @@ export type SettingsUpdate = Partial<{
   media: Partial<MediaSettings>
   metadata: Partial<MetadataSettings>
   ui: Partial<UISettings>
+  requests: Partial<RequestSettings>
+  sizeFilter: Partial<SizeFilterSettings>
 }>

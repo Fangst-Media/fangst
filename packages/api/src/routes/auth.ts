@@ -3,6 +3,7 @@ import { setCookie, getCookie, deleteCookie } from 'hono/cookie'
 import { z } from 'zod'
 import { zValidator } from '@hono/zod-validator'
 import { authService } from '../services/auth'
+import { configService } from '../services/config'
 
 const auth = new Hono()
 
@@ -37,11 +38,27 @@ auth.post('/login', zValidator('json', loginSchema), async (c) => {
       expires: result.session.expiresAt,
     })
 
+    // Compute effective request mode based on role and settings
+    const settings = configService.get()
+    const rolePermission =
+      result.user.role === 'admin'
+        ? settings.requests.adminRequestMode
+        : settings.requests.memberRequestMode
+
+    let effectiveRequestMode: 'simple' | 'detailed'
+    if (rolePermission === 'user_choice') {
+      effectiveRequestMode = result.user.preferredRequestMode ?? 'simple'
+    } else {
+      effectiveRequestMode = rolePermission === 'simple_only' ? 'simple' : 'detailed'
+    }
+
     return c.json({
       user: {
         id: result.user.id,
         name: result.user.name,
         role: result.user.role,
+        requestMode: effectiveRequestMode,
+        canChooseRequestMode: rolePermission === 'user_choice',
       },
     })
   } catch (error) {
@@ -64,11 +81,27 @@ auth.get('/me', async (c) => {
     return c.json({ user: null })
   }
 
+  // Compute effective request mode based on role and settings
+  const settings = configService.get()
+  const rolePermission =
+    user.role === 'admin'
+      ? settings.requests.adminRequestMode
+      : settings.requests.memberRequestMode
+
+  let effectiveRequestMode: 'simple' | 'detailed'
+  if (rolePermission === 'user_choice') {
+    effectiveRequestMode = user.preferredRequestMode ?? 'simple'
+  } else {
+    effectiveRequestMode = rolePermission === 'simple_only' ? 'simple' : 'detailed'
+  }
+
   return c.json({
     user: {
       id: user.id,
       name: user.name,
       role: user.role,
+      requestMode: effectiveRequestMode,
+      canChooseRequestMode: rolePermission === 'user_choice',
     },
   })
 })

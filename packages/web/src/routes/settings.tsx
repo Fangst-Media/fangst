@@ -294,6 +294,162 @@ export default function Settings() {
           </SettingField>
         </SettingsSection>
 
+        {/* Request Permissions */}
+        <SettingsSection title="Request Permissions" description="Configure how different roles can make requests">
+          <SettingField
+            label="Member Request Mode"
+            description="How members interact with the request system"
+          >
+            <select
+              className="rounded-md bg-background border border-border px-3 py-1.5 text-foreground text-sm min-w-[150px]"
+              value={settings.requests?.memberRequestMode ?? 'simple_only'}
+              onChange={(e) =>
+                updateMutation.mutate({
+                  requests: { memberRequestMode: e.target.value as 'simple_only' | 'detailed_only' | 'user_choice' },
+                })
+              }
+            >
+              <option value="simple_only">Simple Mode Only</option>
+              <option value="detailed_only">Detailed Mode Only</option>
+              <option value="user_choice">User Choice</option>
+            </select>
+          </SettingField>
+
+          <SettingField
+            label="Admin Request Mode"
+            description="How admins interact with the request system"
+          >
+            <select
+              className="rounded-md bg-background border border-border px-3 py-1.5 text-foreground text-sm min-w-[150px]"
+              value={settings.requests?.adminRequestMode ?? 'detailed_only'}
+              onChange={(e) =>
+                updateMutation.mutate({
+                  requests: { adminRequestMode: e.target.value as 'simple_only' | 'detailed_only' | 'user_choice' },
+                })
+              }
+            >
+              <option value="simple_only">Simple Mode Only</option>
+              <option value="detailed_only">Detailed Mode Only</option>
+              <option value="user_choice">User Choice</option>
+            </select>
+          </SettingField>
+
+          <SettingField
+            label="Default Simple Quality"
+            description="Default quality preset for simple mode"
+          >
+            <select
+              className="rounded-md bg-background border border-border px-3 py-1.5 text-foreground text-sm min-w-[120px]"
+              value={settings.requests?.defaultSimpleQuality ?? '1080p'}
+              onChange={(e) =>
+                updateMutation.mutate({
+                  requests: { defaultSimpleQuality: e.target.value as '2160p' | '1080p' | '720p' | 'any' },
+                })
+              }
+            >
+              <option value="2160p">4K (2160p)</option>
+              <option value="1080p">1080p</option>
+              <option value="720p">720p</option>
+              <option value="any">Any</option>
+            </select>
+          </SettingField>
+        </SettingsSection>
+
+        {/* Size Filter */}
+        <SettingsSection
+          title="Size Filter"
+          description="Filter releases based on file size per minute of runtime (TRaSH Guides recommendations)"
+        >
+          <SettingField
+            label="Enable Size Filter"
+            description="Reject releases with suspiciously small file sizes"
+          >
+            <button
+              type="button"
+              onClick={() =>
+                updateMutation.mutate({
+                  sizeFilter: { enabled: !settings.sizeFilter?.enabled },
+                })
+              }
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                settings.sizeFilter?.enabled ? 'bg-accent' : 'bg-border'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  settings.sizeFilter?.enabled ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </SettingField>
+
+          <SettingField
+            label="720p Minimum"
+            description="Minimum MB per minute for 720p releases"
+          >
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                step="0.5"
+                min="0"
+                className="w-20 rounded-md bg-background border border-border px-3 py-1.5 text-foreground text-sm"
+                value={settings.sizeFilter?.minMbPerMin720p ?? 12.5}
+                disabled={!settings.sizeFilter?.enabled}
+                onChange={(e) =>
+                  updateMutation.mutate({
+                    sizeFilter: { minMbPerMin720p: Number.parseFloat(e.target.value) },
+                  })
+                }
+              />
+              <span className="text-sm text-muted">MB/min</span>
+            </div>
+          </SettingField>
+
+          <SettingField
+            label="1080p Minimum"
+            description="Minimum MB per minute for 1080p releases"
+          >
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                step="0.5"
+                min="0"
+                className="w-20 rounded-md bg-background border border-border px-3 py-1.5 text-foreground text-sm"
+                value={settings.sizeFilter?.minMbPerMin1080p ?? 12.5}
+                disabled={!settings.sizeFilter?.enabled}
+                onChange={(e) =>
+                  updateMutation.mutate({
+                    sizeFilter: { minMbPerMin1080p: Number.parseFloat(e.target.value) },
+                  })
+                }
+              />
+              <span className="text-sm text-muted">MB/min</span>
+            </div>
+          </SettingField>
+
+          <SettingField
+            label="2160p (4K) Minimum"
+            description="Minimum MB per minute for 4K releases"
+          >
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                step="0.5"
+                min="0"
+                className="w-20 rounded-md bg-background border border-border px-3 py-1.5 text-foreground text-sm"
+                value={settings.sizeFilter?.minMbPerMin2160p ?? 34.5}
+                disabled={!settings.sizeFilter?.enabled}
+                onChange={(e) =>
+                  updateMutation.mutate({
+                    sizeFilter: { minMbPerMin2160p: Number.parseFloat(e.target.value) },
+                  })
+                }
+              />
+              <span className="text-sm text-muted">MB/min</span>
+            </div>
+          </SettingField>
+        </SettingsSection>
+
         {/* Metadata */}
         <SettingsSection title="Metadata" description="Configure metadata providers">
           <SettingField

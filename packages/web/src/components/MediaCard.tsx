@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { getPosterUrl, type MediaItem } from '../lib/api'
+import { Link } from '@tanstack/react-router'
+import { getPosterUrl, getMediaSlug, type MediaItem } from '../lib/api'
 
 type MediaCardProps = {
   item: MediaItem
@@ -13,8 +14,10 @@ export function MediaCard({ item, episodeCount }: MediaCardProps) {
   const posterUrl = getPosterUrl(metadata?.posterPath)
   const [imgError, setImgError] = useState(false)
 
+  const detailsPath = `/library/${getMediaSlug(item)}`
+
   return (
-    <div className="group cursor-pointer">
+    <Link to={detailsPath} className="group cursor-pointer block">
       <div className="relative aspect-[2/3] overflow-hidden rounded-md bg-card mb-2">
         {!imgError ? (
           <img
@@ -35,26 +38,12 @@ export function MediaCard({ item, episodeCount }: MediaCardProps) {
           </div>
         )}
 
-        <div className="absolute inset-0 bg-black/60 opacity-0 transition-opacity duration-200 group-hover:opacity-100 flex items-center justify-center">
-          <div className="flex gap-2">
-            <button
-              type="button"
-              className="rounded-full bg-white p-3 text-black hover:bg-white/90 transition-colors"
-              title="Play"
-            >
-              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              className="rounded-full bg-white/20 p-3 text-white hover:bg-white/30 transition-colors"
-              title="More info"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </button>
+        {/* Hover overlay with info icon */}
+        <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100 flex items-center justify-center">
+          <div className="rounded-full bg-white/20 p-3">
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
           </div>
         </div>
 
@@ -100,6 +89,6 @@ export function MediaCard({ item, episodeCount }: MediaCardProps) {
         </h3>
         {year && <p className="text-xs text-muted mt-0.5">{year}</p>}
       </div>
-    </div>
+    </Link>
   )
 }

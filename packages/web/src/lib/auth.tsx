@@ -2,16 +2,23 @@ import { createContext, useContext, useState, useEffect, type ReactNode } from '
 
 const API_BASE_URL = 'http://localhost:5001'
 
+type RequestMode = 'simple' | 'detailed'
+
 type User = {
   id: string
   name: string
   role: 'member' | 'admin'
+  requestMode: RequestMode
+  canChooseRequestMode: boolean
 }
 
 type AuthContextType = {
   user: User | null
   isLoading: boolean
   isAdmin: boolean
+  requestMode: RequestMode
+  canChooseRequestMode: boolean
+  setRequestMode: (mode: RequestMode) => Promise<void>
   login: (provider: string, username: string, password: string) => Promise<void>
   logout: () => Promise<void>
 }
@@ -65,12 +72,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
   }
 
+  async function setRequestMode(mode: RequestMode) {
+    if (!user?.canChooseRequestMode) return
+
+    const response = await fetch(`${API_BASE_URL}/api/users/me/preferences`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ preferredRequestMode: mode }),
+    })
+
+    if (response.ok) {
+      setUser({ ...user, requestMode: mode })
+    }
+  }
+
   return (
     <AuthContext.Provider
       value={{
         user,
         isLoading,
         isAdmin: user?.role === 'admin',
+        requestMode: user?.requestMode ?? 'simple',
+        canChooseRequestMode: user?.canChooseRequestMode ?? false,
+        setRequestMode,
         login,
         logout,
       }}

@@ -11,17 +11,25 @@ export interface NewznabSearchParams {
   offset?: number
 }
 
+export interface NewznabClientOptions {
+  baseUrl: string
+  apiKey: string
+  apiPath?: string
+}
+
 export class NewznabClient {
   private baseUrl: string
   private apiKey: string
+  private apiPath: string
 
-  constructor(baseUrl: string, apiKey: string) {
-    this.baseUrl = baseUrl.replace(/\/$/, '')
-    this.apiKey = apiKey
+  constructor(options: NewznabClientOptions) {
+    this.baseUrl = options.baseUrl.replace(/\/$/, '')
+    this.apiKey = options.apiKey
+    this.apiPath = options.apiPath ?? '/api'
   }
 
   private buildUrl(mode: string, params: Record<string, string | number | undefined> = {}): string {
-    const url = new URL(`${this.baseUrl}/api`)
+    const url = new URL(`${this.baseUrl}${this.apiPath}`)
     url.searchParams.set('apikey', this.apiKey)
     url.searchParams.set('o', 'json')
     url.searchParams.set('t', mode)
@@ -165,7 +173,9 @@ export class NewznabClient {
     indexerName: string,
     indexerId: string
   ): SearchResult | null {
-    const attrs = item.attr as Array<{ name: string; value: string }> | undefined
+    // Handle both direct attrs and @attributes nested format
+    const rawAttrs = item.attr as Array<{ '@attributes'?: { name: string; value: string }; name?: string; value?: string }> | undefined
+    const attrs = rawAttrs?.map(a => a['@attributes'] ?? a) as Array<{ name: string; value: string }> | undefined
     const guid = (item.guid as string) || attrs?.find((a) => a.name === 'guid')?.value
     const title = item.title as string
     const enclosure = item.enclosure as Record<string, unknown> | undefined

@@ -9,6 +9,8 @@ import indexers from './routes/indexers'
 import search from './routes/search'
 import metadata from './routes/metadata'
 import activity from './routes/activity'
+import requestsRouter from './routes/requests'
+import usersRouter from './routes/users'
 import { authMiddleware } from './middleware/auth'
 import { configService } from './services/config'
 
@@ -48,6 +50,8 @@ app.route('/api/indexers', indexers)
 app.route('/api/search', search)
 app.route('/api/metadata', metadata)
 app.route('/api/activity', activity)
+app.route('/api/requests', requestsRouter)
+app.route('/api/users', usersRouter)
 
 const port = configService.getPort()
 console.log(`Server running on http://localhost:${port}`)

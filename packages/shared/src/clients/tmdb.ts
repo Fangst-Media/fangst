@@ -11,6 +11,7 @@ const tmdbMovieSchema = z.object({
   vote_average: z.number(),
   vote_count: z.number(),
   genres: z.array(z.object({ id: z.number(), name: z.string() })).optional(),
+  runtime: z.number().nullable().optional(),
 })
 
 const tmdbTvSchema = z.object({
@@ -24,6 +25,7 @@ const tmdbTvSchema = z.object({
   vote_average: z.number(),
   vote_count: z.number(),
   genres: z.array(z.object({ id: z.number(), name: z.string() })).optional(),
+  episode_run_time: z.array(z.number()).optional(),
 })
 
 const tmdbSearchResultSchema = z.object({

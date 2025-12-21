@@ -16,6 +16,10 @@ export const indexerSchema = z.object({
       tv: z.array(z.number()).optional(),
     })
     .optional(),
+  apiPath: z.string().default('/api'),
+  priority: z.number().min(1).max(100).default(50),
+  queryLimit: z.number().positive().nullable().optional(),
+  grabLimit: z.number().positive().nullable().optional(),
 })
 
 export type Indexer = z.infer<typeof indexerSchema>
@@ -25,6 +29,23 @@ export type CreateIndexer = z.infer<typeof createIndexerSchema>
 
 export const updateIndexerSchema = indexerSchema.partial().omit({ id: true })
 export type UpdateIndexer = z.infer<typeof updateIndexerSchema>
+
+export const parsedReleaseInfoSchema = z.object({
+  resolution: z.enum(['2160p', '1080p', '720p', '480p']).optional(),
+  source: z.enum(['bluray', 'webdl', 'webrip', 'hdtv', 'dvd']).optional(),
+  videoCodec: z.enum(['x265', 'x264', 'av1', 'xvid']).optional(),
+  audioCodec: z.enum(['atmos', 'truehd', 'dtsx', 'dtshd', 'dts', 'ddp', 'dd', 'flac', 'aac', 'ac3', 'opus']).optional(),
+  hdr: z.enum(['dv', 'hdr10+', 'hdr10', 'hlg']).optional(),
+  releaseGroup: z.string().optional(),
+  releaseGroupTier: z.union([z.literal(1), z.literal(2), z.literal(3), z.null()]).optional(),
+  streamingService: z.string().optional(),
+  isRemux: z.boolean().optional(),
+  proper: z.boolean().optional(),
+  repack: z.boolean().optional(),
+  qualityScore: z.number().optional(),
+})
+
+export type ParsedReleaseInfo = z.infer<typeof parsedReleaseInfoSchema>
 
 export const searchResultSchema = z.object({
   guid: z.string(),
@@ -38,6 +59,7 @@ export const searchResultSchema = z.object({
   grabs: z.number().optional(),
   seeders: z.number().optional(),
   peers: z.number().optional(),
+  parsed: parsedReleaseInfoSchema.optional(),
 })
 
 export type SearchResult = z.infer<typeof searchResultSchema>
@@ -50,6 +72,7 @@ export const searchRequestSchema = z.object({
   episode: z.number().optional(),
   type: z.enum(['movie', 'tv', 'general']).default('general'),
   categories: z.array(z.number()).optional(),
+  runtime: z.number().optional(),
 })
 
 export type SearchRequest = z.infer<typeof searchRequestSchema>
@@ -84,4 +107,5 @@ export interface IndexerRegistryEntry {
     movies?: number[]
     tv?: number[]
   }
+  apiPath?: string
 }

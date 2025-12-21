@@ -16,7 +16,8 @@
     "./clients/jellyfin": "./src/clients/jellyfin.ts",
     "./clients/sabnzbd": "./src/clients/sabnzbd.ts",
     "./clients/newznab": "./src/clients/newznab.ts",
-    "./data/indexer-registry": "./src/data/indexer-registry.ts"
+    "./data/indexer-registry": "./src/data/indexer-registry.ts",
+    "./lib/size-filter": "./src/lib/size-filter.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

@@ -157,7 +157,11 @@ indexers.post('/:id/test', async (c) => {
   }
 
   if (indexer.protocol === 'newznab') {
-    const client = new NewznabClient(indexer.url, indexer.apiKey)
+    const client = new NewznabClient({
+      baseUrl: indexer.url,
+      apiKey: indexer.apiKey,
+      apiPath: indexer.apiPath,
+    })
     const result = await client.testConnection()
 
     return c.json({
@@ -179,14 +183,19 @@ indexers.post('/test', async (c) => {
 
   try {
     const body = await c.req.json()
-    const { protocol, url, apiKey } = body as { protocol: string; url: string; apiKey: string }
+    const { protocol, url, apiKey, apiPath } = body as {
+      protocol: string
+      url: string
+      apiKey: string
+      apiPath?: string
+    }
 
     if (!protocol || !url || !apiKey) {
       return c.json({ error: 'Missing required fields: protocol, url, apiKey' }, 400)
     }
 
     if (protocol === 'newznab') {
-      const client = new NewznabClient(url, apiKey)
+      const client = new NewznabClient({ baseUrl: url, apiKey, apiPath })
       const result = await client.testConnection()
 
       return c.json({

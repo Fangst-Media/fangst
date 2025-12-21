@@ -1,10 +1,16 @@
 import { configService } from './config'
 import { NewznabClient, type NewznabSearchParams } from '@jaeger/shared/clients/newznab'
-import type { SearchResult, SearchRequest, SearchResponse, Indexer } from '@jaeger/shared/types/indexer'
+import type { SearchResult, SearchRequest, SearchResponse, Indexer, ParsedReleaseInfo } from '@jaeger/shared/types/indexer'
+import { parseReleaseName } from '@jaeger/parser'
+import { isReleaseTooSmall } from '@jaeger/shared/lib/size-filter'
 
 interface SearchError {
   indexer: string
   error: string
+}
+
+interface SearchResultWithPriority extends SearchResult {
+  indexerPriority: number
 }
 
 export class SearchService {
@@ -16,33 +22,72 @@ export class SearchService {
     }
 
     const searchPromises = indexers.map((indexer) =>
-      this.searchIndexer(indexer, request).catch((error) => ({
-        results: [] as SearchResult[],
-        error: {
-          indexer: indexer.name,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        },
-      }))
+      this.searchIndexer(indexer, request)
+        .then((results) => ({
+          results: results.map((r) => ({ ...r, indexerPriority: indexer.priority ?? 50 })),
+        }))
+        .catch((error) => ({
+          results: [] as SearchResultWithPriority[],
+          error: {
+            indexer: indexer.name,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          },
+        }))
     )
 
     const results = await Promise.all(searchPromises)
 
-    const allResults: SearchResult[] = []
+    const allResults: SearchResultWithPriority[] = []
     const errors: SearchError[] = []
 
     for (const result of results) {
       if ('error' in result) {
         errors.push(result.error)
-      } else {
-        allResults.push(...result)
       }
+      allResults.push(...result.results)
     }
 
-    // Sort by pub date (newest first)
-    allResults.sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime())
+    // Parse each result to extract quality info
+    const parsedResults = allResults.map((result) => {
+      const parsed = parseReleaseName(result.title)
+      const parsedInfo: ParsedReleaseInfo = {
+        resolution: parsed.resolution,
+        source: parsed.source,
+        videoCodec: parsed.videoCodec,
+        audioCodec: parsed.audioCodec,
+        hdr: parsed.hdr,
+        releaseGroup: parsed.releaseGroup,
+        releaseGroupTier: parsed.releaseGroupTier,
+        streamingService: parsed.streamingService,
+        isRemux: parsed.isRemux,
+        proper: parsed.proper,
+        repack: parsed.repack,
+        qualityScore: parsed.qualityScore,
+      }
+      return { ...result, parsed: parsedInfo }
+    })
+
+    // Filter out releases that are too small based on MB/min calculation
+    const sizeFilterConfig = configService.get().sizeFilter
+    const filteredResults = request.runtime
+      ? parsedResults.filter(
+          (result) => !isReleaseTooSmall(result.size, request.runtime!, result.parsed?.resolution, sizeFilterConfig)
+        )
+      : parsedResults
+
+    // Sort by quality score (highest first), then by indexer priority (lower = better), then by pub date
+    filteredResults.sort((a, b) => {
+      const scoreA = a.parsed?.qualityScore ?? 0
+      const scoreB = b.parsed?.qualityScore ?? 0
+      if (scoreA !== scoreB) return scoreB - scoreA
+      const priorityA = (a as SearchResultWithPriority).indexerPriority ?? 50
+      const priorityB = (b as SearchResultWithPriority).indexerPriority ?? 50
+      if (priorityA !== priorityB) return priorityA - priorityB
+      return new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime()
+    })
 
     return {
-      results: allResults,
+      results: filteredResults,
       errors: errors.length > 0 ? errors : undefined,
     }
   }
@@ -56,7 +101,11 @@ export class SearchService {
   }
 
   private async searchNewznab(indexer: Indexer, request: SearchRequest): Promise<SearchResult[]> {
-    const client = new NewznabClient(indexer.url, indexer.apiKey)
+    const client = new NewznabClient({
+      baseUrl: indexer.url,
+      apiKey: indexer.apiKey,
+      apiPath: indexer.apiPath,
+    })
 
     const params: NewznabSearchParams = {
       query: request.query,

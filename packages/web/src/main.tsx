@@ -8,7 +8,9 @@ import { Layout } from './components/Layout'
 import Login from './routes/login'
 import Dashboard from './routes/dashboard'
 import Library from './routes/library'
+import MediaDetails from './routes/media-details'
 import Requests from './routes/requests'
+import RequestsList from './routes/requests-list'
 import Activity from './routes/activity'
 import Indexers from './routes/indexers'
 import Downloaders from './routes/downloaders'
@@ -39,7 +41,7 @@ function IndexRedirect() {
     return <Navigate to="/dashboard" />
   }
 
-  return <Navigate to="/library" />
+  return <Navigate to="/discover" />
 }
 
 function ProtectedRoute({ children, adminOnly = false }: { children: React.ReactNode; adminOnly?: boolean }) {
@@ -58,7 +60,7 @@ function ProtectedRoute({ children, adminOnly = false }: { children: React.React
   }
 
   if (adminOnly && !isAdmin) {
-    return <Navigate to="/library" />
+    return <Navigate to="/discover" />
   }
 
   return <Layout>{children}</Layout>
@@ -68,7 +70,7 @@ function LoginPage() {
   const { user, isAdmin } = useAuth()
 
   if (user) {
-    return <Navigate to={isAdmin ? '/dashboard' : '/library'} />
+    return <Navigate to={isAdmin ? '/dashboard' : '/discover'} />
   }
 
   return <Login onSuccess={() => window.location.reload()} />
@@ -106,12 +108,35 @@ const libraryRoute = createRoute({
   ),
 })
 
+const mediaDetailsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/library/$slug',
+  component: function MediaDetailsPage() {
+    const { slug } = mediaDetailsRoute.useParams()
+    return (
+      <ProtectedRoute>
+        <MediaDetails slug={slug} />
+      </ProtectedRoute>
+    )
+  },
+})
+
 const requestsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/discover',
+  component: () => (
+    <ProtectedRoute>
+      <Requests />
+    </ProtectedRoute>
+  ),
+})
+
+const requestsListRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/requests',
   component: () => (
     <ProtectedRoute>
-      <Requests />
+      <RequestsList />
     </ProtectedRoute>
   ),
 })
@@ -120,7 +145,7 @@ const activityRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/activity',
   component: () => (
-    <ProtectedRoute>
+    <ProtectedRoute adminOnly>
       <Activity />
     </ProtectedRoute>
   ),
@@ -156,7 +181,7 @@ const settingsRoute = createRoute({
   ),
 })
 
-const routeTree = rootRoute.addChildren([indexRoute, loginRoute, dashboardRoute, libraryRoute, requestsRoute, activityRoute, indexersRoute, downloadersRoute, settingsRoute])
+const routeTree = rootRoute.addChildren([indexRoute, loginRoute, dashboardRoute, libraryRoute, mediaDetailsRoute, requestsRoute, requestsListRoute, activityRoute, indexersRoute, downloadersRoute, settingsRoute])
 
 const router = createRouter({
   routeTree,
