@@ -42,14 +42,17 @@ export function parseReleaseName(name: string): ParsedRelease {
     title: '',
   }
 
+  // Normalize underscores to dots for consistent parsing
+  const normalized = name.replace(/_/g, '.')
+
   // Resolution
-  const resolutionMatch = name.match(patterns.resolution)
+  const resolutionMatch = normalized.match(patterns.resolution)
   if (resolutionMatch?.[1]) {
     result.resolution = resolutionMatch[1].toLowerCase() as ParsedRelease['resolution']
   }
 
   // Source
-  const sourceMatch = name.match(patterns.source)
+  const sourceMatch = normalized.match(patterns.source)
   if (sourceMatch?.[1]) {
     const source = sourceMatch[1].toLowerCase().replace(/[.-]/g, '')
     const sourceMap: Record<string, ParsedRelease['source']> = {
@@ -65,13 +68,13 @@ export function parseReleaseName(name: string): ParsedRelease {
   }
 
   // Remux detection
-  result.isRemux = patterns.remux.test(name)
+  result.isRemux = patterns.remux.test(normalized)
 
   // Streaming service (from Dictionarry patterns)
-  result.streamingService = detectStreamingService(name)
+  result.streamingService = detectStreamingService(normalized)
 
   // Video codec
-  const videoMatch = name.match(patterns.videoCodec)
+  const videoMatch = normalized.match(patterns.videoCodec)
   if (videoMatch?.[1]) {
     const codec = videoMatch[1].toLowerCase().replace(/[.]/g, '')
     const codecMap: Record<string, ParsedRelease['videoCodec']> = {
@@ -87,10 +90,10 @@ export function parseReleaseName(name: string): ParsedRelease {
   }
 
   // Audio codec - Atmos is checked separately as it appears alongside other audio codecs
-  if (/\batmos\b/i.test(name)) {
+  if (/\batmos\b/i.test(normalized)) {
     result.audioCodec = 'atmos'
   } else {
-    const audioMatch = name.match(patterns.audioCodec)
+    const audioMatch = normalized.match(patterns.audioCodec)
     if (audioMatch?.[1]) {
       const audio = audioMatch[1].toLowerCase().replace(/[.-\s]/g, '')
       const audioMap: Record<string, ParsedRelease['audioCodec']> = {
@@ -111,7 +114,7 @@ export function parseReleaseName(name: string): ParsedRelease {
   }
 
   // HDR format
-  const hdrMatch = name.match(patterns.hdr)
+  const hdrMatch = normalized.match(patterns.hdr)
   if (hdrMatch?.[1]) {
     const hdr = hdrMatch[1].toLowerCase().replace(/[- ]/g, '')
     const hdrMap: Record<string, ParsedRelease['hdr']> = {
@@ -127,26 +130,26 @@ export function parseReleaseName(name: string): ParsedRelease {
   }
 
   // Year
-  const yearMatch = name.match(patterns.year)
+  const yearMatch = normalized.match(patterns.year)
   if (yearMatch?.[1]) {
     result.year = Number.parseInt(yearMatch[1])
   }
 
   // Season/Episode
-  const seMatch = name.match(patterns.seasonEpisode)
+  const seMatch = normalized.match(patterns.seasonEpisode)
   if (seMatch?.[1] && seMatch?.[2]) {
     result.season = Number.parseInt(seMatch[1])
     result.episode = Number.parseInt(seMatch[2])
   } else {
     // Try season only (e.g., "S01" without episode)
-    const seasonMatch = name.match(patterns.seasonOnly)
+    const seasonMatch = normalized.match(patterns.seasonOnly)
     if (seasonMatch?.[1]) {
       result.season = Number.parseInt(seasonMatch[1])
     }
   }
 
   // Release group and tier (from Dictionarry data)
-  const groupMatch = name.match(patterns.releaseGroup)
+  const groupMatch = normalized.match(patterns.releaseGroup)
   if (groupMatch) {
     result.releaseGroup = groupMatch[1]
 
@@ -166,15 +169,15 @@ export function parseReleaseName(name: string): ParsedRelease {
   }
 
   // Proper/Repack flags
-  result.proper = patterns.proper.test(name)
-  result.repack = patterns.repack.test(name)
+  result.proper = patterns.proper.test(normalized)
+  result.repack = patterns.repack.test(normalized)
 
   // Extract title (everything before year or season/episode marker)
-  let titleEnd = name.length
+  let titleEnd = normalized.length
   if (yearMatch?.index) titleEnd = Math.min(titleEnd, yearMatch.index)
   if (seMatch?.index) titleEnd = Math.min(titleEnd, seMatch.index)
 
-  result.title = name.slice(0, titleEnd).replace(/[._]/g, ' ').trim().replace(/\s+/g, ' ')
+  result.title = normalized.slice(0, titleEnd).replace(/[._]/g, ' ').trim().replace(/\s+/g, ' ')
 
   // Calculate quality score
   result.qualityScore = calculateQualityScore(result)
