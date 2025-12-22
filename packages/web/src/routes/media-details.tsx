@@ -14,12 +14,7 @@ async function fetchMediaItem(slug: string): Promise<MediaItem | null> {
   if (!response.ok) return null
   const data = await response.json()
 
-  // Try to find by metadata ID first, then fall back to base64 path match
-  return data.results.find((item: MediaItem) => {
-    if (item.metadata?.id === id) return true
-    const itemId = btoa(item.path).slice(0, 12)
-    return itemId === id
-  }) ?? null
+  return data.results.find((item: MediaItem) => item.id === id) ?? null
 }
 
 async function fetchJellyfinUrl(): Promise<string | null> {
@@ -55,6 +50,13 @@ function QualityBadge({ label, value, variant = 'default' }: { label: string; va
       <p className="font-medium">{value}</p>
     </div>
   )
+}
+
+function isSizeWarning(sizeBytes: number | undefined, resolution: string | undefined): boolean {
+  if (!sizeBytes) return false
+  const sizeMB = sizeBytes / 1024 / 1024
+  const minMB = resolution === '2160p' ? 2000 : resolution === '720p' ? 700 : 1000
+  return sizeMB < minMB
 }
 
 export default function MediaDetails({ slug }: MediaDetailsProps) {
@@ -241,8 +243,27 @@ export default function MediaDetails({ slug }: MediaDetailsProps) {
             {/* File Info */}
             <div>
               <h2 className="text-lg font-semibold text-foreground mb-4">File Information</h2>
+              {isSizeWarning(item.size, parsed.resolution) && (
+                <div className="rounded-lg bg-orange-500/10 border border-orange-500/30 p-3 mb-4 flex items-start gap-3">
+                  <svg className="w-5 h-5 text-orange-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <div>
+                    <p className="text-sm font-medium text-orange-400">File size seems low</p>
+                    <p className="text-xs text-orange-400/70 mt-0.5">
+                      This file may be a low quality encode or incomplete download.
+                    </p>
+                  </div>
+                </div>
+              )}
               <div className="rounded-lg bg-card border border-border p-4">
                 <div className="grid gap-3">
+                  {item.size && (
+                    <div>
+                      <p className="text-xs text-muted mb-1">Size</p>
+                      <p className="text-sm text-foreground font-mono">{formatFileSize(item.size)}</p>
+                    </div>
+                  )}
                   <div>
                     <p className="text-xs text-muted mb-1">Filename</p>
                     <p className="text-sm text-foreground font-mono break-all">{item.filename}</p>

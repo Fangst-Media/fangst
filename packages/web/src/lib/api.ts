@@ -1,8 +1,10 @@
 const API_BASE_URL = 'http://localhost:5001'
 
 export type MediaItem = {
+  id: string
   path: string
   filename: string
+  size?: number
   parsed: {
     title: string
     year?: number
@@ -88,11 +90,11 @@ export function getMediaSlug(item: MediaItem): string {
   const title = item.metadata?.title || item.parsed.title
   const year = item.metadata?.year || item.parsed.year
   const slug = slugify(year ? `${title}-${year}` : title)
-  const id = item.metadata?.id || btoa(item.path).slice(0, 12)
-  return `${id}-${slug}`
+  return `${item.id}--${slug}`
 }
 
 export function parseMediaSlug(slug: string): string {
-  const dashIndex = slug.indexOf('-')
-  return dashIndex > 0 ? slug.slice(0, dashIndex) : slug
+  // ID is separated by double dash from the slug
+  const separatorIndex = slug.indexOf('--')
+  return separatorIndex > 0 ? slug.slice(0, separatorIndex) : slug
 }
