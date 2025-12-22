@@ -237,12 +237,14 @@ async function getDownloaders(): Promise<Downloader[]> {
 
 async function sendToDownloader(
   downloadUrl: string,
-  downloaderId: string
+  downloaderId: string,
+  releaseName: string,
+  category?: string
 ): Promise<{ success: boolean; nzoId?: string }> {
   const response = await fetch('/api/search/download', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ downloadUrl, downloaderId }),
+    body: JSON.stringify({ downloadUrl, downloaderId, releaseName, category }),
   })
   if (!response.ok) {
     const error = await response.json()
@@ -380,7 +382,7 @@ function ReleaseModal({
   }
 
   const downloadMutation = useMutation({
-    mutationFn: async ({ downloadUrl, downloaderId }: { downloadUrl: string; downloaderId: string }) => {
+    mutationFn: async ({ downloadUrl, downloaderId, releaseName, category }: { downloadUrl: string; downloaderId: string; releaseName: string; category?: string }) => {
       // First create a request record to track this download
       await createRequest({
         title: media.title,
@@ -394,7 +396,7 @@ function ReleaseModal({
         downloading: true,
       })
       // Then send to downloader
-      return sendToDownloader(downloadUrl, downloaderId)
+      return sendToDownloader(downloadUrl, downloaderId, releaseName, category)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['requests'] })
@@ -416,7 +418,8 @@ function ReleaseModal({
       return
     }
     setDownloadingGuid(result.guid)
-    downloadMutation.mutate({ downloadUrl: result.downloadUrl, downloaderId })
+    const category = media.type === 'movie' ? 'movies' : 'tv'
+    downloadMutation.mutate({ downloadUrl: result.downloadUrl, downloaderId, releaseName: result.title, category })
   }
 
   return (

@@ -355,6 +355,22 @@ export default function Settings() {
           </SettingField>
         </SettingsSection>
 
+        {/* Downloads */}
+        <SettingsSection title="Downloads" description="Configure download and backup behavior">
+          <SettingField
+            label="NZB Backup Path"
+            description="Optional: Save a copy of downloaded NZB files to this folder for backup/debugging"
+          >
+            <input
+              type="text"
+              className="w-64 rounded-md bg-background border border-border px-3 py-1.5 text-foreground text-sm font-mono"
+              value={settings.download?.nzbBackupPath ?? ''}
+              placeholder="Leave empty to disable"
+              onChange={(e) => updateMutation.mutate({ download: { nzbBackupPath: e.target.value } })}
+            />
+          </SettingField>
+        </SettingsSection>
+
         {/* Size Filter */}
         <SettingsSection
           title="Size Filter"

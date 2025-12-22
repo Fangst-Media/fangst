@@ -10,12 +10,11 @@ import { configService } from '../services/config'
 
 const media = new Hono()
 
-media.get('/', async (c) => {
-  const results = await mediaService.getAll()
-  return c.json({ results })
-})
-
-media.post('/scan', async (c) => {
+export async function runLibraryScan(): Promise<{
+  added: number
+  updated: number
+  removed: number
+}> {
   const mockFilesystem = configService.isMockFilesystem()
   const providers = configService.getMetadataProviders()
 
@@ -54,15 +53,24 @@ media.post('/scan', async (c) => {
 
   const scanPath = mockFilesystem ? '/media' : configService.getMediaPath()
 
+  const scannedFiles = await scanner.scanDirectory(scanPath)
+  return mediaService.syncFromScan(scannedFiles)
+}
+
+media.get('/', async (c) => {
+  const results = await mediaService.getAll()
+  return c.json({ results })
+})
+
+media.post('/scan', async (c) => {
   try {
-    const scannedFiles = await scanner.scanDirectory(scanPath)
-    const syncResult = await mediaService.syncFromScan(scannedFiles)
+    const syncResult = await runLibraryScan()
     const results = await mediaService.getAll()
 
     return c.json({
-      mockFilesystem,
-      providers,
-      scannedPath: scanPath,
+      mockFilesystem: configService.isMockFilesystem(),
+      providers: configService.getMetadataProviders(),
+      scannedPath: configService.isMockFilesystem() ? '/media' : configService.getMediaPath(),
       sync: syncResult,
       results,
     })

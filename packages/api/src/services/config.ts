@@ -353,6 +353,10 @@ class ConfigService {
     return this.get().security.apiKey
   }
 
+  getNzbBackupPath(): string {
+    return this.get().download.nzbBackupPath
+  }
+
   // Downloader CRUD methods
   getDownloaders(): Downloader[] {
     return this.downloaders

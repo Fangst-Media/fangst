@@ -18,6 +18,7 @@ const API_KEY_USER: User = {
   provider: 'jellyfin',
   name: 'API Key',
   role: 'admin',
+  preferredRequestMode: 'detailed',
   createdAt: new Date(),
   lastSeenAt: new Date(),
 }

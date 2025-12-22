@@ -204,14 +204,58 @@ export class SABnzbdClient {
     }
   }
 
-  async addNzb(url: string, category?: string): Promise<{ nzoId: string }> {
-    const params: Record<string, string> = { name: url }
-    if (category) {
-      params.cat = category
+  async addNzbFromUrl(
+    url: string,
+    releaseName: string,
+    category?: string
+  ): Promise<{ nzoId: string; nzbContent: string }> {
+    // Fetch the NZB file ourselves for better reliability
+    const nzbResponse = await fetch(url)
+    if (!nzbResponse.ok) {
+      throw new Error(`Failed to fetch NZB: ${nzbResponse.status} ${nzbResponse.statusText}`)
     }
 
-    const data = await this.request<{ nzo_ids: string[] }>('addurl', params)
-    return { nzoId: data.nzo_ids[0] ?? '' }
+    const nzbContent = await nzbResponse.text()
+    if (!nzbContent || nzbContent.length < 100 || !nzbContent.includes('<?xml')) {
+      throw new Error('Invalid or empty NZB file received from indexer')
+    }
+
+    const result = await this.addNzbContent(nzbContent, releaseName, category)
+    return { ...result, nzbContent }
+  }
+
+  async addNzbContent(
+    nzbContent: string,
+    releaseName: string,
+    category?: string
+  ): Promise<{ nzoId: string }> {
+    // Upload NZB content directly to SABnzbd
+    const formData = new FormData()
+    formData.append('apikey', this.apiKey)
+    formData.append('output', 'json')
+    formData.append('mode', 'addfile')
+    formData.append('nzbname', releaseName)
+    if (category) {
+      formData.append('cat', category)
+    }
+    const filename = `${releaseName}.nzb`
+    formData.append('name', new Blob([nzbContent], { type: 'application/x-nzb' }), filename)
+
+    const response = await fetch(`${this.baseUrl}/api`, {
+      method: 'POST',
+      body: formData,
+    })
+
+    if (!response.ok) {
+      throw new Error(`SABnzbd request failed: ${response.statusText}`)
+    }
+
+    const data = await response.json() as { nzo_ids?: string[]; error?: string }
+    if (data.error) {
+      throw new Error(`SABnzbd error: ${data.error}`)
+    }
+
+    return { nzoId: data.nzo_ids?.[0] ?? '' }
   }
 
   async pause(): Promise<void> {

@@ -1,9 +1,11 @@
-import { requestService, type RequestWithUser } from '../services/requests'
-import { searchService } from '../services/search'
-import { configService } from '../services/config'
+import { mkdir, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { type ParsedRelease, parseReleaseName } from '@jaeger/parser'
 import { SABnzbdClient } from '@jaeger/shared/clients/sabnzbd'
 import type { SearchResult } from '@jaeger/shared/types/indexer'
-import { parseReleaseName, type ParsedRelease } from '@jaeger/parser'
+import { configService } from '../services/config'
+import { type RequestWithUser, requestService } from '../services/requests'
+import { searchService } from '../services/search'
 
 const QUALITY_ORDER = ['2160p', '1080p', '720p', '480p']
 
@@ -11,7 +13,8 @@ async function fetchRuntime(request: RequestWithUser): Promise<number | undefine
   if (!request.tmdbId) return undefined
 
   const relayUrl = configService.getMetadataRelayUrl()
-  const endpoint = request.type === 'movie' ? `/tmdb/movies/${request.tmdbId}` : `/tmdb/tv/${request.tmdbId}`
+  const endpoint =
+    request.type === 'movie' ? `/tmdb/movies/${request.tmdbId}` : `/tmdb/tv/${request.tmdbId}`
 
   try {
     const response = await fetch(`${relayUrl}${endpoint}`, {
@@ -19,7 +22,7 @@ async function fetchRuntime(request: RequestWithUser): Promise<number | undefine
     })
     if (!response.ok) return undefined
 
-    const data = await response.json()
+    const data = (await response.json()) as { runtime?: number; episode_run_time?: number[] }
     if (request.type === 'movie') {
       return data.runtime ?? undefined
     }
@@ -93,7 +96,25 @@ function selectBestRelease(
   return best?.result ?? null
 }
 
-async function downloadRelease(release: SearchResult): Promise<boolean> {
+async function saveNzbBackup(nzbContent: string, filename: string): Promise<void> {
+  const backupPath = configService.getNzbBackupPath()
+  if (!backupPath) return
+
+  try {
+    await mkdir(backupPath, { recursive: true })
+    const filePath = join(backupPath, filename.endsWith('.nzb') ? filename : `${filename}.nzb`)
+    await writeFile(filePath, nzbContent, 'utf-8')
+    console.log(`[SearchJob] NZB backed up to: ${filePath}`)
+  } catch (error) {
+    console.error('[SearchJob] Failed to save NZB backup:', error)
+  }
+}
+
+async function downloadRelease(
+  release: SearchResult,
+  requestId: string,
+  mediaType: 'movie' | 'tv'
+): Promise<boolean> {
   const downloaders = configService.getEnabledDownloaders()
 
   if (downloaders.length === 0) {
@@ -107,9 +128,26 @@ async function downloadRelease(release: SearchResult): Promise<boolean> {
   if (downloader.type === 'sabnzbd') {
     const client = new SABnzbdClient(downloader.url, downloader.apiKey)
     try {
-      await client.addNzb(release.downloadUrl, release.title)
-      console.log(`[SearchJob] Sent to ${downloader.name}: ${release.title}`)
-      return true
+      await requestService.updateStatus(requestId, 'fetching_nzb')
+      console.log(`[SearchJob] Fetching NZB: ${release.title}`)
+
+      const category = mediaType === 'movie' ? downloader.categories?.movies : downloader.categories?.tv
+      const result = await client.addNzbFromUrl(release.downloadUrl, release.title, category)
+
+      // Save backup if configured
+      if (result.nzbContent) {
+        const safeFilename = release.title.replace(/[<>:"/\\|?*]/g, '_')
+        await saveNzbBackup(result.nzbContent, safeFilename)
+      }
+
+      if (result.nzoId) {
+        await requestService.updateDownloadInfo(requestId, result.nzoId, release.title)
+        await requestService.updateStatus(requestId, 'downloading')
+        console.log(`[SearchJob] Sent to ${downloader.name}: ${release.title} (nzoId: ${result.nzoId})`)
+        return true
+      }
+
+      return false
     } catch (error) {
       console.error(`[SearchJob] Failed to send to ${downloader.name}:`, error)
       return false
@@ -166,13 +204,12 @@ async function processRequest(request: RequestWithUser): Promise<'found' | 'not_
     }
 
     console.log(`[SearchJob] Found: ${bestRelease.title}`)
+    await requestService.updateStatus(request.id, 'found')
 
-    const downloaded = await downloadRelease(bestRelease)
+    const downloaded = await downloadRelease(bestRelease, request.id, request.type)
 
     if (downloaded) {
-      await requestService.updateStatus(request.id, 'downloading')
-
-      // For movies, mark as completed. For TV, keep monitoring
+      // For movies, mark as completed after download starts. For TV, keep monitoring
       if (request.type === 'movie') {
         await requestService.updateStatus(request.id, 'completed')
       }
@@ -180,6 +217,7 @@ async function processRequest(request: RequestWithUser): Promise<'found' | 'not_
       return 'found'
     }
 
+    await requestService.updateStatus(request.id, 'failed')
     return 'error'
   } catch (error) {
     console.error(`[SearchJob] Error processing ${request.title}:`, error)

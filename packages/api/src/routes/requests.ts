@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { requestService, type CreateRequestData, type RequestStatus } from '../services/requests'
 import { runSearchJob } from '../jobs/searchRequests'
+import { runDownloadMonitor } from '../jobs/downloadMonitor'
 import type { User } from '../services/auth'
 
 type AuthEnv = {
@@ -204,6 +205,24 @@ requestsRouter.post('/search-job', async (c) => {
   } catch (error) {
     return c.json(
       { error: error instanceof Error ? error.message : 'Failed to run search job' },
+      500
+    )
+  }
+})
+
+// POST /api/requests/monitor-job - Check download status (admin only)
+requestsRouter.post('/monitor-job', async (c) => {
+  const user = c.get('user')
+  if (!requireAdmin(user)) {
+    return c.json({ error: 'Admin access required' }, 403)
+  }
+
+  try {
+    const result = await runDownloadMonitor()
+    return c.json({ success: true, ...result })
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to run download monitor' },
       500
     )
   }

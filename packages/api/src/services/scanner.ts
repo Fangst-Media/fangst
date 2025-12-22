@@ -6,6 +6,7 @@ import type { IFilesystem } from './filesystem'
 export type ScannedFile = {
   path: string
   filename: string
+  size?: number
   parsed: ReturnType<typeof parseReleaseName>
   metadata?: MetadataResult
 }
@@ -35,6 +36,7 @@ export class MediaScanner {
         const scanned: ScannedFile = {
           path: entry.path,
           filename: entry.name,
+          size: entry.size,
           parsed,
         }
 

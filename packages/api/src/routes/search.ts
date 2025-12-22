@@ -47,14 +47,15 @@ search.post('/download', async (c) => {
 
   try {
     const body = await c.req.json()
-    const { downloadUrl, downloaderId, category } = body as {
+    const { downloadUrl, downloaderId, releaseName, category } = body as {
       downloadUrl: string
       downloaderId: string
+      releaseName: string
       category?: string
     }
 
-    if (!downloadUrl || !downloaderId) {
-      return c.json({ error: 'Missing required fields: downloadUrl, downloaderId' }, 400)
+    if (!downloadUrl || !downloaderId || !releaseName) {
+      return c.json({ error: 'Missing required fields: downloadUrl, downloaderId, releaseName' }, 400)
     }
 
     const downloader = configService.getDownloader(downloaderId)
@@ -68,7 +69,7 @@ search.post('/download', async (c) => {
 
     if (downloader.type === 'sabnzbd') {
       const client = new SABnzbdClient(downloader.url, downloader.apiKey)
-      const result = await client.addNzb(downloadUrl, category)
+      const result = await client.addNzbFromUrl(downloadUrl, releaseName, category)
 
       return c.json({
         success: true,

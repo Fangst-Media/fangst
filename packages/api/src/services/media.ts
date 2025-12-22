@@ -7,6 +7,7 @@ export type MediaItemWithMetadata = {
   id: string
   path: string
   filename: string
+  size?: number
   parsed: {
     title: string
     year?: number
@@ -48,6 +49,7 @@ export class MediaService {
       id: row.media_items.id,
       path: row.media_items.path,
       filename: row.media_items.filename,
+      size: row.media_items.size ?? undefined,
       parsed: {
         title: row.media_items.title,
         year: row.media_items.year ?? undefined,
@@ -112,6 +114,7 @@ export class MediaService {
           .update(mediaItems)
           .set({
             filename: file.filename,
+            size: file.size ?? null,
             title: file.parsed.title,
             year: file.parsed.year ?? null,
             season: file.parsed.season ?? null,
@@ -134,6 +137,7 @@ export class MediaService {
           id: generateId(),
           path: file.path,
           filename: file.filename,
+          size: file.size ?? null,
           title: file.parsed.title,
           year: file.parsed.year ?? null,
           season: file.parsed.season ?? null,

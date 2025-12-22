@@ -1,4 +1,4 @@
-import { readdir } from 'node:fs/promises'
+import { readdir, stat } from 'node:fs/promises'
 import { readFileSync, existsSync } from 'node:fs'
 import { join, extname } from 'node:path'
 
@@ -6,6 +6,7 @@ export type FileEntry = {
   path: string
   name: string
   isDirectory: boolean
+  size?: number
 }
 
 export interface IFilesystem {
@@ -18,11 +19,23 @@ const VIDEO_EXTENSIONS = ['.mkv', '.mp4', '.avi', '.m4v', '.ts']
 export class RealFilesystem implements IFilesystem {
   async readDirectory(path: string): Promise<FileEntry[]> {
     const entries = await readdir(path, { withFileTypes: true })
-    return entries.map((entry) => ({
-      path: join(path, entry.name),
-      name: entry.name,
-      isDirectory: entry.isDirectory(),
-    }))
+    return Promise.all(
+      entries.map(async (entry) => {
+        const fullPath = join(path, entry.name)
+        const isDir = entry.isDirectory()
+        let size: number | undefined
+        if (!isDir) {
+          const stats = await stat(fullPath)
+          size = stats.size
+        }
+        return {
+          path: fullPath,
+          name: entry.name,
+          isDirectory: isDir,
+          size,
+        }
+      })
+    )
   }
 
   isVideoFile(filename: string): boolean {

@@ -90,6 +90,11 @@ export const sizeFilterSettingsSchema = z.object({
   minMbPerMin2160p: z.number().default(34.5),
 })
 
+// Download settings
+export const downloadSettingsSchema = z.object({
+  nzbBackupPath: z.string().default(''),
+})
+
 // Downloader categories schema
 export const downloaderCategoriesSchema = z.object({
   movies: z.string().optional(),
@@ -124,6 +129,7 @@ export const settingsSchema = z.object({
   ui: uiSettingsSchema.default({}),
   requests: requestSettingsSchema.default({}),
   sizeFilter: sizeFilterSettingsSchema.default({}),
+  download: downloadSettingsSchema.default({}),
 })
 
 // Inferred types
@@ -138,6 +144,7 @@ export type UISettings = z.infer<typeof uiSettingsSchema>
 export type RequestSettings = z.infer<typeof requestSettingsSchema>
 export type RequestModePermission = z.infer<typeof requestModePermissionSchema>
 export type SizeFilterSettings = z.infer<typeof sizeFilterSettingsSchema>
+export type DownloadSettings = z.infer<typeof downloadSettingsSchema>
 export type Downloader = z.infer<typeof downloaderSchema>
 export type DownloaderCategories = z.infer<typeof downloaderCategoriesSchema>
 export type CreateDownloader = z.infer<typeof createDownloaderSchema>
@@ -166,4 +173,5 @@ export type SettingsUpdate = Partial<{
   ui: Partial<UISettings>
   requests: Partial<RequestSettings>
   sizeFilter: Partial<SizeFilterSettings>
+  download: Partial<DownloadSettings>
 }>

@@ -6,9 +6,16 @@ export type RequestStatus =
   | 'pending_approval'
   | 'approved'
   | 'searching'
+  | 'found'
+  | 'fetching_nzb'
+  | 'nzb_downloaded'
+  | 'sent_to_downloader'
   | 'downloading'
+  | 'download_complete'
+  | 'importing'
   | 'completed'
   | 'rejected'
+  | 'failed'
 
 export type CreateRequestData = {
   title: string
@@ -42,6 +49,8 @@ export type RequestWithUser = {
   overview: string | null
   status: RequestStatus
   minQuality: string | null
+  nzoId: string | null
+  releaseName: string | null
   createdAt: Date
   approvedAt: Date | null
   lastSearchedAt: Date | null
@@ -242,6 +251,8 @@ export class RequestService {
         overview: row.request.overview,
         status: row.request.status as RequestStatus,
         minQuality: row.request.minQuality,
+        nzoId: row.request.nzoId,
+        releaseName: row.request.releaseName,
         createdAt: row.request.createdAt,
         approvedAt: row.request.approvedAt,
         lastSearchedAt: row.request.lastSearchedAt,
@@ -371,8 +382,16 @@ export class RequestService {
       .where(eq(requests.id, id))
   }
 
+  async updateDownloadInfo(id: string, nzoId: string, releaseName: string): Promise<void> {
+    await db.update(requests).set({ nzoId, releaseName }).where(eq(requests.id, id))
+  }
+
   async getApprovedForSearch(): Promise<RequestWithUser[]> {
     return this.getAll({ status: ['approved', 'searching'] })
+  }
+
+  async getDownloading(): Promise<RequestWithUser[]> {
+    return this.getAll({ status: 'downloading' })
   }
 
   async getTvForMonitoring(): Promise<RequestWithUser[]> {

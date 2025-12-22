@@ -58,6 +58,7 @@ export const mediaItems = sqliteTable('media_items', {
   id: text('id').primaryKey(),
   path: text('path').notNull().unique(),
   filename: text('filename').notNull(),
+  size: integer('size'),
   title: text('title').notNull(),
   year: integer('year'),
   season: integer('season'),
@@ -98,7 +99,21 @@ export const requests = sqliteTable('requests', {
   // Request tracking - kept for backwards compatibility, primary user
   requestedBy: text('requested_by').notNull().references(() => users.id),
   status: text('status', {
-    enum: ['pending_approval', 'approved', 'searching', 'downloading', 'completed', 'rejected'],
+    enum: [
+      'pending_approval',
+      'approved',
+      'searching',
+      'found',
+      'fetching_nzb',
+      'nzb_downloaded',
+      'sent_to_downloader',
+      'downloading',
+      'download_complete',
+      'importing',
+      'completed',
+      'rejected',
+      'failed',
+    ],
   }).notNull(),
 
   // Timestamps
@@ -110,6 +125,10 @@ export const requests = sqliteTable('requests', {
 
   // Search preferences
   minQuality: text('min_quality'),
+
+  // Download tracking
+  nzoId: text('nzo_id'),
+  releaseName: text('release_name'),
 })
 
 // Join table for multiple users requesting the same media
