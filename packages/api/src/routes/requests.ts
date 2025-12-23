@@ -1,8 +1,12 @@
+import { MetadataRelayClient } from '@jaeger/shared/clients/metadata-relay'
 import { Hono } from 'hono'
-import { requestService, type CreateRequestData, type RequestStatus } from '../services/requests'
-import { runSearchJob } from '../jobs/searchRequests'
+import { runAirDateMonitor } from '../jobs/airDateMonitor'
 import { runDownloadMonitor } from '../jobs/downloadMonitor'
+import { runEpisodeSearchJob } from '../jobs/episodeSearch'
+import { runSearchJob } from '../jobs/searchRequests'
 import type { User } from '../services/auth'
+import { configService } from '../services/config'
+import { type CreateRequestData, type RequestStatus, requestService } from '../services/requests'
 
 type AuthEnv = {
   Variables: {
@@ -223,6 +227,148 @@ requestsRouter.post('/monitor-job', async (c) => {
   } catch (error) {
     return c.json(
       { error: error instanceof Error ? error.message : 'Failed to run download monitor' },
+      500
+    )
+  }
+})
+
+// POST /api/requests/episode-search-job - Search for TV episodes (admin only)
+requestsRouter.post('/episode-search-job', async (c) => {
+  const user = c.get('user')
+  if (!requireAdmin(user)) {
+    return c.json({ error: 'Admin access required' }, 403)
+  }
+
+  try {
+    const result = await runEpisodeSearchJob()
+    return c.json({ success: true, ...result })
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to run episode search job' },
+      500
+    )
+  }
+})
+
+// POST /api/requests/air-date-monitor - Check for new episodes (admin only)
+requestsRouter.post('/air-date-monitor', async (c) => {
+  const user = c.get('user')
+  if (!requireAdmin(user)) {
+    return c.json({ error: 'Admin access required' }, 403)
+  }
+
+  try {
+    const result = await runAirDateMonitor()
+    return c.json({ success: true, ...result })
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to run air date monitor' },
+      500
+    )
+  }
+})
+
+// GET /api/requests/:id/episodes - Get episodes for a TV request
+requestsRouter.get('/:id/episodes', async (c) => {
+  const user = c.get('user')
+  if (!requireAuth(user)) {
+    return c.json({ error: 'Authentication required' }, 401)
+  }
+
+  const id = c.req.param('id')
+  const request = await requestService.getById(id)
+
+  if (!request) {
+    return c.json({ error: 'Request not found' }, 404)
+  }
+
+  // Non-admins can only see their own requests
+  if (user.role !== 'admin' && !request.requestedByUsers.some((u) => u.id === user.id)) {
+    return c.json({ error: 'Not authorized' }, 403)
+  }
+
+  const episodes = await requestService.getEpisodes(id)
+
+  return c.json({ episodes })
+})
+
+// POST /api/requests/:id/episodes/fetch - Fetch episodes from TMDB and create records
+requestsRouter.post('/:id/episodes/fetch', async (c) => {
+  const user = c.get('user')
+  if (!requireAuth(user)) {
+    return c.json({ error: 'Authentication required' }, 401)
+  }
+
+  const id = c.req.param('id')
+  const request = await requestService.getById(id)
+
+  if (!request) {
+    return c.json({ error: 'Request not found' }, 404)
+  }
+
+  // Allow admins or the user who created the request
+  if (user.role !== 'admin' && !request.requestedByUsers.some((u) => u.id === user.id)) {
+    return c.json({ error: 'Not authorized' }, 403)
+  }
+
+  if (request.type !== 'tv' || !request.season) {
+    return c.json({ error: 'Not a TV season request' }, 400)
+  }
+
+  if (!request.tmdbId) {
+    return c.json({ error: 'No TMDB ID for this request' }, 400)
+  }
+
+  try {
+    const relayUrl = configService.getMetadataRelayUrl()
+    const client = new MetadataRelayClient(relayUrl)
+
+    // Fetch series details to get status
+    const seriesDetails = await client.getTvDetails(request.tmdbId)
+
+    // Update series status
+    await requestService.updateRequestSeriesStatus(request.id, seriesDetails.status)
+
+    // Fetch season details
+    const seasonDetails = await client.getSeasonDetails(request.tmdbId, request.season)
+
+    // Check existing episodes
+    const existingEpisodes = await requestService.getEpisodes(request.id)
+    const existingEpNumbers = new Set(existingEpisodes.map((ep) => ep.episodeNumber))
+
+    // Add new episodes
+    const newEpisodes = seasonDetails.episodes.filter(
+      (ep) => !existingEpNumbers.has(ep.episodeNumber)
+    )
+
+    if (newEpisodes.length > 0) {
+      const created = await requestService.createEpisodesForSeason(
+        request.id,
+        newEpisodes.map((ep) => ({
+          seasonNumber: ep.seasonNumber,
+          episodeNumber: ep.episodeNumber,
+          title: ep.name,
+          airDate: ep.airDate,
+        }))
+      )
+
+      return c.json({
+        success: true,
+        seriesStatus: seriesDetails.status,
+        episodesAdded: created.length,
+        totalEpisodes: existingEpisodes.length + created.length,
+      })
+    }
+
+    return c.json({
+      success: true,
+      seriesStatus: seriesDetails.status,
+      episodesAdded: 0,
+      totalEpisodes: existingEpisodes.length,
+    })
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to fetch episodes' },
       500
     )
   }

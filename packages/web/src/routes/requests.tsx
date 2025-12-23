@@ -1,8 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useState, useRef } from 'react'
 import type { ParsedReleaseInfo } from '@jaeger/shared/types/indexer'
-import { QualitySummary, QualityDetails } from '../components/quality'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useRef, useState } from 'react'
 import { SimpleRequestModal } from '../components/SimpleRequestModal'
+import { QualityDetails, QualitySummary } from '../components/quality'
 import { useAuth } from '../lib/auth'
 
 type TrendingItem = {
@@ -64,7 +64,12 @@ function TrendingLane({
           className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-background/80 border border-border flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-card"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 19l-7-7 7-7"
+            />
           </svg>
         </button>
         <div
@@ -92,8 +97,18 @@ function TrendingLane({
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-card">
-                      <svg className="w-8 h-8 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
+                      <svg
+                        className="w-8 h-8 text-muted"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"
+                        />
                       </svg>
                     </div>
                   )}
@@ -102,9 +117,7 @@ function TrendingLane({
                   </div>
                 </div>
                 <p className="mt-2 text-sm text-foreground truncate">{itemTitle}</p>
-                {year && (
-                  <p className="text-xs text-muted">{new Date(year).getFullYear()}</p>
-                )}
+                {year && <p className="text-xs text-muted">{new Date(year).getFullYear()}</p>}
               </button>
             )
           })}
@@ -156,12 +169,10 @@ async function searchContent(query: string): Promise<SearchResult[]> {
   if (!query.trim()) return []
 
   const [movies, tv] = await Promise.all([
-    fetch(
-      `/api/metadata/tmdb/movies/search?query=${encodeURIComponent(query)}`
-    ).then((r) => r.json()),
-    fetch(
-      `/api/metadata/tmdb/tv/search?query=${encodeURIComponent(query)}`
-    ).then((r) => r.json()),
+    fetch(`/api/metadata/tmdb/movies/search?query=${encodeURIComponent(query)}`).then((r) =>
+      r.json()
+    ),
+    fetch(`/api/metadata/tmdb/tv/search?query=${encodeURIComponent(query)}`).then((r) => r.json()),
   ])
 
   const movieResults: SearchResult[] =
@@ -210,11 +221,33 @@ async function getMovieDetails(tmdbId: string): Promise<{ imdbId?: string; runti
   return { imdbId: data.imdb_id, runtime: data.runtime ?? undefined }
 }
 
+type TvSeasonInfo = {
+  seasonNumber: number
+  name: string
+  episodeCount: number
+  airDate?: string
+}
+
+type TvDetailsResponse = {
+  id: string
+  title: string
+  status: 'returning' | 'ended' | 'upcoming' | 'unknown'
+  numberOfSeasons: number
+  seasons: TvSeasonInfo[]
+}
+
+async function getTvDetails(tmdbId: string): Promise<TvDetailsResponse> {
+  const response = await fetch(`/api/metadata/tmdb/tv/${tmdbId}`)
+  if (!response.ok) throw new Error('Failed to fetch TV details')
+  return response.json()
+}
+
 async function searchIndexers(params: {
   imdbId?: string
   query?: string
   type: 'movie' | 'tv'
   runtime?: number
+  season?: number
 }): Promise<{ results: IndexerResult[]; errors?: { indexer: string; error: string }[] }> {
   const response = await fetch('/api/search', {
     method: 'POST',
@@ -286,7 +319,10 @@ function formatBytes(bytes: number): string {
 
 type QualityFilter = '2160p' | '1080p' | '720p' | 'all'
 
-function matchesQualityFilter(parsed: ParsedReleaseInfo | undefined, filter: QualityFilter): boolean {
+function matchesQualityFilter(
+  parsed: ParsedReleaseInfo | undefined,
+  filter: QualityFilter
+): boolean {
   if (filter === 'all') return true
   if (!parsed?.resolution) return false
   return parsed.resolution === filter
@@ -307,6 +343,42 @@ function formatAge(dateString: string): string {
   }
   const years = Math.floor(diffDays / 365)
   return `${years} ${years === 1 ? 'year' : 'years'} ago`
+}
+
+async function requestSeasonWithEpisodes(data: {
+  title: string
+  year?: number
+  tmdbId: string
+  posterPath?: string
+  overview?: string
+  season: number
+  seriesStatus: 'returning' | 'ended' | 'upcoming' | 'unknown'
+}): Promise<{ success: boolean; request: { id: string } }> {
+  // Create the request
+  const response = await fetch('/api/requests', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      title: data.title,
+      year: data.year,
+      type: 'tv',
+      tmdbId: data.tmdbId,
+      posterPath: data.posterPath,
+      overview: data.overview,
+      season: data.season,
+      seriesStatus: data.seriesStatus,
+    }),
+  })
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to create request')
+  }
+  const result = await response.json()
+
+  // Fetch episodes from TMDB
+  await fetch(`/api/requests/${result.request.id}/episodes/fetch`, { method: 'POST' })
+
+  return result
 }
 
 function ReleaseModal({
@@ -331,12 +403,19 @@ function ReleaseModal({
     queryFn: getDownloaders,
   })
 
+  // Fetch TV details for season info
+  const { data: tvDetails } = useQuery({
+    queryKey: ['tv-details', media.id],
+    queryFn: () => getTvDetails(media.id),
+    enabled: media.type === 'tv',
+  })
+
   const {
     data: indexerResults,
     isLoading: isSearching,
     error: searchError,
   } = useQuery({
-    queryKey: ['indexer-search', media.id, media.type],
+    queryKey: ['indexer-search', media.id, media.type, selectedSeason],
     queryFn: async () => {
       if (media.type === 'movie') {
         const details = await getMovieDetails(media.id)
@@ -348,7 +427,7 @@ function ReleaseModal({
         return searchIndexers({ query, type: 'movie', runtime: details.runtime })
       }
       const query = media.year ? `${media.title} ${media.year}` : media.title
-      return searchIndexers({ query, type: 'tv' })
+      return searchIndexers({ query, type: 'tv', season: selectedSeason })
     },
   })
 
@@ -356,7 +435,7 @@ function ReleaseModal({
     mutationFn: createRequest,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['requests'] })
-      setSuccessMessage('Added to requests! We\'ll keep searching.')
+      setSuccessMessage("Added to requests! We'll keep searching.")
       setTimeout(() => {
         setSuccessMessage(null)
         onClose()
@@ -381,8 +460,42 @@ function ReleaseModal({
     })
   }
 
+  const seasonRequestMutation = useMutation({
+    mutationFn: requestSeasonWithEpisodes,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['requests'] })
+      setSuccessMessage('Season requested! Episodes will be searched automatically.')
+      setTimeout(() => {
+        setSuccessMessage(null)
+        onClose()
+      }, 2000)
+    },
+    onError: (error: Error) => {
+      setErrorMessage(error.message)
+      setTimeout(() => setErrorMessage(null), 5000)
+    },
+  })
+
+  function handleRequestSeason() {
+    if (!selectedSeason || !tvDetails) return
+    seasonRequestMutation.mutate({
+      title: media.title,
+      year: media.year,
+      tmdbId: media.id,
+      posterPath: media.posterPath,
+      overview: media.overview,
+      season: selectedSeason,
+      seriesStatus: tvDetails.status,
+    })
+  }
+
   const downloadMutation = useMutation({
-    mutationFn: async ({ downloadUrl, downloaderId, releaseName, category }: { downloadUrl: string; downloaderId: string; releaseName: string; category?: string }) => {
+    mutationFn: async ({
+      downloadUrl,
+      downloaderId,
+      releaseName,
+      category,
+    }: { downloadUrl: string; downloaderId: string; releaseName: string; category?: string }) => {
       // First create a request record to track this download
       await createRequest({
         title: media.title,
@@ -419,7 +532,12 @@ function ReleaseModal({
     }
     setDownloadingGuid(result.guid)
     const category = media.type === 'movie' ? 'movies' : 'tv'
-    downloadMutation.mutate({ downloadUrl: result.downloadUrl, downloaderId, releaseName: result.title, category })
+    downloadMutation.mutate({
+      downloadUrl: result.downloadUrl,
+      downloaderId,
+      releaseName: result.title,
+      category,
+    })
   }
 
   return (
@@ -473,6 +591,60 @@ function ReleaseModal({
 
         {/* Filters bar */}
         <div className="px-6 py-3 border-b border-border bg-background/50 flex items-center gap-4 flex-wrap">
+          {/* Season selector for TV */}
+          {media.type === 'tv' && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted">Season:</span>
+              <select
+                value={selectedSeason ?? ''}
+                onChange={(e) =>
+                  setSelectedSeason(e.target.value ? Number(e.target.value) : undefined)
+                }
+                className="rounded-md bg-card border border-border px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+              >
+                <option value="">All seasons</option>
+                {tvDetails?.seasons
+                  .filter((s) => s.seasonNumber > 0)
+                  .map((s) => (
+                    <option key={s.seasonNumber} value={s.seasonNumber}>
+                      Season {s.seasonNumber} ({s.episodeCount} eps)
+                    </option>
+                  ))}
+              </select>
+              {tvDetails && (
+                <span
+                  className={`text-xs px-2 py-0.5 rounded ${
+                    tvDetails.status === 'returning'
+                      ? 'bg-green-500/10 text-green-400'
+                      : tvDetails.status === 'ended'
+                        ? 'bg-muted/20 text-muted'
+                        : 'bg-yellow-500/10 text-yellow-400'
+                  }`}
+                >
+                  {tvDetails.status === 'returning'
+                    ? 'Ongoing'
+                    : tvDetails.status === 'ended'
+                      ? 'Ended'
+                      : tvDetails.status === 'upcoming'
+                        ? 'Upcoming'
+                        : 'Unknown'}
+                </span>
+              )}
+              {selectedSeason && tvDetails && (
+                <button
+                  type="button"
+                  onClick={handleRequestSeason}
+                  disabled={seasonRequestMutation.isPending}
+                  className="rounded-md bg-accent px-4 py-1.5 text-sm font-medium text-white hover:bg-accent/90 transition-colors disabled:opacity-50"
+                >
+                  {seasonRequestMutation.isPending
+                    ? 'Requesting...'
+                    : `Request Season ${selectedSeason}`}
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Quality filter */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted">Quality:</span>
@@ -591,13 +763,19 @@ function ReleaseModal({
                     <select
                       id="season-select"
                       value={selectedSeason ?? ''}
-                      onChange={(e) => setSelectedSeason(e.target.value ? Number(e.target.value) : undefined)}
+                      onChange={(e) =>
+                        setSelectedSeason(e.target.value ? Number(e.target.value) : undefined)
+                      }
                       className="w-full rounded-md bg-card border border-border px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
                     >
                       <option value="">All seasons</option>
-                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((s) => (
-                        <option key={s} value={s}>Season {s}</option>
-                      ))}
+                      {tvDetails?.seasons
+                        .filter((s) => s.seasonNumber > 0)
+                        .map((s) => (
+                          <option key={s.seasonNumber} value={s.seasonNumber}>
+                            Season {s.seasonNumber} ({s.episodeCount} eps)
+                          </option>
+                        ))}
                     </select>
                   </div>
                 )}
@@ -624,94 +802,105 @@ function ReleaseModal({
             </div>
           )}
 
-          {!isSearching && indexerResults && indexerResults.results.length > 0 && (() => {
-            const filteredResults = indexerResults.results.filter((r) =>
-              matchesQualityFilter(r.parsed, qualityFilter)
-            )
-            return (
-            <div className="space-y-2">
-              {/* Table header */}
-              <div className="grid grid-cols-[1fr_minmax(200px,auto)_100px_120px_80px_100px] gap-3 px-4 py-2 text-xs font-medium text-muted uppercase tracking-wider">
-                <div>Release</div>
-                <div>Quality</div>
-                <div>Size</div>
-                <div>Indexer</div>
-                <div>Grabs</div>
-                <div>Age</div>
-              </div>
+          {!isSearching &&
+            indexerResults &&
+            indexerResults.results.length > 0 &&
+            (() => {
+              const filteredResults = indexerResults.results.filter((r) =>
+                matchesQualityFilter(r.parsed, qualityFilter)
+              )
+              return (
+                <div className="space-y-2">
+                  {/* Table header */}
+                  <div className="grid grid-cols-[1fr_minmax(200px,auto)_100px_120px_80px_100px] gap-3 px-4 py-2 text-xs font-medium text-muted uppercase tracking-wider">
+                    <div>Release</div>
+                    <div>Quality</div>
+                    <div>Size</div>
+                    <div>Indexer</div>
+                    <div>Grabs</div>
+                    <div>Age</div>
+                  </div>
 
-              {/* Results */}
-              {filteredResults.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-muted">No releases match the selected quality filter</p>
-                </div>
-              ) : (
-                filteredResults.map((result) => {
-                  const isExpanded = expandedGuid === result.guid
-                  return (
-                    <div key={result.guid} className="rounded-lg bg-background border border-border hover:border-accent/30 transition-colors">
-                      <div className="grid grid-cols-[1fr_minmax(200px,auto)_100px_120px_80px_100px] gap-3 items-center px-4 py-3 group">
-                        <div className="min-w-0">
-                          <p className="text-sm text-foreground truncate" title={result.title}>
-                            {result.title}
-                          </p>
-                        </div>
-                        <div>
-                          {result.parsed && (
-                            <QualitySummary
-                              parsed={result.parsed}
-                              showExpandButton
-                              expanded={isExpanded}
-                              onToggleExpand={() => setExpandedGuid(isExpanded ? null : result.guid)}
-                            />
+                  {/* Results */}
+                  {filteredResults.length === 0 ? (
+                    <div className="text-center py-8">
+                      <p className="text-muted">No releases match the selected quality filter</p>
+                    </div>
+                  ) : (
+                    filteredResults.map((result) => {
+                      const isExpanded = expandedGuid === result.guid
+                      return (
+                        <div
+                          key={result.guid}
+                          className="rounded-lg bg-background border border-border hover:border-accent/30 transition-colors"
+                        >
+                          <div className="grid grid-cols-[1fr_minmax(200px,auto)_100px_120px_80px_100px] gap-3 items-center px-4 py-3 group">
+                            <div className="min-w-0">
+                              <p className="text-sm text-foreground truncate" title={result.title}>
+                                {result.title}
+                              </p>
+                            </div>
+                            <div>
+                              {result.parsed && (
+                                <QualitySummary
+                                  parsed={result.parsed}
+                                  showExpandButton
+                                  expanded={isExpanded}
+                                  onToggleExpand={() =>
+                                    setExpandedGuid(isExpanded ? null : result.guid)
+                                  }
+                                />
+                              )}
+                            </div>
+                            <div className="text-sm text-muted">{formatBytes(result.size)}</div>
+                            <div className="text-sm text-muted truncate" title={result.indexer}>
+                              {result.indexer}
+                            </div>
+                            <div className="text-sm text-muted">{result.grabs ?? '-'}</div>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-sm text-muted">
+                                {formatAge(result.pubDate)}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleDownload(result)}
+                                disabled={downloadingGuid === result.guid || !downloaders?.length}
+                                className="opacity-0 group-hover:opacity-100 shrink-0 rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {downloadingGuid === result.guid ? (
+                                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                                ) : (
+                                  'Download'
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                          {isExpanded && result.parsed && (
+                            <div className="px-4 pb-4">
+                              <QualityDetails parsed={result.parsed} />
+                            </div>
                           )}
                         </div>
-                        <div className="text-sm text-muted">{formatBytes(result.size)}</div>
-                        <div className="text-sm text-muted truncate" title={result.indexer}>
-                          {result.indexer}
-                        </div>
-                        <div className="text-sm text-muted">{result.grabs ?? '-'}</div>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm text-muted">{formatAge(result.pubDate)}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleDownload(result)}
-                            disabled={downloadingGuid === result.guid || !downloaders?.length}
-                            className="opacity-0 group-hover:opacity-100 shrink-0 rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            {downloadingGuid === result.guid ? (
-                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                            ) : (
-                              'Download'
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                      {isExpanded && result.parsed && (
-                        <div className="px-4 pb-4">
-                          <QualityDetails parsed={result.parsed} />
-                        </div>
-                      )}
-                    </div>
-                  )
-                })
-              )}
+                      )
+                    })
+                  )}
 
-              {/* Errors */}
-              {indexerResults.errors && indexerResults.errors.length > 0 && (
-                <div className="mt-4 px-4 py-3 rounded-lg bg-yellow-500/5 border border-yellow-500/20">
-                  <p className="text-xs font-medium text-yellow-500 mb-1">
-                    Some indexers had errors:
-                  </p>
-                  {indexerResults.errors.map((err) => (
-                    <p key={err.indexer} className="text-xs text-yellow-400/80">
-                      {err.indexer}: {err.error}
-                    </p>
-                  ))}
+                  {/* Errors */}
+                  {indexerResults.errors && indexerResults.errors.length > 0 && (
+                    <div className="mt-4 px-4 py-3 rounded-lg bg-yellow-500/5 border border-yellow-500/20">
+                      <p className="text-xs font-medium text-yellow-500 mb-1">
+                        Some indexers had errors:
+                      </p>
+                      {indexerResults.errors.map((err) => (
+                        <p key={err.indexer} className="text-xs text-yellow-400/80">
+                          {err.indexer}: {err.error}
+                        </p>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          )})()}
+              )
+            })()}
         </div>
 
         {/* Footer */}
@@ -806,8 +995,18 @@ export default function Requests() {
             className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm text-muted hover:text-foreground border border-border hover:border-foreground/30 transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+              />
             </svg>
             {requestMode === 'simple' ? 'Simple Mode' : 'Detailed Mode'}
           </button>
@@ -914,13 +1113,12 @@ export default function Requests() {
       </div>
 
       {/* Modal - conditional based on request mode */}
-      {selectedMedia && (
-        requestMode === 'simple' ? (
+      {selectedMedia &&
+        (requestMode === 'simple' ? (
           <SimpleRequestModal media={selectedMedia} onClose={() => setSelectedMedia(null)} />
         ) : (
           <ReleaseModal media={selectedMedia} onClose={() => setSelectedMedia(null)} />
-        )
-      )}
+        ))}
     </div>
   )
 }

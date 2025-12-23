@@ -91,6 +91,9 @@ export const requests = sqliteTable('requests', {
 
   // TV-specific
   season: integer('season'),
+  seriesStatus: text('series_status', { enum: ['returning', 'ended', 'upcoming', 'unknown'] }),
+  totalEpisodes: integer('total_episodes'),
+  downloadedEpisodes: integer('downloaded_episodes').default(0),
 
   // Display
   posterPath: text('poster_path'),
@@ -137,4 +140,21 @@ export const requestUsers = sqliteTable('request_users', {
   requestId: text('request_id').notNull().references(() => requests.id),
   userId: text('user_id').notNull().references(() => users.id),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+})
+
+// Episode tracking for TV requests
+export const episodes = sqliteTable('episodes', {
+  id: text('id').primaryKey(),
+  requestId: text('request_id').notNull().references(() => requests.id, { onDelete: 'cascade' }),
+  seasonNumber: integer('season_number').notNull(),
+  episodeNumber: integer('episode_number').notNull(),
+  title: text('title'),
+  airDate: text('air_date'),
+  status: text('status', {
+    enum: ['pending', 'searching', 'downloading', 'completed', 'failed'],
+  }).notNull().default('pending'),
+  nzoId: text('nzo_id'),
+  releaseName: text('release_name'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 })

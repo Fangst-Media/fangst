@@ -1,6 +1,7 @@
+import { MetadataRelayClient } from '@jaeger/shared/clients/metadata-relay'
 import { Hono } from 'hono'
-import { configService } from '../services/config'
 import type { User } from '../services/auth'
+import { configService } from '../services/config'
 
 type AuthEnv = {
   Variables: {
@@ -14,7 +15,29 @@ function requireAuth(user: User | null): user is User {
   return user !== null
 }
 
-// Proxy all requests to metadata-relay
+// Get TV series details with seasons info
+metadata.get('/tmdb/tv/:id', async (c) => {
+  const user = c.get('user')
+  if (!requireAuth(user)) {
+    return c.json({ error: 'Authentication required' }, 401)
+  }
+
+  const tmdbId = c.req.param('id')
+
+  try {
+    const relayUrl = configService.getMetadataRelayUrl()
+    const client = new MetadataRelayClient(relayUrl)
+    const details = await client.getTvDetails(tmdbId)
+    return c.json(details)
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to fetch TV details' },
+      500
+    )
+  }
+})
+
+// Proxy all other requests to metadata-relay
 // GET /api/metadata/tmdb/* -> metadata-relay/tmdb/*
 metadata.all('/tmdb/*', async (c) => {
   const user = c.get('user')
@@ -43,10 +66,7 @@ metadata.all('/tmdb/*', async (c) => {
     const data = await response.json()
     return c.json(data)
   } catch (error) {
-    return c.json(
-      { error: error instanceof Error ? error.message : 'Proxy request failed' },
-      500
-    )
+    return c.json({ error: error instanceof Error ? error.message : 'Proxy request failed' }, 500)
   }
 })
 

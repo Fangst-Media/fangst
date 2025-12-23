@@ -1,6 +1,6 @@
-import { eq, inArray, and, isNull } from 'drizzle-orm'
+import { eq, inArray, and, isNull, sql } from 'drizzle-orm'
 import { db } from '../db'
-import { requests, users, requestUsers } from '../db/schema'
+import { requests, users, requestUsers, episodes } from '../db/schema'
 
 export type RequestStatus =
   | 'pending_approval'
@@ -28,6 +28,41 @@ export type CreateRequestData = {
   posterPath?: string
   overview?: string
   minQuality?: string
+  // TV series specific
+  seriesStatus?: 'returning' | 'ended' | 'upcoming' | 'unknown'
+  totalEpisodes?: number
+}
+
+export type EpisodeStatus = 'pending' | 'searching' | 'downloading' | 'completed' | 'failed'
+
+export type CreateEpisodeData = {
+  seasonNumber: number
+  episodeNumber: number
+  title?: string
+  airDate?: string
+}
+
+export type Episode = {
+  id: string
+  requestId: string
+  seasonNumber: number
+  episodeNumber: number
+  title: string | null
+  airDate: string | null
+  status: EpisodeStatus
+  nzoId: string | null
+  releaseName: string | null
+  createdAt: Date
+  updatedAt: Date
+}
+
+export type EpisodeWithRequest = Episode & {
+  request: {
+    id: string
+    title: string
+    tmdbId: string | null
+    season: number | null
+  }
 }
 
 export type RequestingUser = {
@@ -51,6 +86,11 @@ export type RequestWithUser = {
   minQuality: string | null
   nzoId: string | null
   releaseName: string | null
+  // TV series specific
+  seriesStatus: 'returning' | 'ended' | 'upcoming' | 'unknown' | null
+  totalEpisodes: number | null
+  downloadedEpisodes: number | null
+  // Timestamps
   createdAt: Date
   approvedAt: Date | null
   lastSearchedAt: Date | null
@@ -139,6 +179,9 @@ export class RequestService {
       posterPath: data.posterPath ?? null,
       overview: data.overview ?? null,
       minQuality: data.minQuality ?? null,
+      // TV series specific
+      seriesStatus: data.seriesStatus ?? null,
+      totalEpisodes: data.totalEpisodes ?? null,
       requestedBy: userId,
       status,
       createdAt: now,
@@ -253,6 +296,9 @@ export class RequestService {
         minQuality: row.request.minQuality,
         nzoId: row.request.nzoId,
         releaseName: row.request.releaseName,
+        seriesStatus: row.request.seriesStatus as 'returning' | 'ended' | 'upcoming' | 'unknown' | null,
+        totalEpisodes: row.request.totalEpisodes,
+        downloadedEpisodes: row.request.downloadedEpisodes,
         createdAt: row.request.createdAt,
         approvedAt: row.request.approvedAt,
         lastSearchedAt: row.request.lastSearchedAt,
@@ -397,6 +443,243 @@ export class RequestService {
   async getTvForMonitoring(): Promise<RequestWithUser[]> {
     const all = await this.getAll({ type: 'tv', status: 'completed' })
     return all.filter((r) => r.season !== null)
+  }
+
+  // Episode management methods
+
+  async createEpisodesForSeason(requestId: string, episodeList: CreateEpisodeData[]): Promise<Episode[]> {
+    const now = new Date()
+    const created: Episode[] = []
+
+    for (const ep of episodeList) {
+      const id = generateId()
+      await db.insert(episodes).values({
+        id,
+        requestId,
+        seasonNumber: ep.seasonNumber,
+        episodeNumber: ep.episodeNumber,
+        title: ep.title ?? null,
+        airDate: ep.airDate ?? null,
+        status: 'pending',
+        createdAt: now,
+        updatedAt: now,
+      })
+
+      created.push({
+        id,
+        requestId,
+        seasonNumber: ep.seasonNumber,
+        episodeNumber: ep.episodeNumber,
+        title: ep.title ?? null,
+        airDate: ep.airDate ?? null,
+        status: 'pending',
+        nzoId: null,
+        releaseName: null,
+        createdAt: now,
+        updatedAt: now,
+      })
+    }
+
+    // Update request's totalEpisodes count
+    await this.updateRequestEpisodeCounts(requestId)
+
+    return created
+  }
+
+  async getEpisodes(requestId: string): Promise<Episode[]> {
+    const results = await db.select().from(episodes).where(eq(episodes.requestId, requestId))
+
+    return results.map((ep) => ({
+      id: ep.id,
+      requestId: ep.requestId,
+      seasonNumber: ep.seasonNumber,
+      episodeNumber: ep.episodeNumber,
+      title: ep.title,
+      airDate: ep.airDate,
+      status: ep.status as EpisodeStatus,
+      nzoId: ep.nzoId,
+      releaseName: ep.releaseName,
+      createdAt: ep.createdAt,
+      updatedAt: ep.updatedAt,
+    }))
+  }
+
+  async getEpisodeById(id: string): Promise<Episode | null> {
+    const results = await db.select().from(episodes).where(eq(episodes.id, id)).limit(1)
+    if (results.length === 0) return null
+
+    const ep = results[0]!
+    return {
+      id: ep.id,
+      requestId: ep.requestId,
+      seasonNumber: ep.seasonNumber,
+      episodeNumber: ep.episodeNumber,
+      title: ep.title,
+      airDate: ep.airDate,
+      status: ep.status as EpisodeStatus,
+      nzoId: ep.nzoId,
+      releaseName: ep.releaseName,
+      createdAt: ep.createdAt,
+      updatedAt: ep.updatedAt,
+    }
+  }
+
+  async updateEpisodeStatus(
+    episodeId: string,
+    status: EpisodeStatus,
+    nzoId?: string,
+    releaseName?: string
+  ): Promise<void> {
+    const updates: Record<string, unknown> = {
+      status,
+      updatedAt: new Date(),
+    }
+
+    if (nzoId !== undefined) updates.nzoId = nzoId
+    if (releaseName !== undefined) updates.releaseName = releaseName
+
+    await db.update(episodes).set(updates).where(eq(episodes.id, episodeId))
+
+    // Get episode to find request ID and update counts
+    const ep = await this.getEpisodeById(episodeId)
+    if (ep) {
+      await this.updateRequestEpisodeCounts(ep.requestId)
+    }
+  }
+
+  async updateAllEpisodesForSeason(
+    requestId: string,
+    seasonNumber: number,
+    status: EpisodeStatus,
+    nzoId?: string,
+    releaseName?: string
+  ): Promise<void> {
+    const updates: Record<string, unknown> = {
+      status,
+      updatedAt: new Date(),
+    }
+
+    if (nzoId !== undefined) updates.nzoId = nzoId
+    if (releaseName !== undefined) updates.releaseName = releaseName
+
+    await db
+      .update(episodes)
+      .set(updates)
+      .where(and(eq(episodes.requestId, requestId), eq(episodes.seasonNumber, seasonNumber)))
+
+    await this.updateRequestEpisodeCounts(requestId)
+  }
+
+  async getEpisodesReadyToSearch(): Promise<EpisodeWithRequest[]> {
+    const today = new Date().toISOString().split('T')[0]!
+
+    const results = await db
+      .select({
+        episode: episodes,
+        request: {
+          id: requests.id,
+          title: requests.title,
+          tmdbId: requests.tmdbId,
+          season: requests.season,
+        },
+      })
+      .from(episodes)
+      .innerJoin(requests, eq(episodes.requestId, requests.id))
+      .where(
+        and(
+          eq(episodes.status, 'pending'),
+          // Air date is today or earlier (or null for unknown dates)
+          sql`(${episodes.airDate} IS NULL OR ${episodes.airDate} <= ${today})`
+        )
+      )
+
+    return results.map((row) => ({
+      id: row.episode.id,
+      requestId: row.episode.requestId,
+      seasonNumber: row.episode.seasonNumber,
+      episodeNumber: row.episode.episodeNumber,
+      title: row.episode.title,
+      airDate: row.episode.airDate,
+      status: row.episode.status as EpisodeStatus,
+      nzoId: row.episode.nzoId,
+      releaseName: row.episode.releaseName,
+      createdAt: row.episode.createdAt,
+      updatedAt: row.episode.updatedAt,
+      request: row.request,
+    }))
+  }
+
+  async getPendingEpisodesByRequest(requestId: string): Promise<Episode[]> {
+    const allEps = await this.getEpisodes(requestId)
+    return allEps.filter((ep) => ep.status === 'pending')
+  }
+
+  async updateRequestEpisodeCounts(requestId: string): Promise<void> {
+    const allEps = await this.getEpisodes(requestId)
+    const totalEpisodes = allEps.length
+    const downloadedEpisodes = allEps.filter((ep) => ep.status === 'completed').length
+
+    await db.update(requests).set({ totalEpisodes, downloadedEpisodes }).where(eq(requests.id, requestId))
+  }
+
+  async updateRequestSeriesStatus(
+    requestId: string,
+    seriesStatus: 'returning' | 'ended' | 'upcoming' | 'unknown'
+  ): Promise<void> {
+    await db.update(requests).set({ seriesStatus }).where(eq(requests.id, requestId))
+  }
+
+  async addEpisode(requestId: string, episode: CreateEpisodeData): Promise<Episode> {
+    const now = new Date()
+    const id = generateId()
+
+    await db.insert(episodes).values({
+      id,
+      requestId,
+      seasonNumber: episode.seasonNumber,
+      episodeNumber: episode.episodeNumber,
+      title: episode.title ?? null,
+      airDate: episode.airDate ?? null,
+      status: 'pending',
+      createdAt: now,
+      updatedAt: now,
+    })
+
+    await this.updateRequestEpisodeCounts(requestId)
+
+    return {
+      id,
+      requestId,
+      seasonNumber: episode.seasonNumber,
+      episodeNumber: episode.episodeNumber,
+      title: episode.title ?? null,
+      airDate: episode.airDate ?? null,
+      status: 'pending',
+      nzoId: null,
+      releaseName: null,
+      createdAt: now,
+      updatedAt: now,
+    }
+  }
+
+  async getTvRequestsWithPendingEpisodes(): Promise<RequestWithUser[]> {
+    const tvRequests = await this.getAll({ type: 'tv' })
+    const result: RequestWithUser[] = []
+
+    for (const request of tvRequests) {
+      if (request.season === null) continue
+      const pendingEps = await this.getPendingEpisodesByRequest(request.id)
+      if (pendingEps.length > 0) {
+        result.push(request)
+      }
+    }
+
+    return result
+  }
+
+  async getReturningSeriesRequests(): Promise<RequestWithUser[]> {
+    const tvRequests = await this.getAll({ type: 'tv' })
+    return tvRequests.filter((r) => r.seriesStatus === 'returning' || r.seriesStatus === 'upcoming')
   }
 }
 

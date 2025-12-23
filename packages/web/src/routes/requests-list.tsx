@@ -36,6 +36,11 @@ type MediaRequest = {
   overview: string | null
   status: RequestStatus
   minQuality: string | null
+  // TV series specific
+  seriesStatus: 'returning' | 'ended' | 'upcoming' | 'unknown' | null
+  totalEpisodes: number | null
+  downloadedEpisodes: number | null
+  // Timestamps
   createdAt: string
   approvedAt: string | null
   lastSearchedAt: string | null
@@ -81,6 +86,24 @@ async function runMonitorJob(): Promise<{ checked: number; completed: number; fa
   return response.json()
 }
 
+async function runEpisodeSearchJob(): Promise<{ checked: number; found: number; errors: number; seasonPacks: number }> {
+  const response = await fetch('/api/requests/episode-search-job', { method: 'POST' })
+  if (!response.ok) throw new Error('Failed to run episode search job')
+  return response.json()
+}
+
+async function runAirDateMonitor(): Promise<{ requestsChecked: number; episodesAdded: number; statusUpdates: number; errors: number }> {
+  const response = await fetch('/api/requests/air-date-monitor', { method: 'POST' })
+  if (!response.ok) throw new Error('Failed to run air date monitor')
+  return response.json()
+}
+
+async function fetchEpisodesFromTmdb(requestId: string): Promise<{ success: boolean; episodesAdded: number; seriesStatus: string }> {
+  const response = await fetch(`/api/requests/${requestId}/episodes/fetch`, { method: 'POST' })
+  if (!response.ok) throw new Error('Failed to fetch episodes from TMDB')
+  return response.json()
+}
+
 function formatRelativeTime(dateString: string | null): string {
   if (!dateString) return '-'
   const date = new Date(dateString)
@@ -94,6 +117,46 @@ function formatRelativeTime(dateString: string | null): string {
   if (diffHours < 24) return `${diffHours}h ago`
   const diffDays = Math.floor(diffHours / 24)
   return `${diffDays}d ago`
+}
+
+function SeriesStatusBadge({ status }: { status: 'returning' | 'ended' | 'upcoming' | 'unknown' }) {
+  const styles: Record<typeof status, string> = {
+    returning: 'bg-green-500/20 text-green-400',
+    ended: 'bg-gray-500/20 text-gray-400',
+    upcoming: 'bg-blue-500/20 text-blue-400',
+    unknown: 'bg-gray-500/20 text-gray-400',
+  }
+
+  const labels: Record<typeof status, string> = {
+    returning: 'Ongoing',
+    ended: 'Ended',
+    upcoming: 'Upcoming',
+    unknown: 'Unknown',
+  }
+
+  return (
+    <span className={`inline-block px-1.5 py-0.5 text-[10px] font-medium rounded ${styles[status]}`}>
+      {labels[status]}
+    </span>
+  )
+}
+
+function EpisodeProgress({ downloaded, total }: { downloaded: number; total: number }) {
+  const percentage = total > 0 ? Math.round((downloaded / total) * 100) : 0
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex-1 h-1.5 bg-background rounded-full overflow-hidden">
+        <div
+          className="h-full bg-accent transition-all duration-300"
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+      <span className="text-xs text-muted whitespace-nowrap">
+        {downloaded}/{total}
+      </span>
+    </div>
+  )
 }
 
 function StatusBadge({ status }: { status: RequestStatus }) {
@@ -180,6 +243,30 @@ export default function RequestsList() {
     },
   })
 
+  const episodeSearchMutation = useMutation({
+    mutationFn: runEpisodeSearchJob,
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['requests'] })
+      alert(`Episode search complete: ${result.found} found, ${result.seasonPacks} season packs, ${result.errors} errors`)
+    },
+  })
+
+  const airDateMonitorMutation = useMutation({
+    mutationFn: runAirDateMonitor,
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['requests'] })
+      alert(`Air date monitor complete: ${result.episodesAdded} episodes added, ${result.statusUpdates} status updates`)
+    },
+  })
+
+  const fetchEpisodesMutation = useMutation({
+    mutationFn: fetchEpisodesFromTmdb,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['requests'] })
+      queryClient.invalidateQueries({ queryKey: ['episodes'] })
+    },
+  })
+
   const tabs: { key: FilterTab; label: string }[] = [
     { key: 'all', label: 'All' },
     { key: 'pending', label: 'Pending' },
@@ -197,46 +284,70 @@ export default function RequestsList() {
         </div>
 
         {isAdmin && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <button
+              type="button"
+              onClick={() => airDateMonitorMutation.mutate()}
+              disabled={airDateMonitorMutation.isPending}
+              className="flex items-center gap-2 rounded-md bg-card border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-background disabled:opacity-50 transition-colors"
+              title="Check for new episodes from TMDB"
+            >
+              {airDateMonitorMutation.isPending ? (
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-foreground border-t-transparent" />
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              )}
+              <span className="hidden sm:inline">Air Dates</span>
+            </button>
             <button
               type="button"
               onClick={() => monitorJobMutation.mutate()}
               disabled={monitorJobMutation.isPending}
-              className="flex items-center gap-2 rounded-md bg-card border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-background disabled:opacity-50 transition-colors"
+              className="flex items-center gap-2 rounded-md bg-card border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-background disabled:opacity-50 transition-colors"
+              title="Check download status"
             >
               {monitorJobMutation.isPending ? (
-                <>
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-foreground border-t-transparent" />
-                  Checking...
-                </>
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-foreground border-t-transparent" />
               ) : (
-                <>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Check Downloads
-                </>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
               )}
+              <span className="hidden sm:inline">Downloads</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => episodeSearchMutation.mutate()}
+              disabled={episodeSearchMutation.isPending}
+              className="flex items-center gap-2 rounded-md bg-card border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-background disabled:opacity-50 transition-colors"
+              title="Search for TV episodes"
+            >
+              {episodeSearchMutation.isPending ? (
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-foreground border-t-transparent" />
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
+                </svg>
+              )}
+              <span className="hidden sm:inline">Episodes</span>
             </button>
             <button
               type="button"
               onClick={() => searchJobMutation.mutate()}
               disabled={searchJobMutation.isPending}
-              className="flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-50 transition-colors"
+              className="flex items-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-50 transition-colors"
+              title="Search for all approved requests"
             >
               {searchJobMutation.isPending ? (
-                <>
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  Searching...
-                </>
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
               ) : (
-                <>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  Search Now
-                </>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
               )}
+              <span className="hidden sm:inline">Search</span>
             </button>
           </div>
         )}
@@ -313,9 +424,15 @@ export default function RequestsList() {
                         {request.title}
                         {request.year && <span className="text-muted ml-1">({request.year})</span>}
                       </h3>
-                      <div className="flex items-center gap-2 mt-1 text-xs text-muted">
+                      <div className="flex items-center gap-2 mt-1 text-xs text-muted flex-wrap">
                         <span className="capitalize">{request.type}</span>
                         {request.season && <span>· Season {request.season}</span>}
+                        {request.seriesStatus && (
+                          <>
+                            <span>·</span>
+                            <SeriesStatusBadge status={request.seriesStatus} />
+                          </>
+                        )}
                         <span>
                           · by{' '}
                           {request.requestedByUsers.length > 0
@@ -337,6 +454,15 @@ export default function RequestsList() {
                           ))}
                         </div>
                       )}
+                      {/* Episode progress for TV requests */}
+                      {request.type === 'tv' && request.season && request.totalEpisodes !== null && request.totalEpisodes > 0 && (
+                        <div className="mt-2 max-w-xs">
+                          <EpisodeProgress
+                            downloaded={request.downloadedEpisodes ?? 0}
+                            total={request.totalEpisodes}
+                          />
+                        </div>
+                      )}
                     </div>
                     <StatusBadge status={request.status} />
                   </div>
@@ -354,7 +480,7 @@ export default function RequestsList() {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-2 mt-3">
+                  <div className="flex items-center gap-2 mt-3 flex-wrap">
                     {isAdmin && request.status === 'pending_approval' && (
                       <>
                         <button
@@ -374,6 +500,17 @@ export default function RequestsList() {
                           Reject
                         </button>
                       </>
+                    )}
+                    {/* Fetch episodes button for TV requests without episodes */}
+                    {isAdmin && request.type === 'tv' && request.season && request.tmdbId && (request.totalEpisodes === null || request.totalEpisodes === 0) && (
+                      <button
+                        type="button"
+                        onClick={() => fetchEpisodesMutation.mutate(request.id)}
+                        disabled={fetchEpisodesMutation.isPending}
+                        className="px-3 py-1 text-xs font-medium rounded bg-accent/20 text-accent hover:bg-accent/30 transition-colors"
+                      >
+                        {fetchEpisodesMutation.isPending ? 'Fetching...' : 'Fetch Episodes'}
+                      </button>
                     )}
                     {isAdmin ? (
                       <button
