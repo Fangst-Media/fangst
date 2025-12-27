@@ -254,9 +254,19 @@ export default function Requests() {
       {/* Modal - conditional based on request mode */}
       {selectedMedia &&
         (requestMode === 'simple' ? (
-          <SimpleRequestModal media={selectedMedia} onClose={() => setSelectedMedia(null)} />
+          <SimpleRequestModal
+            media={selectedMedia}
+            onClose={() => setSelectedMedia(null)}
+            canSwitchMode={canChooseRequestMode}
+            onSwitchMode={() => setRequestMode('detailed')}
+          />
         ) : (
-          <ReleaseModal media={selectedMedia} onClose={() => setSelectedMedia(null)} />
+          <ReleaseModal
+            media={selectedMedia}
+            onClose={() => setSelectedMedia(null)}
+            canSwitchMode={canChooseRequestMode}
+            onSwitchMode={() => setRequestMode('simple')}
+          />
         ))}
     </div>
   )

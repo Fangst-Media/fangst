@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 type SearchResult = {
   id: string
@@ -14,6 +14,28 @@ type SimpleRequestModalProps = {
   media: SearchResult
   onClose: () => void
   defaultQuality?: string
+  canSwitchMode?: boolean
+  onSwitchMode?: () => void
+}
+
+type TvSeasonInfo = {
+  seasonNumber: number
+  name: string
+  episodeCount: number
+}
+
+type TvDetailsResponse = {
+  id: string
+  title: string
+  status: 'returning' | 'ended' | 'upcoming' | 'unknown'
+  numberOfSeasons: number
+  seasons: TvSeasonInfo[]
+}
+
+async function getTvDetails(tmdbId: string): Promise<TvDetailsResponse> {
+  const response = await fetch(`/api/metadata/tmdb/tv/${tmdbId}`, { credentials: 'include' })
+  if (!response.ok) throw new Error('Failed to fetch TV details')
+  return response.json()
 }
 
 async function createRequest(data: {
@@ -24,11 +46,15 @@ async function createRequest(data: {
   posterPath?: string
   overview?: string
   minQuality?: string | null
+  season?: number
+  seriesStatus?: 'returning' | 'ended' | 'upcoming' | 'unknown'
+  fetchEpisodes?: boolean
 }): Promise<{ success: boolean }> {
   const response = await fetch('/api/requests', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
+    credentials: 'include',
   })
   if (!response.ok) {
     const error = await response.json()
@@ -37,11 +63,24 @@ async function createRequest(data: {
   return response.json()
 }
 
-export function SimpleRequestModal({ media, onClose, defaultQuality = '1080p' }: SimpleRequestModalProps) {
+export function SimpleRequestModal({
+  media,
+  onClose,
+  defaultQuality = '1080p',
+  canSwitchMode,
+  onSwitchMode,
+}: SimpleRequestModalProps) {
   const [quality, setQuality] = useState(defaultQuality)
+  const [selectedSeason, setSelectedSeason] = useState<number | 'all' | undefined>(undefined)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const queryClient = useQueryClient()
+
+  const { data: tvDetails, isLoading: isLoadingTvDetails } = useQuery({
+    queryKey: ['tv-details', media.id],
+    queryFn: () => getTvDetails(media.id),
+    enabled: media.type === 'tv',
+  })
 
   const requestMutation = useMutation({
     mutationFn: async () => {
@@ -53,6 +92,11 @@ export function SimpleRequestModal({ media, onClose, defaultQuality = '1080p' }:
         posterPath: media.posterPath,
         overview: media.overview,
         minQuality: quality === 'any' ? null : quality,
+        ...(media.type === 'tv' && {
+          season: selectedSeason === 'all' ? undefined : selectedSeason,
+          seriesStatus: tvDetails?.status,
+          fetchEpisodes: true,
+        }),
       })
     },
     onSuccess: () => {
@@ -104,6 +148,18 @@ export function SimpleRequestModal({ media, onClose, defaultQuality = '1080p' }:
               {media.type}
             </span>
           </div>
+          {canSwitchMode && onSwitchMode && (
+            <button
+              type="button"
+              onClick={onSwitchMode}
+              className="self-start p-1.5 rounded-md text-muted hover:text-foreground hover:bg-background transition-colors"
+              title="Switch to detailed mode"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+              </svg>
+            </button>
+          )}
         </div>
 
         {/* Messages */}
@@ -115,6 +171,42 @@ export function SimpleRequestModal({ media, onClose, defaultQuality = '1080p' }:
         {errorMessage && (
           <div className="mx-4 mt-4 px-4 py-3 rounded-md bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
             {errorMessage}
+          </div>
+        )}
+
+        {/* Season selector for TV shows */}
+        {media.type === 'tv' && (
+          <div className="p-4 pb-0">
+            <label htmlFor="season-select" className="block text-sm font-medium text-foreground mb-2">
+              Season
+            </label>
+            {isLoadingTvDetails ? (
+              <div className="flex items-center gap-2 text-sm text-muted py-2">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+                Loading seasons...
+              </div>
+            ) : (
+              <select
+                id="season-select"
+                value={selectedSeason ?? 'all'}
+                onChange={(e) => setSelectedSeason(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+                className="w-full rounded-md bg-background border border-border px-3 py-2.5 text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+              >
+                <option value="all">All Seasons</option>
+                {tvDetails?.seasons
+                  .filter((s) => s.seasonNumber > 0)
+                  .map((season) => (
+                    <option key={season.seasonNumber} value={season.seasonNumber}>
+                      {season.name} ({season.episodeCount} episodes)
+                    </option>
+                  ))}
+              </select>
+            )}
+            <p className="mt-2 text-xs text-muted">
+              {selectedSeason === 'all' || selectedSeason === undefined
+                ? 'All available seasons will be requested.'
+                : 'Only this season will be requested.'}
+            </p>
           </div>
         )}
 

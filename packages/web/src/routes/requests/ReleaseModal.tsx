@@ -184,9 +184,13 @@ function formatAge(dateString: string): string {
 export function ReleaseModal({
   media,
   onClose,
+  canSwitchMode,
+  onSwitchMode,
 }: {
   media: SearchResult
   onClose: () => void
+  canSwitchMode?: boolean
+  onSwitchMode?: () => void
 }) {
   const queryClient = useQueryClient()
   const [selectedDownloader, setSelectedDownloader] = useState<string>('')
@@ -364,26 +368,40 @@ export function ReleaseModal({
                 : `${indexerResults?.results.length || 0} releases found`}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 rounded-md text-muted hover:text-foreground hover:bg-background transition-colors"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
+          <div className="flex items-center gap-2">
+            {canSwitchMode && onSwitchMode && (
+              <button
+                type="button"
+                onClick={onSwitchMode}
+                className="p-2 rounded-md text-muted hover:text-foreground hover:bg-background transition-colors"
+                title="Switch to simple mode"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h8m-8 6h16" />
+                </svg>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 rounded-md text-muted hover:text-foreground hover:bg-background transition-colors"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Filters bar */}
