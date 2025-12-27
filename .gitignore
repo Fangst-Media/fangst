@@ -35,6 +35,7 @@ logs
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+drizzle/
 
 # Settings
 **/data/settings.yaml

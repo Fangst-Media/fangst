@@ -1,25 +1,29 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
-import { logger } from 'hono/logger'
-import media from './routes/media'
+import activity from './routes/activity'
 import auth from './routes/auth'
-import settings from './routes/settings'
 import downloaders from './routes/downloaders'
 import indexers from './routes/indexers'
-import search from './routes/search'
+import logsRouter from './routes/logs'
+import media from './routes/media'
 import metadata from './routes/metadata'
-import activity from './routes/activity'
 import requestsRouter from './routes/requests'
+import search from './routes/search'
+import settings from './routes/settings'
 import usersRouter from './routes/users'
 import { authMiddleware } from './middleware/auth'
+import { requestLogger } from './middleware/logging'
 import { configService } from './services/config'
+import { logger } from './lib/logger'
 
 // Initialize config before starting server
 await configService.initialize()
 
 const app = new Hono()
 
-app.use('*', logger())
+// Request logging (before auth so we log all requests)
+app.use('*', requestLogger)
+
 app.use(
   '*',
   cors({
@@ -43,6 +47,7 @@ app.get('/health', (c) => {
 })
 
 app.route('/api/auth', auth)
+app.route('/api/logs', logsRouter)
 app.route('/api/media', media)
 app.route('/api/settings', settings)
 app.route('/api/downloaders', downloaders)
@@ -54,12 +59,12 @@ app.route('/api/requests', requestsRouter)
 app.route('/api/users', usersRouter)
 
 const port = configService.getPort()
-console.log(`Server running on http://localhost:${port}`)
+logger.info({ port }, 'Server starting')
 if (configService.isMockFilesystem()) {
-  console.log('[MOCK] Filesystem: loaded from mock-filesystem.json')
+  logger.info('[MOCK] Filesystem: loaded from mock-filesystem.json')
 }
 if (configService.isMockAuth()) {
-  console.log('[MOCK] Auth: enabled')
+  logger.info('[MOCK] Auth: enabled')
 }
 
 export default {

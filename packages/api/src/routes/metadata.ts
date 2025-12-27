@@ -1,3 +1,4 @@
+import type { MetadataRelayResult } from '@jaeger/shared/clients/metadata-relay'
 import { MetadataRelayClient } from '@jaeger/shared/clients/metadata-relay'
 import { Hono } from 'hono'
 import type { User } from '../services/auth'
@@ -14,6 +15,76 @@ const metadata = new Hono<AuthEnv>()
 function requireAuth(user: User | null): user is User {
   return user !== null
 }
+
+// Simple in-memory cache for trending data (refreshes every 10 minutes)
+const cache = new Map<string, { data: MetadataRelayResult[]; expires: number }>()
+const CACHE_TTL = 10 * 60 * 1000 // 10 minutes
+
+function getCached(key: string): MetadataRelayResult[] | null {
+  const entry = cache.get(key)
+  if (!entry) return null
+  if (Date.now() > entry.expires) {
+    cache.delete(key)
+    return null
+  }
+  return entry.data
+}
+
+function setCache(key: string, data: MetadataRelayResult[]): void {
+  cache.set(key, { data, expires: Date.now() + CACHE_TTL })
+}
+
+// Trending movies with caching
+metadata.get('/tmdb/movies/trending', async (c) => {
+  const user = c.get('user')
+  if (!requireAuth(user)) {
+    return c.json({ error: 'Authentication required' }, 401)
+  }
+
+  try {
+    const cached = getCached('trending-movies')
+    if (cached) {
+      return c.json({ results: cached })
+    }
+
+    const relayUrl = configService.getMetadataRelayUrl()
+    const client = new MetadataRelayClient(relayUrl)
+    const results = await client.getTrendingMovies()
+    setCache('trending-movies', results)
+    return c.json({ results })
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to fetch trending movies' },
+      500
+    )
+  }
+})
+
+// Trending TV shows with caching - MUST be before /tmdb/tv/:id
+metadata.get('/tmdb/tv/trending', async (c) => {
+  const user = c.get('user')
+  if (!requireAuth(user)) {
+    return c.json({ error: 'Authentication required' }, 401)
+  }
+
+  try {
+    const cached = getCached('trending-tv')
+    if (cached) {
+      return c.json({ results: cached })
+    }
+
+    const relayUrl = configService.getMetadataRelayUrl()
+    const client = new MetadataRelayClient(relayUrl)
+    const results = await client.getTrendingTv()
+    setCache('trending-tv', results)
+    return c.json({ results })
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to fetch trending TV' },
+      500
+    )
+  }
+})
 
 // Get TV series details with seasons info
 metadata.get('/tmdb/tv/:id', async (c) => {

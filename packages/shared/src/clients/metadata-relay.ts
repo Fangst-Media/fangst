@@ -34,6 +34,17 @@ const tmdbTvSearchResponseSchema = z.object({
   total_pages: z.number(),
 })
 
+// Trending responses don't include total_results/total_pages
+const tmdbTrendingMovieResponseSchema = z.object({
+  results: z.array(tmdbMovieResultSchema),
+  page: z.number(),
+})
+
+const tmdbTrendingTvResponseSchema = z.object({
+  results: z.array(tmdbTvResultSchema),
+  page: z.number(),
+})
+
 // TV Series details with status and episode info
 const tmdbEpisodeSchema = z.object({
   id: z.number(),
@@ -288,6 +299,36 @@ export class MetadataRelayClient {
         airDate: ep.air_date || undefined,
       })),
     }
+  }
+
+  async getTrendingMovies(): Promise<MetadataRelayResult[]> {
+    const result = await this.fetch('/tmdb/movies/trending', tmdbTrendingMovieResponseSchema)
+
+    return result.results.map((movie) => ({
+      id: movie.id.toString(),
+      title: movie.title,
+      year: movie.release_date ? new Date(movie.release_date).getFullYear() : undefined,
+      overview: movie.overview,
+      poster: movie.poster_path || undefined,
+      backdrop: movie.backdrop_path || undefined,
+      rating: movie.vote_average,
+      type: 'movie' as const,
+    }))
+  }
+
+  async getTrendingTv(): Promise<MetadataRelayResult[]> {
+    const result = await this.fetch('/tmdb/tv/trending', tmdbTrendingTvResponseSchema)
+
+    return result.results.map((show) => ({
+      id: show.id.toString(),
+      title: show.name,
+      year: show.first_air_date ? new Date(show.first_air_date).getFullYear() : undefined,
+      overview: show.overview,
+      poster: show.poster_path || undefined,
+      backdrop: show.backdrop_path || undefined,
+      rating: show.vote_average,
+      type: 'tv' as const,
+    }))
   }
 
   private mapTmdbStatus(status?: string): TvSeriesStatus {
