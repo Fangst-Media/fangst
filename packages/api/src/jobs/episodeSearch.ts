@@ -4,7 +4,8 @@ import { type ParsedRelease, parseReleaseName } from '@jaeger/parser'
 import { SABnzbdClient } from '@jaeger/shared/clients/sabnzbd'
 import type { SearchResult } from '@jaeger/shared/types/indexer'
 import { configService } from '../services/config'
-import { type RequestWithUser, type Episode, requestService } from '../services/requests'
+import { type RequestWithUser, requestService } from '../services/requests'
+import type { Episode } from '../services/episodes'
 import { searchService } from '../services/search'
 
 const QUALITY_ORDER = ['2160p', '1080p', '720p', '480p']

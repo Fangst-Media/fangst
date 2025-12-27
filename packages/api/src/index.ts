@@ -15,6 +15,7 @@ import { authMiddleware } from './middleware/auth'
 import { requestLogger } from './middleware/logging'
 import { configService } from './services/config'
 import { logger } from './lib/logger'
+import { startScheduler } from './lib/scheduler'
 
 // Initialize config before starting server
 await configService.initialize()
@@ -66,6 +67,9 @@ if (configService.isMockFilesystem()) {
 if (configService.isMockAuth()) {
   logger.info('[MOCK] Auth: enabled')
 }
+
+// Start the job scheduler
+startScheduler()
 
 export default {
   port,

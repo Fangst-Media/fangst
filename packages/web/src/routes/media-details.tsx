@@ -30,6 +30,20 @@ async function fetchJellyfinUrl(): Promise<string | null> {
   }
 }
 
+async function fetchExternalIds(tmdbId: string, isTV: boolean): Promise<{ imdbId?: string } | null> {
+  try {
+    const type = isTV ? 'tv/shows' : 'movies'
+    const response = await fetch(`http://localhost:5001/api/metadata/tmdb/${type}/${tmdbId}/external_ids`, {
+      credentials: 'include',
+    })
+    if (!response.ok) return null
+    const data = await response.json()
+    return { imdbId: data.imdb_id }
+  } catch {
+    return null
+  }
+}
+
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
@@ -68,6 +82,16 @@ export default function MediaDetails({ slug }: MediaDetailsProps) {
   const { data: jellyfinUrl } = useQuery({
     queryKey: ['jellyfin-url'],
     queryFn: fetchJellyfinUrl,
+    staleTime: 1000 * 60 * 60,
+  })
+
+  const tmdbId = item?.metadata?.id?.replace('relay:', '')
+  const isTV = item?.parsed?.season !== undefined
+
+  const { data: externalIds } = useQuery({
+    queryKey: ['external-ids', tmdbId, isTV],
+    queryFn: () => fetchExternalIds(tmdbId!, isTV),
+    enabled: !!tmdbId,
     staleTime: 1000 * 60 * 60,
   })
 
@@ -204,6 +228,32 @@ export default function MediaDetails({ slug }: MediaDetailsProps) {
                       <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
                     </svg>
                     Open in Jellyfin
+                  </a>
+                )}
+                {metadata?.id && (metadata.provider === 'tmdb' || metadata.provider === 'relay') && (
+                  <a
+                    href={`https://www.themoviedb.org/${parsed.season !== undefined ? 'tv' : 'movie'}/${metadata.id.replace('relay:', '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-3 rounded-lg bg-[#01b4e4] text-white font-medium hover:bg-[#019fc7] transition-colors"
+                  >
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" />
+                    </svg>
+                    TMDB
+                  </a>
+                )}
+                {externalIds?.imdbId && (
+                  <a
+                    href={`https://www.imdb.com/title/${externalIds.imdbId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-3 rounded-lg bg-[#f5c518] text-black font-medium hover:bg-[#e6b800] transition-colors"
+                  >
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z" />
+                    </svg>
+                    IMDB
                   </a>
                 )}
               </div>

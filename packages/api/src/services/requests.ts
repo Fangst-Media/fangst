@@ -2,6 +2,7 @@ import { eq, inArray, and, isNull } from 'drizzle-orm'
 import { db } from '../db'
 import { requests, users, requestUsers } from '../db/schema'
 import { episodeService } from './episodes'
+import { triggerSearchJob } from '../lib/scheduler'
 import type { Episode } from './episodes'
 
 export type RequestStatus =
@@ -166,6 +167,12 @@ export class RequestService {
     if (!created) {
       throw new Error('Failed to create request')
     }
+
+    // If auto-approved (admin), trigger search job immediately
+    if (isAdmin) {
+      triggerSearchJob()
+    }
+
     return created
   }
 
@@ -349,6 +356,10 @@ export class RequestService {
     if (!updated) {
       throw new Error('Failed to approve request')
     }
+
+    // Trigger search job immediately for the newly approved request
+    triggerSearchJob()
+
     return updated
   }
 

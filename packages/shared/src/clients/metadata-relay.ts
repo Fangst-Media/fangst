@@ -243,7 +243,7 @@ export class MetadataRelayClient {
   }
 
   async getTvDetails(tmdbId: string | number): Promise<TvSeriesDetails> {
-    const result = await this.fetch(`/tmdb/tv/${tmdbId}`, tmdbTvDetailsSchema)
+    const result = await this.fetch(`/tmdb/tv/shows/${tmdbId}`, tmdbTvDetailsSchema)
 
     return {
       id: result.id.toString(),
@@ -285,7 +285,7 @@ export class MetadataRelayClient {
   }
 
   async getSeasonDetails(tmdbId: string | number, seasonNumber: number): Promise<SeasonDetails> {
-    const result = await this.fetch(`/tmdb/tv/${tmdbId}/season/${seasonNumber}`, tmdbSeasonDetailsSchema)
+    const result = await this.fetch(`/tmdb/tv/shows/${tmdbId}/${seasonNumber}`, tmdbSeasonDetailsSchema)
 
     return {
       seasonNumber: result.season_number,

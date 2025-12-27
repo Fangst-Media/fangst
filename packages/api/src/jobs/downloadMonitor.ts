@@ -78,42 +78,22 @@ export async function runDownloadMonitor(): Promise<{
   return { checked: downloadingRequests.length, completed, failed, librarySync }
 }
 
-function normalizeForMatching(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/['"!?]/g, '')
-    .replace(/[:\s]+/g, '.')
-    .replace(/\.+/g, '.')
-}
-
 function findMatchingHistorySlot(
   nzoId: string | null,
-  releaseName: string | null,
+  _releaseName: string | null,
   requestTitle: string,
   history: SABnzbdHistorySlot[]
 ): SABnzbdHistorySlot | undefined {
-  // Primary match: by nzoId (exact)
+  // Only match by nzoId - fuzzy matching causes false positives
   if (nzoId) {
     const match = history.find((slot) => slot.id === nzoId)
     if (match) return match
   }
 
-  // Secondary: by release name (fuzzy)
-  if (releaseName) {
-    const normalizedRelease = normalizeForMatching(releaseName)
-    const match = history.find((slot) => {
-      const slotName = normalizeForMatching(slot.name)
-      return slotName.includes(normalizedRelease) || normalizedRelease.includes(slotName)
-    })
-    if (match) return match
+  // If no nzoId, we can't reliably match - log warning
+  if (!nzoId) {
+    console.warn(`[DownloadMonitor] No nzoId for "${requestTitle}" - cannot match in history`)
   }
 
-  // Tertiary: by request title (for requests without release name)
-  const normalizedTitle = normalizeForMatching(requestTitle)
-  const match = history.find((slot) => {
-    const slotName = normalizeForMatching(slot.name)
-    return slotName.includes(normalizedTitle) || normalizedTitle.includes(slotName.split('.').slice(0, 3).join('.'))
-  })
-
-  return match
+  return undefined
 }

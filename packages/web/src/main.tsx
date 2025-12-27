@@ -4,6 +4,7 @@ import './index.css'
 import { RouterProvider, createRouter, createRootRoute, createRoute, Outlet, Navigate } from '@tanstack/react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider, useAuth } from './lib/auth'
+import { ConnectionProvider } from './lib/connection'
 import { Layout } from './components/Layout'
 import Login from './routes/login'
 import Dashboard from './routes/dashboard'
@@ -197,9 +198,11 @@ declare module '@tanstack/react-router' {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <RouterProvider router={router} />
-      </AuthProvider>
+      <ConnectionProvider>
+        <AuthProvider>
+          <RouterProvider router={router} />
+        </AuthProvider>
+      </ConnectionProvider>
     </QueryClientProvider>
   </StrictMode>
 )
