@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import activity from './routes/activity'
 import auth from './routes/auth'
+import calendarRouter from './routes/calendar'
 import downloaders from './routes/downloaders'
 import indexers from './routes/indexers'
 import logsRouter from './routes/logs'
@@ -56,6 +57,7 @@ app.route('/api/indexers', indexers)
 app.route('/api/search', search)
 app.route('/api/metadata', metadata)
 app.route('/api/activity', activity)
+app.route('/api/calendar', calendarRouter)
 app.route('/api/requests', requestsRouter)
 app.route('/api/users', usersRouter)
 

@@ -98,6 +98,7 @@ export type MetadataRelayResult = {
   id: string
   title: string
   year?: number
+  releaseDate?: string
   overview?: string
   poster?: string
   backdrop?: string
@@ -210,6 +211,7 @@ export class MetadataRelayClient {
         id: movie.id.toString(),
         title: movie.title,
         year: movie.release_date ? new Date(movie.release_date).getFullYear() : undefined,
+        releaseDate: movie.release_date,
         overview: movie.overview,
         poster: movie.poster_path || undefined,
         backdrop: movie.backdrop_path || undefined,
@@ -308,6 +310,7 @@ export class MetadataRelayClient {
       id: movie.id.toString(),
       title: movie.title,
       year: movie.release_date ? new Date(movie.release_date).getFullYear() : undefined,
+      releaseDate: movie.release_date,
       overview: movie.overview,
       poster: movie.poster_path || undefined,
       backdrop: movie.backdrop_path || undefined,

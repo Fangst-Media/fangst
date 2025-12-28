@@ -12,6 +12,7 @@ import Library from './routes/library'
 import MediaDetails from './routes/media-details'
 import Requests from './routes/requests'
 import RequestsList from './routes/requests-list'
+import Calendar from './routes/calendar'
 import Activity from './routes/activity'
 import Indexers from './routes/indexers'
 import Downloaders from './routes/downloaders'
@@ -142,6 +143,16 @@ const requestsListRoute = createRoute({
   ),
 })
 
+const calendarRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/calendar',
+  component: () => (
+    <ProtectedRoute>
+      <Calendar />
+    </ProtectedRoute>
+  ),
+})
+
 const activityRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/activity',
@@ -182,7 +193,7 @@ const settingsRoute = createRoute({
   ),
 })
 
-const routeTree = rootRoute.addChildren([indexRoute, loginRoute, dashboardRoute, libraryRoute, mediaDetailsRoute, requestsRoute, requestsListRoute, activityRoute, indexersRoute, downloadersRoute, settingsRoute])
+const routeTree = rootRoute.addChildren([indexRoute, loginRoute, dashboardRoute, libraryRoute, mediaDetailsRoute, requestsRoute, requestsListRoute, calendarRoute, activityRoute, indexersRoute, downloadersRoute, settingsRoute])
 
 const router = createRouter({
   routeTree,

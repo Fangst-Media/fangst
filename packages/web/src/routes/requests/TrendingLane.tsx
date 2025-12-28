@@ -4,10 +4,22 @@ export type TrendingItem = {
   id: string
   title: string
   year?: number
+  releaseDate?: string
   overview?: string
   poster?: string
   rating?: number
   type: 'movie' | 'tv'
+}
+
+function isNotReleased(releaseDate?: string): boolean {
+  if (!releaseDate) return false
+  const today = new Date().toISOString().split('T')[0]!
+  return releaseDate > today
+}
+
+function formatReleaseDate(releaseDate: string): string {
+  const date = new Date(releaseDate + 'T00:00:00')
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 export function TrendingLane({
@@ -86,6 +98,11 @@ export function TrendingLane({
                         d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"
                       />
                     </svg>
+                  </div>
+                )}
+                {item.type === 'movie' && isNotReleased(item.releaseDate) && (
+                  <div className="absolute top-1 right-1 px-1.5 py-0.5 text-[10px] font-medium rounded bg-orange-500 text-white shadow">
+                    {formatReleaseDate(item.releaseDate!)}
                   </div>
                 )}
                 <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity">

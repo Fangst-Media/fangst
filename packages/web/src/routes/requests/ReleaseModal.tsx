@@ -7,6 +7,7 @@ export type SearchResult = {
   id: string
   title: string
   year?: number
+  releaseDate?: string
   overview?: string
   posterPath?: string
   type: 'movie' | 'tv'

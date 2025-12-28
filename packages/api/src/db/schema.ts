@@ -95,6 +95,9 @@ export const requests = sqliteTable('requests', {
   totalEpisodes: integer('total_episodes'),
   downloadedEpisodes: integer('downloaded_episodes').default(0),
 
+  // Movie-specific (for calendar)
+  releaseDate: text('release_date'),
+
   // Display
   posterPath: text('poster_path'),
   overview: text('overview'),

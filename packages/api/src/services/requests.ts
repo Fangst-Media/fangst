@@ -34,6 +34,8 @@ export type CreateRequestData = {
   // TV series specific
   seriesStatus?: 'returning' | 'ended' | 'upcoming' | 'unknown'
   totalEpisodes?: number
+  // Movie specific (for calendar)
+  releaseDate?: string
 }
 
 export type RequestingUser = {
@@ -61,6 +63,8 @@ export type RequestWithUser = {
   seriesStatus: 'returning' | 'ended' | 'upcoming' | 'unknown' | null
   totalEpisodes: number | null
   downloadedEpisodes: number | null
+  // Movie specific
+  releaseDate: string | null
   // Timestamps
   createdAt: Date
   approvedAt: Date | null
@@ -153,6 +157,8 @@ export class RequestService {
       // TV series specific
       seriesStatus: data.seriesStatus ?? null,
       totalEpisodes: data.totalEpisodes ?? null,
+      // Movie specific
+      releaseDate: data.releaseDate ?? null,
       requestedBy: userId,
       status,
       createdAt: now,
@@ -276,6 +282,7 @@ export class RequestService {
         seriesStatus: row.request.seriesStatus as 'returning' | 'ended' | 'upcoming' | 'unknown' | null,
         totalEpisodes: row.request.totalEpisodes,
         downloadedEpisodes: row.request.downloadedEpisodes,
+        releaseDate: row.request.releaseDate,
         createdAt: row.request.createdAt,
         approvedAt: row.request.approvedAt,
         lastSearchedAt: row.request.lastSearchedAt,

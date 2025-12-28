@@ -5,6 +5,7 @@ type SearchResult = {
   id: string
   title: string
   year?: number
+  releaseDate?: string
   overview?: string
   posterPath?: string
   type: 'movie' | 'tv'
@@ -49,6 +50,7 @@ async function createRequest(data: {
   season?: number
   seriesStatus?: 'returning' | 'ended' | 'upcoming' | 'unknown'
   fetchEpisodes?: boolean
+  releaseDate?: string
 }): Promise<{ success: boolean }> {
   const response = await fetch('/api/requests', {
     method: 'POST',
@@ -92,6 +94,9 @@ export function SimpleRequestModal({
         posterPath: media.posterPath,
         overview: media.overview,
         minQuality: quality === 'any' ? null : quality,
+        ...(media.type === 'movie' && {
+          releaseDate: media.releaseDate,
+        }),
         ...(media.type === 'tv' && {
           season: selectedSeason === 'all' ? undefined : selectedSeason,
           seriesStatus: tvDetails?.status,
