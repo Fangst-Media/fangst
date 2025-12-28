@@ -1,8 +1,7 @@
-import type { MetadataRelayResult } from '@jaeger/shared/clients/metadata-relay'
-import { MetadataRelayClient } from '@jaeger/shared/clients/metadata-relay'
 import { Hono } from 'hono'
 import type { User } from '../services/auth'
 import { configService } from '../services/config'
+import { getMetadataService, type MetadataResult } from '../services/metadata'
 
 type AuthEnv = {
   Variables: {
@@ -16,25 +15,19 @@ function requireAuth(user: User | null): user is User {
   return user !== null
 }
 
-// Simple in-memory cache for trending data (refreshes every 10 minutes)
-const cache = new Map<string, { data: MetadataRelayResult[]; expires: number }>()
-const CACHE_TTL = 10 * 60 * 1000 // 10 minutes
-
-function getCached(key: string): MetadataRelayResult[] | null {
-  const entry = cache.get(key)
-  if (!entry) return null
-  if (Date.now() > entry.expires) {
-    cache.delete(key)
-    return null
-  }
-  return entry.data
+function getService() {
+  return getMetadataService({
+    relayUrl: configService.getMetadataRelayUrl(),
+    tmdbApiKey: configService.getTmdbApiKey() || undefined,
+  })
 }
 
-function setCache(key: string, data: MetadataRelayResult[]): void {
-  cache.set(key, { data, expires: Date.now() + CACHE_TTL })
+type LaneResponse = {
+  results: MetadataResult[]
+  unsupported?: boolean
 }
 
-// Trending movies with caching
+// Trending movies
 metadata.get('/tmdb/movies/trending', async (c) => {
   const user = c.get('user')
   if (!requireAuth(user)) {
@@ -42,16 +35,14 @@ metadata.get('/tmdb/movies/trending', async (c) => {
   }
 
   try {
-    const cached = getCached('trending-movies')
-    if (cached) {
-      return c.json({ results: cached })
+    const service = getService()
+    const results = await service.getTrendingMovies()
+
+    if (results === null) {
+      return c.json({ results: [], unsupported: true } satisfies LaneResponse)
     }
 
-    const relayUrl = configService.getMetadataRelayUrl()
-    const client = new MetadataRelayClient(relayUrl)
-    const results = await client.getTrendingMovies()
-    setCache('trending-movies', results)
-    return c.json({ results })
+    return c.json({ results } satisfies LaneResponse)
   } catch (error) {
     return c.json(
       { error: error instanceof Error ? error.message : 'Failed to fetch trending movies' },
@@ -60,7 +51,7 @@ metadata.get('/tmdb/movies/trending', async (c) => {
   }
 })
 
-// Trending TV shows with caching - MUST be before /tmdb/tv/:id
+// Trending TV shows - MUST be before /tmdb/tv/:id
 metadata.get('/tmdb/tv/trending', async (c) => {
   const user = c.get('user')
   if (!requireAuth(user)) {
@@ -68,19 +59,185 @@ metadata.get('/tmdb/tv/trending', async (c) => {
   }
 
   try {
-    const cached = getCached('trending-tv')
-    if (cached) {
-      return c.json({ results: cached })
+    const service = getService()
+    const results = await service.getTrendingTv()
+
+    if (results === null) {
+      return c.json({ results: [], unsupported: true } satisfies LaneResponse)
     }
 
-    const relayUrl = configService.getMetadataRelayUrl()
-    const client = new MetadataRelayClient(relayUrl)
-    const results = await client.getTrendingTv()
-    setCache('trending-tv', results)
-    return c.json({ results })
+    return c.json({ results } satisfies LaneResponse)
   } catch (error) {
     return c.json(
       { error: error instanceof Error ? error.message : 'Failed to fetch trending TV' },
+      500
+    )
+  }
+})
+
+// Popular movies
+metadata.get('/tmdb/movies/popular', async (c) => {
+  const user = c.get('user')
+  if (!requireAuth(user)) {
+    return c.json({ error: 'Authentication required' }, 401)
+  }
+
+  try {
+    const service = getService()
+    const results = await service.getPopularMovies()
+
+    if (results === null) {
+      return c.json({ results: [], unsupported: true } satisfies LaneResponse)
+    }
+
+    return c.json({ results } satisfies LaneResponse)
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to fetch popular movies' },
+      500
+    )
+  }
+})
+
+// Upcoming movies
+metadata.get('/tmdb/movies/upcoming', async (c) => {
+  const user = c.get('user')
+  if (!requireAuth(user)) {
+    return c.json({ error: 'Authentication required' }, 401)
+  }
+
+  try {
+    const service = getService()
+    const results = await service.getUpcomingMovies()
+
+    if (results === null) {
+      return c.json({ results: [], unsupported: true } satisfies LaneResponse)
+    }
+
+    return c.json({ results } satisfies LaneResponse)
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to fetch upcoming movies' },
+      500
+    )
+  }
+})
+
+// Now playing movies
+metadata.get('/tmdb/movies/now_playing', async (c) => {
+  const user = c.get('user')
+  if (!requireAuth(user)) {
+    return c.json({ error: 'Authentication required' }, 401)
+  }
+
+  try {
+    const service = getService()
+    const results = await service.getNowPlayingMovies()
+
+    if (results === null) {
+      return c.json({ results: [], unsupported: true } satisfies LaneResponse)
+    }
+
+    return c.json({ results } satisfies LaneResponse)
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to fetch now playing movies' },
+      500
+    )
+  }
+})
+
+// Top rated movies
+metadata.get('/tmdb/movies/top_rated', async (c) => {
+  const user = c.get('user')
+  if (!requireAuth(user)) {
+    return c.json({ error: 'Authentication required' }, 401)
+  }
+
+  try {
+    const service = getService()
+    const results = await service.getTopRatedMovies()
+
+    if (results === null) {
+      return c.json({ results: [], unsupported: true } satisfies LaneResponse)
+    }
+
+    return c.json({ results } satisfies LaneResponse)
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to fetch top rated movies' },
+      500
+    )
+  }
+})
+
+// Popular TV shows - MUST be before /tmdb/tv/:id
+metadata.get('/tmdb/tv/popular', async (c) => {
+  const user = c.get('user')
+  if (!requireAuth(user)) {
+    return c.json({ error: 'Authentication required' }, 401)
+  }
+
+  try {
+    const service = getService()
+    const results = await service.getPopularTv()
+
+    if (results === null) {
+      return c.json({ results: [], unsupported: true } satisfies LaneResponse)
+    }
+
+    return c.json({ results } satisfies LaneResponse)
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to fetch popular TV' },
+      500
+    )
+  }
+})
+
+// Top rated TV shows - MUST be before /tmdb/tv/:id
+metadata.get('/tmdb/tv/top_rated', async (c) => {
+  const user = c.get('user')
+  if (!requireAuth(user)) {
+    return c.json({ error: 'Authentication required' }, 401)
+  }
+
+  try {
+    const service = getService()
+    const results = await service.getTopRatedTv()
+
+    if (results === null) {
+      return c.json({ results: [], unsupported: true } satisfies LaneResponse)
+    }
+
+    return c.json({ results } satisfies LaneResponse)
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to fetch top rated TV' },
+      500
+    )
+  }
+})
+
+// On air TV shows - MUST be before /tmdb/tv/:id
+metadata.get('/tmdb/tv/on_the_air', async (c) => {
+  const user = c.get('user')
+  if (!requireAuth(user)) {
+    return c.json({ error: 'Authentication required' }, 401)
+  }
+
+  try {
+    const service = getService()
+    const results = await service.getOnAirTv()
+
+    if (results === null) {
+      return c.json({ results: [], unsupported: true } satisfies LaneResponse)
+    }
+
+    return c.json({ results } satisfies LaneResponse)
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to fetch on air TV' },
       500
     )
   }
@@ -96,9 +253,13 @@ metadata.get('/tmdb/tv/:id', async (c) => {
   const tmdbId = c.req.param('id')
 
   try {
-    const relayUrl = configService.getMetadataRelayUrl()
-    const client = new MetadataRelayClient(relayUrl)
-    const details = await client.getTvDetails(tmdbId)
+    const service = getService()
+    const details = await service.getTvDetails(tmdbId)
+
+    if (details === null) {
+      return c.json({ error: 'No provider supports TV details' }, 501)
+    }
+
     return c.json(details)
   } catch (error) {
     return c.json(
@@ -108,36 +269,57 @@ metadata.get('/tmdb/tv/:id', async (c) => {
   }
 })
 
-// Proxy all other requests to metadata-relay
-// GET /api/metadata/tmdb/* -> metadata-relay/tmdb/*
-metadata.all('/tmdb/*', async (c) => {
+// Proxy movie and TV search requests
+metadata.get('/tmdb/movies/search', async (c) => {
   const user = c.get('user')
   if (!requireAuth(user)) {
     return c.json({ error: 'Authentication required' }, 401)
   }
 
-  const relayUrl = configService.getMetadataRelayUrl()
-  const path = c.req.path.replace('/api/metadata', '')
-  const search = c.req.url.includes('?') ? `?${c.req.url.split('?')[1]}` : ''
+  const query = c.req.query('query')
+  if (!query) {
+    return c.json({ error: 'Query parameter required' }, 400)
+  }
 
   try {
-    const response = await fetch(`${relayUrl}${path}${search}`, {
-      method: c.req.method,
-      headers: {
-        'User-Agent': 'Jaeger/0.1.0',
-        Accept: 'application/json',
-      },
-    })
+    const service = getService()
+    const results = await service.searchMovie(query)
 
-    if (!response.ok) {
-      const status = response.status as 400 | 401 | 403 | 404 | 500
-      return c.json({ error: `Upstream error: ${response.statusText}` }, status)
+    if (results === null) {
+      return c.json({ results: [], unsupported: true })
     }
 
-    const data = await response.json()
-    return c.json(data)
+    return c.json({ results })
   } catch (error) {
-    return c.json({ error: error instanceof Error ? error.message : 'Proxy request failed' }, 500)
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to search movies' },
+      500
+    )
+  }
+})
+
+metadata.get('/tmdb/tv/search', async (c) => {
+  const user = c.get('user')
+  if (!requireAuth(user)) {
+    return c.json({ error: 'Authentication required' }, 401)
+  }
+
+  const query = c.req.query('query')
+  if (!query) {
+    return c.json({ error: 'Query parameter required' }, 400)
+  }
+
+  try {
+    const service = getService()
+    const results = await service.searchTv(query)
+
+    if (results === null) {
+      return c.json({ results: [], unsupported: true })
+    }
+
+    return c.json({ results })
+  } catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : 'Failed to search TV' }, 500)
   }
 })
 

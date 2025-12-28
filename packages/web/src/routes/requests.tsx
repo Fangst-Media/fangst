@@ -2,21 +2,14 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { SimpleRequestModal } from '../components/SimpleRequestModal'
 import { useAuth } from '../lib/auth'
+import { ContentLane, type LaneResponse } from './requests/ContentLane'
 import { ReleaseModal, type SearchResult } from './requests/ReleaseModal'
-import { TrendingLane, type TrendingItem } from './requests/TrendingLane'
+import type { TrendingItem } from './requests/TrendingLane'
 
-async function fetchTrendingMovies(): Promise<TrendingItem[]> {
-  const response = await fetch('/api/metadata/tmdb/movies/trending', { credentials: 'include' })
-  if (!response.ok) return []
-  const data = await response.json()
-  return data.results || []
-}
-
-async function fetchTrendingTv(): Promise<TrendingItem[]> {
-  const response = await fetch('/api/metadata/tmdb/tv/trending', { credentials: 'include' })
-  if (!response.ok) return []
-  const data = await response.json()
-  return data.results || []
+async function fetchLane(endpoint: string): Promise<LaneResponse> {
+  const response = await fetch(`/api/metadata/tmdb/${endpoint}`, { credentials: 'include' })
+  if (!response.ok) return { results: [] }
+  return response.json()
 }
 
 async function searchContent(query: string): Promise<SearchResult[]> {
@@ -43,6 +36,7 @@ async function searchContent(query: string): Promise<SearchResult[]> {
         id: m.id.toString(),
         title: m.title,
         year: m.release_date ? new Date(m.release_date).getFullYear() : undefined,
+        releaseDate: m.release_date,
         overview: m.overview,
         posterPath: m.poster_path,
         type: 'movie' as const,
@@ -71,7 +65,7 @@ async function searchContent(query: string): Promise<SearchResult[]> {
 }
 
 export default function Requests() {
-  const { requestMode, canChooseRequestMode, setRequestMode } = useAuth()
+  const { requestMode, canChooseRequestMode, setRequestMode, isAdmin } = useAuth()
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [selectedMedia, setSelectedMedia] = useState<SearchResult | null>(null)
@@ -87,21 +81,76 @@ export default function Requests() {
     enabled: debouncedQuery.length > 2,
   })
 
-  const { data: trendingMovies = [] } = useQuery({
+  // Movie lanes
+  const { data: trendingMovies } = useQuery({
     queryKey: ['trending-movies'],
-    queryFn: fetchTrendingMovies,
+    queryFn: () => fetchLane('movies/trending'),
     staleTime: 1000 * 60 * 10,
   })
 
-  const { data: trendingTv = [] } = useQuery({
+  const { data: upcomingMovies } = useQuery({
+    queryKey: ['upcoming-movies'],
+    queryFn: () => fetchLane('movies/upcoming'),
+    staleTime: 1000 * 60 * 60,
+  })
+
+  const { data: nowPlayingMovies } = useQuery({
+    queryKey: ['now-playing-movies'],
+    queryFn: () => fetchLane('movies/now_playing'),
+    staleTime: 1000 * 60 * 60,
+  })
+
+  const { data: popularMovies } = useQuery({
+    queryKey: ['popular-movies'],
+    queryFn: () => fetchLane('movies/popular'),
+    staleTime: 1000 * 60 * 60,
+  })
+
+  const { data: topRatedMovies } = useQuery({
+    queryKey: ['top-rated-movies'],
+    queryFn: () => fetchLane('movies/top_rated'),
+    staleTime: 1000 * 60 * 60,
+  })
+
+  // TV lanes
+  const { data: trendingTv } = useQuery({
     queryKey: ['trending-tv'],
-    queryFn: fetchTrendingTv,
+    queryFn: () => fetchLane('tv/trending'),
     staleTime: 1000 * 60 * 10,
+  })
+
+  const { data: onAirTv } = useQuery({
+    queryKey: ['on-air-tv'],
+    queryFn: () => fetchLane('tv/on_the_air'),
+    staleTime: 1000 * 60 * 60,
+  })
+
+  const { data: popularTv } = useQuery({
+    queryKey: ['popular-tv'],
+    queryFn: () => fetchLane('tv/popular'),
+    staleTime: 1000 * 60 * 60,
+  })
+
+  const { data: topRatedTv } = useQuery({
+    queryKey: ['top-rated-tv'],
+    queryFn: () => fetchLane('tv/top_rated'),
+    staleTime: 1000 * 60 * 60,
   })
 
   function getPosterUrl(path?: string) {
     if (!path) return '/placeholder-poster.png'
     return `https://image.tmdb.org/t/p/w185${path}`
+  }
+
+  function isNotReleased(releaseDate?: string): boolean {
+    if (!releaseDate) return false
+    const today = new Date().toISOString().split('T')[0]!
+    return releaseDate > today
+  }
+
+  function formatReleaseDate(releaseDate: string): string {
+    const date = new Date(releaseDate + 'T00:00:00')
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   }
 
   function handleRequest(result: SearchResult) {
@@ -113,6 +162,7 @@ export default function Requests() {
       id: item.id,
       title: item.title,
       year: item.year,
+      releaseDate: item.releaseDate,
       overview: item.overview,
       posterPath: item.poster,
       type: item.type,
@@ -196,11 +246,18 @@ export default function Requests() {
                 key={`${result.type}-${result.id}`}
                 className="flex gap-4 p-4 rounded-lg bg-card border border-border hover:border-accent/50 transition-colors"
               >
-                <img
-                  src={getPosterUrl(result.posterPath)}
-                  alt={result.title}
-                  className="w-16 h-24 rounded object-cover bg-background"
-                />
+                <div className="relative">
+                  <img
+                    src={getPosterUrl(result.posterPath)}
+                    alt={result.title}
+                    className="w-16 h-24 rounded object-cover bg-background"
+                  />
+                  {result.type === 'movie' && isNotReleased(result.releaseDate) && (
+                    <div className="absolute -top-1 -right-1 px-1.5 py-0.5 text-[10px] font-medium rounded bg-orange-500 text-white">
+                      {formatReleaseDate(result.releaseDate!)}
+                    </div>
+                  )}
+                </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-4">
                     <div>
@@ -237,16 +294,18 @@ export default function Requests() {
 
         {!debouncedQuery && (
           <div className="mt-8">
-            <TrendingLane
-              title="Trending Movies"
-              items={trendingMovies}
-              onSelect={handleTrendingSelect}
-            />
-            <TrendingLane
-              title="Trending TV Shows"
-              items={trendingTv}
-              onSelect={handleTrendingSelect}
-            />
+            {/* Movie lanes */}
+            <ContentLane title="Trending Movies" data={trendingMovies} isAdmin={isAdmin} onSelect={handleTrendingSelect} />
+            <ContentLane title="Upcoming Movies" data={upcomingMovies} isAdmin={isAdmin} onSelect={handleTrendingSelect} />
+            <ContentLane title="Now Playing" data={nowPlayingMovies} isAdmin={isAdmin} onSelect={handleTrendingSelect} />
+            <ContentLane title="Popular Movies" data={popularMovies} isAdmin={isAdmin} onSelect={handleTrendingSelect} />
+            <ContentLane title="Top Rated Movies" data={topRatedMovies} isAdmin={isAdmin} onSelect={handleTrendingSelect} />
+
+            {/* TV lanes */}
+            <ContentLane title="Trending TV Shows" data={trendingTv} isAdmin={isAdmin} onSelect={handleTrendingSelect} />
+            <ContentLane title="On Air" data={onAirTv} isAdmin={isAdmin} onSelect={handleTrendingSelect} />
+            <ContentLane title="Popular TV Shows" data={popularTv} isAdmin={isAdmin} onSelect={handleTrendingSelect} />
+            <ContentLane title="Top Rated TV Shows" data={topRatedTv} isAdmin={isAdmin} onSelect={handleTrendingSelect} />
           </div>
         )}
       </div>
