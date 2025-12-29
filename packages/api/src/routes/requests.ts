@@ -6,6 +6,7 @@ import { runEpisodeSearchJob } from '../jobs/episodeSearch'
 import { runSearchJob } from '../jobs/searchRequests'
 import type { User } from '../services/auth'
 import { configService } from '../services/config'
+import { episodeService, type MonitoringPreset } from '../services/episodes'
 import { type CreateRequestData, type RequestStatus, requestService } from '../services/requests'
 
 type AuthEnv = {
@@ -90,6 +91,32 @@ requestsRouter.post('/', async (c) => {
       400
     )
   }
+})
+
+// GET /api/requests/season/:tmdbId/:seasonNumber - Find request for a specific season
+requestsRouter.get('/season/:tmdbId/:seasonNumber', async (c) => {
+  const user = c.get('user')
+  if (!requireAuth(user)) {
+    return c.json({ error: 'Authentication required' }, 401)
+  }
+
+  const tmdbId = c.req.param('tmdbId')
+  const seasonNumber = parseInt(c.req.param('seasonNumber'), 10)
+
+  if (isNaN(seasonNumber)) {
+    return c.json({ error: 'Invalid season number' }, 400)
+  }
+
+  const request = await requestService.getByTmdbIdAndSeason(tmdbId, seasonNumber)
+
+  if (!request) {
+    return c.json({ request: null })
+  }
+
+  // Include episodes if request exists
+  const episodes = await requestService.getEpisodes(request.id)
+
+  return c.json({ request, episodes })
 })
 
 // GET /api/requests/:id - Get specific request
@@ -292,6 +319,44 @@ requestsRouter.get('/:id/episodes', async (c) => {
   return c.json({ episodes })
 })
 
+// PATCH /api/requests/:id/episodes/:episodeId - Toggle episode monitored status
+requestsRouter.patch('/:id/episodes/:episodeId', async (c) => {
+  const user = c.get('user')
+  if (!requireAuth(user)) {
+    return c.json({ error: 'Authentication required' }, 401)
+  }
+
+  const requestId = c.req.param('id')
+  const episodeId = c.req.param('episodeId')
+  const request = await requestService.getById(requestId)
+
+  if (!request) {
+    return c.json({ error: 'Request not found' }, 404)
+  }
+
+  if (user.role !== 'admin' && !request.requestedByUsers.some((u) => u.id === user.id)) {
+    return c.json({ error: 'Not authorized' }, 403)
+  }
+
+  try {
+    const body = (await c.req.json()) as { monitored: boolean }
+
+    if (typeof body.monitored !== 'boolean') {
+      return c.json({ error: 'monitored must be a boolean' }, 400)
+    }
+
+    await episodeService.setMonitored(episodeId, body.monitored)
+    const episode = await episodeService.getById(episodeId)
+
+    return c.json({ success: true, episode })
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to update episode' },
+      500
+    )
+  }
+})
+
 // POST /api/requests/:id/episodes/fetch - Fetch episodes from TMDB and create records
 requestsRouter.post('/:id/episodes/fetch', async (c) => {
   const user = c.get('user')
@@ -342,6 +407,7 @@ requestsRouter.post('/:id/episodes/fetch', async (c) => {
     )
 
     if (newEpisodes.length > 0) {
+      const preset = (request.monitoringPreset as MonitoringPreset) ?? 'all'
       const created = await requestService.createEpisodesForSeason(
         request.id,
         newEpisodes.map((ep) => ({
@@ -349,7 +415,8 @@ requestsRouter.post('/:id/episodes/fetch', async (c) => {
           episodeNumber: ep.episodeNumber,
           title: ep.name,
           airDate: ep.airDate,
-        }))
+        })),
+        preset
       )
 
       return c.json({

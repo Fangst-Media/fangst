@@ -12,6 +12,16 @@ async function fetchLane(endpoint: string): Promise<LaneResponse> {
   return response.json()
 }
 
+type MetadataResult = {
+  id: string
+  title: string
+  year?: number
+  releaseDate?: string
+  overview?: string
+  poster?: string
+  type: 'movie' | 'tv'
+}
+
 async function searchContent(query: string): Promise<SearchResult[]> {
   if (!query.trim()) return []
 
@@ -25,41 +35,25 @@ async function searchContent(query: string): Promise<SearchResult[]> {
   ])
 
   const movieResults: SearchResult[] =
-    movies.results?.slice(0, 5).map(
-      (m: {
-        id: number
-        title: string
-        release_date?: string
-        overview?: string
-        poster_path?: string
-      }) => ({
-        id: m.id.toString(),
-        title: m.title,
-        year: m.release_date ? new Date(m.release_date).getFullYear() : undefined,
-        releaseDate: m.release_date,
-        overview: m.overview,
-        posterPath: m.poster_path,
-        type: 'movie' as const,
-      })
-    ) || []
+    movies.results?.slice(0, 5).map((m: MetadataResult) => ({
+      id: m.id,
+      title: m.title,
+      year: m.year,
+      releaseDate: m.releaseDate,
+      overview: m.overview,
+      posterPath: m.poster,
+      type: 'movie' as const,
+    })) || []
 
   const tvResults: SearchResult[] =
-    tv.results?.slice(0, 5).map(
-      (t: {
-        id: number
-        name: string
-        first_air_date?: string
-        overview?: string
-        poster_path?: string
-      }) => ({
-        id: t.id.toString(),
-        title: t.name,
-        year: t.first_air_date ? new Date(t.first_air_date).getFullYear() : undefined,
-        overview: t.overview,
-        posterPath: t.poster_path,
-        type: 'tv' as const,
-      })
-    ) || []
+    tv.results?.slice(0, 5).map((t: MetadataResult) => ({
+      id: t.id,
+      title: t.title,
+      year: t.year,
+      overview: t.overview,
+      posterPath: t.poster,
+      type: 'tv' as const,
+    })) || []
 
   return [...movieResults, ...tvResults]
 }

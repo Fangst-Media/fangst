@@ -2,7 +2,25 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getMedia, triggerScan, type MediaItem } from '../lib/api'
 import { MediaCard } from '../components/MediaCard'
+import { TvShowCard } from '../components/TvShowCard'
+import { CollectionCard } from '../components/CollectionCard'
 import { useAuth } from '../lib/auth'
+
+type CollectionOverview = {
+  id: string
+  tmdbCollectionId: number
+  name: string
+  posterPath?: string
+  backdropPath?: string
+  movieCount: number
+  downloadedCount: number
+}
+
+async function getCollections(): Promise<{ collections: CollectionOverview[] }> {
+  const response = await fetch('/api/library/collections', { credentials: 'include' })
+  if (!response.ok) throw new Error('Failed to fetch collections')
+  return response.json()
+}
 
 type GroupedShow = {
   key: string
@@ -48,6 +66,11 @@ export default function Library() {
     queryFn: getMedia,
   })
 
+  const { data: collectionsData } = useQuery({
+    queryKey: ['collections'],
+    queryFn: getCollections,
+  })
+
   async function handleScan() {
     setIsScanning(true)
     try {
@@ -88,7 +111,8 @@ export default function Library() {
   const movies = data?.results.filter((item) => !item.parsed.season) || []
   const tvEpisodes = data?.results.filter((item) => item.parsed.season) || []
   const groupedShows = groupTvShows(tvEpisodes)
-  const totalItems = movies.length + groupedShows.length
+  const collections = collectionsData?.collections || []
+  const totalItems = movies.length + groupedShows.length + collections.length
 
   return (
     <div className="min-h-screen p-6">
@@ -122,6 +146,28 @@ export default function Library() {
       </div>
 
       <div>
+        {/* Collections section */}
+        {collections.length > 0 && (
+          <section className="mb-10">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-foreground">Collections</h2>
+              <span className="text-sm text-muted">{collections.length}</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4">
+              {collections.map((collection) => (
+                <CollectionCard
+                  key={collection.id}
+                  tmdbCollectionId={collection.tmdbCollectionId}
+                  name={collection.name}
+                  posterPath={collection.posterPath}
+                  movieCount={collection.movieCount}
+                  downloadedCount={collection.downloadedCount}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
         {movies.length > 0 && (
           <section className="mb-10">
             <div className="flex items-center justify-between mb-4">
@@ -143,9 +189,25 @@ export default function Library() {
               <span className="text-sm text-muted">{groupedShows.length}</span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4">
-              {groupedShows.map((show) => (
-                <MediaCard key={show.key} item={show.episodes[0]} episodeCount={show.episodeCount} />
-              ))}
+              {groupedShows.map((show) => {
+                const tmdbId = show.metadata?.id?.replace(/^[^:]+:/, '')
+                if (tmdbId) {
+                  return (
+                    <TvShowCard
+                      key={show.key}
+                      tmdbId={tmdbId}
+                      title={show.title}
+                      year={show.year}
+                      posterPath={show.metadata?.posterPath}
+                      rating={show.metadata?.rating}
+                      episodeCount={show.episodeCount}
+                    />
+                  )
+                }
+                return (
+                  <MediaCard key={show.key} item={show.episodes[0]!} episodeCount={show.episodeCount} />
+                )
+              })}
             </div>
           </section>
         )}

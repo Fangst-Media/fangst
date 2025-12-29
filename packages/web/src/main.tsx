@@ -10,6 +10,8 @@ import Login from './routes/login'
 import Dashboard from './routes/dashboard'
 import Library from './routes/library'
 import MediaDetails from './routes/media-details'
+import TvSeriesPage from './routes/tv-series'
+import SeasonPage from './routes/season'
 import Requests from './routes/requests'
 import RequestsList from './routes/requests-list'
 import Calendar from './routes/calendar'
@@ -17,6 +19,7 @@ import Activity from './routes/activity'
 import Indexers from './routes/indexers'
 import Downloaders from './routes/downloaders'
 import Settings from './routes/settings'
+import CollectionPage from './routes/collection'
 
 const queryClient = new QueryClient()
 
@@ -123,6 +126,45 @@ const mediaDetailsRoute = createRoute({
   },
 })
 
+const tvSeriesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/library/tv/$tmdbId',
+  component: function TvSeriesRoutePage() {
+    const { tmdbId } = tvSeriesRoute.useParams()
+    return (
+      <ProtectedRoute>
+        <TvSeriesPage tmdbId={tmdbId} />
+      </ProtectedRoute>
+    )
+  },
+})
+
+const seasonRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/library/tv/$tmdbId/season/$seasonNumber',
+  component: function SeasonRoutePage() {
+    const { tmdbId, seasonNumber } = seasonRoute.useParams()
+    return (
+      <ProtectedRoute>
+        <SeasonPage tmdbId={tmdbId} seasonNumber={parseInt(seasonNumber, 10)} />
+      </ProtectedRoute>
+    )
+  },
+})
+
+const collectionRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/library/collection/$collectionId',
+  component: function CollectionRoutePage() {
+    const { collectionId } = collectionRoute.useParams()
+    return (
+      <ProtectedRoute>
+        <CollectionPage collectionId={collectionId} />
+      </ProtectedRoute>
+    )
+  },
+})
+
 const requestsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/discover',
@@ -193,7 +235,7 @@ const settingsRoute = createRoute({
   ),
 })
 
-const routeTree = rootRoute.addChildren([indexRoute, loginRoute, dashboardRoute, libraryRoute, mediaDetailsRoute, requestsRoute, requestsListRoute, calendarRoute, activityRoute, indexersRoute, downloadersRoute, settingsRoute])
+const routeTree = rootRoute.addChildren([indexRoute, loginRoute, dashboardRoute, libraryRoute, tvSeriesRoute, seasonRoute, collectionRoute, mediaDetailsRoute, requestsRoute, requestsListRoute, calendarRoute, activityRoute, indexersRoute, downloadersRoute, settingsRoute])
 
 const router = createRouter({
   routeTree,

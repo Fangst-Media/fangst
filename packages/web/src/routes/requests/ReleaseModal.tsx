@@ -1,6 +1,10 @@
 import type { ParsedReleaseInfo } from '@jaeger/shared/types/indexer'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import {
+  MonitoringPresetSelector,
+  type MonitoringPreset,
+} from '../../components/MonitoringPresetSelector'
 import { QualityDetails, QualitySummary } from '../../components/quality'
 
 export type SearchResult = {
@@ -50,11 +54,49 @@ type TvDetailsResponse = {
 
 type QualityFilter = '2160p' | '1080p' | '720p' | 'all'
 
-async function getMovieDetails(tmdbId: string): Promise<{ imdbId?: string; runtime?: number }> {
+type MovieCollection = {
+  id: number
+  name: string
+  posterPath?: string
+  backdropPath?: string
+}
+
+type MovieDetailsResponse = {
+  imdbId?: string
+  runtime?: number
+  collection?: MovieCollection
+}
+
+async function getMovieDetails(tmdbId: string): Promise<MovieDetailsResponse> {
   const response = await fetch(`/api/metadata/tmdb/movies/${tmdbId}`)
   if (!response.ok) throw new Error('Failed to fetch movie details')
   const data = await response.json()
-  return { imdbId: data.imdb_id, runtime: data.runtime ?? undefined }
+  return {
+    imdbId: data.imdbId,
+    runtime: data.runtime ?? undefined,
+    collection: data.collection,
+  }
+}
+
+type CollectionDetails = {
+  id: number
+  name: string
+  overview?: string
+  posterPath?: string
+  backdropPath?: string
+  movies: {
+    id: number
+    title: string
+    overview?: string
+    releaseDate?: string
+    posterPath?: string
+  }[]
+}
+
+async function getCollectionDetails(collectionId: number): Promise<CollectionDetails> {
+  const response = await fetch(`/api/metadata/tmdb/collections/${collectionId}`)
+  if (!response.ok) throw new Error('Failed to fetch collection details')
+  return response.json()
 }
 
 async function getTvDetails(tmdbId: string): Promise<TvDetailsResponse> {
@@ -138,6 +180,7 @@ async function requestSeasonWithEpisodes(data: {
   overview?: string
   season: number
   seriesStatus: 'returning' | 'ended' | 'upcoming' | 'unknown'
+  monitoringPreset?: MonitoringPreset
 }): Promise<{ success: boolean; request: { id: string } }> {
   const response = await fetch('/api/requests', {
     method: 'POST',
@@ -200,12 +243,26 @@ export function ReleaseModal({
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [qualityFilter, setQualityFilter] = useState<QualityFilter>('all')
   const [selectedSeason, setSelectedSeason] = useState<number | undefined>(undefined)
+  const [monitoringPreset, setMonitoringPreset] = useState<MonitoringPreset>('all')
   const [imdbId, setImdbId] = useState<string | undefined>(undefined)
-  const [expandedGuid, setExpandedGuid] = useState<string | null>(null)
+  const [expandedGuids, setExpandedGuids] = useState<Set<string>>(new Set())
+  const [showCollectionPrompt, setShowCollectionPrompt] = useState(false)
 
   const { data: downloaders } = useQuery({
     queryKey: ['downloaders'],
     queryFn: getDownloaders,
+  })
+
+  const { data: movieDetails } = useQuery({
+    queryKey: ['movie-details', media.id],
+    queryFn: () => getMovieDetails(media.id),
+    enabled: media.type === 'movie',
+  })
+
+  const { data: collectionDetails } = useQuery({
+    queryKey: ['collection-details', movieDetails?.collection?.id],
+    queryFn: () => getCollectionDetails(movieDetails!.collection!.id),
+    enabled: !!movieDetails?.collection?.id,
   })
 
   const { data: tvDetails } = useQuery({
@@ -219,20 +276,20 @@ export function ReleaseModal({
     isLoading: isSearching,
     error: searchError,
   } = useQuery({
-    queryKey: ['indexer-search', media.id, media.type, selectedSeason],
+    queryKey: ['indexer-search', media.id, media.type, selectedSeason, movieDetails?.imdbId],
     queryFn: async () => {
       if (media.type === 'movie') {
-        const details = await getMovieDetails(media.id)
-        if (details.imdbId) {
-          setImdbId(details.imdbId)
-          return searchIndexers({ imdbId: details.imdbId, type: 'movie', runtime: details.runtime })
+        if (movieDetails?.imdbId) {
+          setImdbId(movieDetails.imdbId)
+          return searchIndexers({ imdbId: movieDetails.imdbId, type: 'movie', runtime: movieDetails.runtime })
         }
         const query = media.year ? `${media.title} ${media.year}` : media.title
-        return searchIndexers({ query, type: 'movie', runtime: details.runtime })
+        return searchIndexers({ query, type: 'movie', runtime: movieDetails?.runtime })
       }
       const query = media.year ? `${media.title} ${media.year}` : media.title
       return searchIndexers({ query, type: 'tv', season: selectedSeason })
     },
+    enabled: media.type === 'tv' || !!movieDetails,
   })
 
   const requestMutation = useMutation({
@@ -252,6 +309,12 @@ export function ReleaseModal({
   })
 
   function handleAddToRequests() {
+    // If movie has a collection and we haven't shown the prompt, show it
+    if (media.type === 'movie' && movieDetails?.collection && !showCollectionPrompt) {
+      setShowCollectionPrompt(true)
+      return
+    }
+
     requestMutation.mutate({
       title: media.title,
       year: media.year,
@@ -262,6 +325,44 @@ export function ReleaseModal({
       overview: media.overview,
       season: media.type === 'tv' ? selectedSeason : undefined,
     })
+  }
+
+  function handleRequestJustThisMovie() {
+    setShowCollectionPrompt(false)
+    requestMutation.mutate({
+      title: media.title,
+      year: media.year,
+      type: media.type,
+      tmdbId: media.id,
+      imdbId,
+      posterPath: media.posterPath,
+      overview: media.overview,
+    })
+  }
+
+  async function handleRequestCollection() {
+    if (!collectionDetails) return
+
+    setShowCollectionPrompt(false)
+
+    // Request each movie in the collection
+    for (const movie of collectionDetails.movies) {
+      await createRequest({
+        title: movie.title,
+        year: movie.releaseDate ? new Date(movie.releaseDate).getFullYear() : undefined,
+        type: 'movie',
+        tmdbId: movie.id.toString(),
+        posterPath: movie.posterPath,
+        overview: movie.overview,
+      })
+    }
+
+    queryClient.invalidateQueries({ queryKey: ['requests'] })
+    setSuccessMessage(`Added ${collectionDetails.movies.length} movies from "${collectionDetails.name}" to requests!`)
+    setTimeout(() => {
+      setSuccessMessage(null)
+      onClose()
+    }, 2500)
   }
 
   const seasonRequestMutation = useMutation({
@@ -290,6 +391,7 @@ export function ReleaseModal({
       overview: media.overview,
       season: selectedSeason,
       seriesStatus: tvDetails.status,
+      monitoringPreset,
     })
   }
 
@@ -461,6 +563,15 @@ export function ReleaseModal({
             </div>
           )}
 
+          {/* Monitoring preset selector for TV */}
+          {media.type === 'tv' && (
+            <MonitoringPresetSelector
+              value={monitoringPreset}
+              onChange={setMonitoringPreset}
+              seriesStatus={tvDetails?.status}
+            />
+          )}
+
           {/* Quality filter */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted">Quality:</span>
@@ -515,6 +626,81 @@ export function ReleaseModal({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
+          {/* Collection Prompt */}
+          {showCollectionPrompt && movieDetails?.collection && (
+            <div className="mb-6 p-6 rounded-xl bg-background border border-accent/30">
+              <div className="flex gap-4">
+                {/* Collection poster */}
+                {collectionDetails?.posterPath && (
+                  <img
+                    src={`https://image.tmdb.org/t/p/w154${collectionDetails.posterPath}`}
+                    alt={collectionDetails.name}
+                    className="w-24 h-36 rounded-lg object-cover shrink-0"
+                  />
+                )}
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-lg font-semibold text-foreground mb-1">
+                    Part of a Collection
+                  </h3>
+                  <p className="text-sm text-muted mb-3">
+                    <span className="text-foreground font-medium">{media.title}</span> is part of{' '}
+                    <span className="text-accent font-medium">{movieDetails.collection.name}</span>
+                  </p>
+
+                  {/* Collection movies list */}
+                  {collectionDetails && (
+                    <div className="mb-4">
+                      <p className="text-xs text-muted mb-2">
+                        {collectionDetails.movies.length} movies in this collection:
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {collectionDetails.movies.map((movie) => (
+                          <span
+                            key={movie.id}
+                            className={`text-xs px-2 py-1 rounded-md ${
+                              movie.id.toString() === media.id
+                                ? 'bg-accent/20 text-accent border border-accent/30'
+                                : 'bg-card text-muted border border-border'
+                            }`}
+                          >
+                            {movie.title}
+                            {movie.releaseDate && (
+                              <span className="opacity-60 ml-1">
+                                ({new Date(movie.releaseDate).getFullYear()})
+                              </span>
+                            )}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Action buttons */}
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={handleRequestJustThisMovie}
+                      disabled={requestMutation.isPending}
+                      className="px-4 py-2 rounded-md bg-card border border-border text-sm font-medium text-foreground hover:bg-background transition-colors disabled:opacity-50"
+                    >
+                      {requestMutation.isPending ? 'Adding...' : 'Just this movie'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleRequestCollection}
+                      disabled={!collectionDetails || requestMutation.isPending}
+                      className="px-4 py-2 rounded-md bg-accent text-sm font-medium text-white hover:bg-accent/90 transition-colors disabled:opacity-50"
+                    >
+                      {!collectionDetails
+                        ? 'Loading...'
+                        : `Request all ${collectionDetails.movies.length} movies`}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {isSearching && (
             <div className="flex flex-col items-center justify-center py-12">
               <div className="h-10 w-10 animate-spin rounded-full border-2 border-accent border-t-transparent mb-4" />
@@ -644,7 +830,7 @@ export function ReleaseModal({
                     </div>
                   ) : (
                     filteredResults.map((result) => {
-                      const isExpanded = expandedGuid === result.guid
+                      const isExpanded = expandedGuids.has(result.guid)
                       return (
                         <div
                           key={result.guid}
@@ -662,9 +848,17 @@ export function ReleaseModal({
                                   parsed={result.parsed}
                                   showExpandButton
                                   expanded={isExpanded}
-                                  onToggleExpand={() =>
-                                    setExpandedGuid(isExpanded ? null : result.guid)
-                                  }
+                                  onToggleExpand={() => {
+                                    setExpandedGuids((prev) => {
+                                      const next = new Set(prev)
+                                      if (next.has(result.guid)) {
+                                        next.delete(result.guid)
+                                      } else {
+                                        next.add(result.guid)
+                                      }
+                                      return next
+                                    })
+                                  }}
                                 />
                               )}
                             </div>
@@ -691,9 +885,12 @@ export function ReleaseModal({
                               </button>
                             </div>
                           </div>
-                          {isExpanded && result.parsed && (
-                            <div className="px-4 pb-4">
-                              <QualityDetails parsed={result.parsed} />
+                          {isExpanded && (
+                            <div className="px-4 pb-4 space-y-3">
+                              <p className="text-xs font-mono text-muted break-all bg-background/50 p-2 rounded">
+                                {result.title}
+                              </p>
+                              {result.parsed && <QualityDetails parsed={result.parsed} />}
                             </div>
                           )}
                         </div>

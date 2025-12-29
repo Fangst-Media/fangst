@@ -19,11 +19,14 @@ export type Episode = {
   title: string | null
   airDate: string | null
   status: EpisodeStatus
+  monitored: boolean
   nzoId: string | null
   releaseName: string | null
   createdAt: Date
   updatedAt: Date
 }
+
+export type MonitoringPreset = 'all' | 'future' | 'missing' | 'latest_season'
 
 export type EpisodeWithRequest = Episode & {
   request: {
@@ -40,11 +43,24 @@ function generateId(): string {
 
 export class EpisodeService {
   async createForSeason(requestId: string, episodeList: CreateEpisodeData[]): Promise<Episode[]> {
+    return this.createWithPreset(requestId, episodeList, 'all')
+  }
+
+  async createWithPreset(
+    requestId: string,
+    episodeList: CreateEpisodeData[],
+    preset: MonitoringPreset
+  ): Promise<Episode[]> {
     const now = new Date()
+    const today = new Date().toISOString().split('T')[0]!
     const created: Episode[] = []
+
+    const highestSeason = Math.max(...episodeList.map((ep) => ep.seasonNumber))
 
     for (const ep of episodeList) {
       const id = generateId()
+      const monitored = this.shouldMonitorEpisode(ep, preset, today, highestSeason)
+
       await db.insert(episodes).values({
         id,
         requestId,
@@ -53,6 +69,7 @@ export class EpisodeService {
         title: ep.title ?? null,
         airDate: ep.airDate ?? null,
         status: 'pending',
+        monitored,
         createdAt: now,
         updatedAt: now,
       })
@@ -65,6 +82,7 @@ export class EpisodeService {
         title: ep.title ?? null,
         airDate: ep.airDate ?? null,
         status: 'pending',
+        monitored,
         nzoId: null,
         releaseName: null,
         createdAt: now,
@@ -74,6 +92,26 @@ export class EpisodeService {
 
     await this.updateRequestEpisodeCounts(requestId)
     return created
+  }
+
+  private shouldMonitorEpisode(
+    ep: CreateEpisodeData,
+    preset: MonitoringPreset,
+    today: string,
+    highestSeason: number
+  ): boolean {
+    switch (preset) {
+      case 'all':
+        return true
+      case 'future':
+        return ep.airDate ? ep.airDate > today : true
+      case 'missing':
+        return true
+      case 'latest_season':
+        return ep.seasonNumber === highestSeason
+      default:
+        return true
+    }
   }
 
   async getByRequestId(requestId: string): Promise<Episode[]> {
@@ -87,6 +125,7 @@ export class EpisodeService {
       title: ep.title,
       airDate: ep.airDate,
       status: ep.status as EpisodeStatus,
+      monitored: ep.monitored,
       nzoId: ep.nzoId,
       releaseName: ep.releaseName,
       createdAt: ep.createdAt,
@@ -107,11 +146,19 @@ export class EpisodeService {
       title: ep.title,
       airDate: ep.airDate,
       status: ep.status as EpisodeStatus,
+      monitored: ep.monitored,
       nzoId: ep.nzoId,
       releaseName: ep.releaseName,
       createdAt: ep.createdAt,
       updatedAt: ep.updatedAt,
     }
+  }
+
+  async setMonitored(episodeId: string, monitored: boolean): Promise<void> {
+    await db
+      .update(episodes)
+      .set({ monitored, updatedAt: new Date() })
+      .where(eq(episodes.id, episodeId))
   }
 
   async updateStatus(
@@ -177,6 +224,7 @@ export class EpisodeService {
       .where(
         and(
           eq(episodes.status, 'pending'),
+          eq(episodes.monitored, true),
           sql`(${episodes.airDate} IS NULL OR ${episodes.airDate} <= ${today})`
         )
       )
@@ -189,6 +237,7 @@ export class EpisodeService {
       title: row.episode.title,
       airDate: row.episode.airDate,
       status: row.episode.status as EpisodeStatus,
+      monitored: row.episode.monitored,
       nzoId: row.episode.nzoId,
       releaseName: row.episode.releaseName,
       createdAt: row.episode.createdAt,
@@ -202,7 +251,7 @@ export class EpisodeService {
     return allEps.filter((ep) => ep.status === 'pending')
   }
 
-  async addOne(requestId: string, episode: CreateEpisodeData): Promise<Episode> {
+  async addOne(requestId: string, episode: CreateEpisodeData, monitored = true): Promise<Episode> {
     const now = new Date()
     const id = generateId()
 
@@ -214,6 +263,7 @@ export class EpisodeService {
       title: episode.title ?? null,
       airDate: episode.airDate ?? null,
       status: 'pending',
+      monitored,
       createdAt: now,
       updatedAt: now,
     })
@@ -228,6 +278,7 @@ export class EpisodeService {
       title: episode.title ?? null,
       airDate: episode.airDate ?? null,
       status: 'pending',
+      monitored,
       nzoId: null,
       releaseName: null,
       createdAt: now,

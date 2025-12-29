@@ -5,6 +5,7 @@ import auth from './routes/auth'
 import calendarRouter from './routes/calendar'
 import downloaders from './routes/downloaders'
 import indexers from './routes/indexers'
+import libraryRouter from './routes/library'
 import logsRouter from './routes/logs'
 import media from './routes/media'
 import metadata from './routes/metadata'
@@ -51,6 +52,7 @@ app.get('/health', (c) => {
 app.route('/api/auth', auth)
 app.route('/api/logs', logsRouter)
 app.route('/api/media', media)
+app.route('/api/library', libraryRouter)
 app.route('/api/settings', settings)
 app.route('/api/downloaders', downloaders)
 app.route('/api/indexers', indexers)

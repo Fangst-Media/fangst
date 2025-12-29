@@ -3,7 +3,7 @@ import { db } from '../db'
 import { requests, users, requestUsers } from '../db/schema'
 import { episodeService } from './episodes'
 import { triggerSearchJob } from '../lib/scheduler'
-import type { Episode } from './episodes'
+import type { Episode, MonitoringPreset } from './episodes'
 
 export type RequestStatus =
   | 'pending_approval'
@@ -34,6 +34,7 @@ export type CreateRequestData = {
   // TV series specific
   seriesStatus?: 'returning' | 'ended' | 'upcoming' | 'unknown'
   totalEpisodes?: number
+  monitoringPreset?: MonitoringPreset
   // Movie specific (for calendar)
   releaseDate?: string
 }
@@ -63,6 +64,7 @@ export type RequestWithUser = {
   seriesStatus: 'returning' | 'ended' | 'upcoming' | 'unknown' | null
   totalEpisodes: number | null
   downloadedEpisodes: number | null
+  monitoringPreset: MonitoringPreset | null
   // Movie specific
   releaseDate: string | null
   // Timestamps
@@ -157,6 +159,7 @@ export class RequestService {
       // TV series specific
       seriesStatus: data.seriesStatus ?? null,
       totalEpisodes: data.totalEpisodes ?? null,
+      monitoringPreset: data.monitoringPreset ?? null,
       // Movie specific
       releaseDate: data.releaseDate ?? null,
       requestedBy: userId,
@@ -282,6 +285,7 @@ export class RequestService {
         seriesStatus: row.request.seriesStatus as 'returning' | 'ended' | 'upcoming' | 'unknown' | null,
         totalEpisodes: row.request.totalEpisodes,
         downloadedEpisodes: row.request.downloadedEpisodes,
+        monitoringPreset: row.request.monitoringPreset as MonitoringPreset | null,
         releaseDate: row.request.releaseDate,
         createdAt: row.request.createdAt,
         approvedAt: row.request.approvedAt,
@@ -302,6 +306,29 @@ export class RequestService {
   async getById(id: string): Promise<RequestWithUser | null> {
     const results = await this.getAll()
     return results.find((r) => r.id === id) ?? null
+  }
+
+  async getByTmdbIdAndSeason(
+    tmdbId: string,
+    seasonNumber: number
+  ): Promise<RequestWithUser | null> {
+    const result = await db
+      .select({ id: requests.id })
+      .from(requests)
+      .where(
+        and(
+          eq(requests.tmdbId, tmdbId),
+          eq(requests.type, 'tv'),
+          eq(requests.season, seasonNumber)
+        )
+      )
+      .limit(1)
+
+    if (result.length === 0) {
+      return null
+    }
+
+    return this.getById(result[0]!.id)
   }
 
   async delete(id: string, userId: string, isAdmin: boolean): Promise<void> {
@@ -438,9 +465,10 @@ export class RequestService {
 
   async createEpisodesForSeason(
     requestId: string,
-    episodeList: { seasonNumber: number; episodeNumber: number; title?: string; airDate?: string }[]
+    episodeList: { seasonNumber: number; episodeNumber: number; title?: string; airDate?: string }[],
+    monitoringPreset?: MonitoringPreset
   ): Promise<Episode[]> {
-    return episodeService.createForSeason(requestId, episodeList)
+    return episodeService.createWithPreset(requestId, episodeList, monitoringPreset ?? 'all')
   }
 
   async getEpisodes(requestId: string): Promise<Episode[]> {

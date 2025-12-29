@@ -40,6 +40,17 @@ export const networkRules = sqliteTable('network_rules', {
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 })
 
+export const collections = sqliteTable('collections', {
+  id: text('id').primaryKey(),
+  tmdbCollectionId: integer('tmdb_collection_id').notNull().unique(),
+  name: text('name').notNull(),
+  overview: text('overview'),
+  posterPath: text('poster_path'),
+  backdropPath: text('backdrop_path'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+})
+
 export const metadata = sqliteTable('metadata', {
   id: text('id').primaryKey(),
   provider: text('provider').notNull(),
@@ -50,6 +61,7 @@ export const metadata = sqliteTable('metadata', {
   posterPath: text('poster_path'),
   backdropPath: text('backdrop_path'),
   rating: real('rating'),
+  tmdbCollectionId: integer('tmdb_collection_id'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 })
@@ -92,6 +104,9 @@ export const requests = sqliteTable('requests', {
   // TV-specific
   season: integer('season'),
   seriesStatus: text('series_status', { enum: ['returning', 'ended', 'upcoming', 'unknown'] }),
+  monitoringPreset: text('monitoring_preset', {
+    enum: ['all', 'future', 'missing', 'latest_season'],
+  }),
   totalEpisodes: integer('total_episodes'),
   downloadedEpisodes: integer('downloaded_episodes').default(0),
 
@@ -156,6 +171,7 @@ export const episodes = sqliteTable('episodes', {
   status: text('status', {
     enum: ['pending', 'searching', 'downloading', 'completed', 'failed'],
   }).notNull().default('pending'),
+  monitored: integer('monitored', { mode: 'boolean' }).notNull().default(true),
   nzoId: text('nzo_id'),
   releaseName: text('release_name'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),

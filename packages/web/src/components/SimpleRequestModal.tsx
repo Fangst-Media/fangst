@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { MonitoringPresetSelector, type MonitoringPreset } from './MonitoringPresetSelector'
 
 type SearchResult = {
   id: string
@@ -33,9 +34,49 @@ type TvDetailsResponse = {
   seasons: TvSeasonInfo[]
 }
 
+type MovieCollection = {
+  id: number
+  name: string
+  posterPath?: string
+  backdropPath?: string
+}
+
+type MovieDetailsResponse = {
+  imdbId?: string
+  runtime?: number
+  collection?: MovieCollection
+}
+
+type CollectionDetails = {
+  id: number
+  name: string
+  overview?: string
+  posterPath?: string
+  backdropPath?: string
+  movies: {
+    id: number
+    title: string
+    overview?: string
+    releaseDate?: string
+    posterPath?: string
+  }[]
+}
+
 async function getTvDetails(tmdbId: string): Promise<TvDetailsResponse> {
   const response = await fetch(`/api/metadata/tmdb/tv/${tmdbId}`, { credentials: 'include' })
   if (!response.ok) throw new Error('Failed to fetch TV details')
+  return response.json()
+}
+
+async function getMovieDetails(tmdbId: string): Promise<MovieDetailsResponse> {
+  const response = await fetch(`/api/metadata/tmdb/movies/${tmdbId}`, { credentials: 'include' })
+  if (!response.ok) throw new Error('Failed to fetch movie details')
+  return response.json()
+}
+
+async function getCollectionDetails(collectionId: number): Promise<CollectionDetails> {
+  const response = await fetch(`/api/metadata/tmdb/collections/${collectionId}`, { credentials: 'include' })
+  if (!response.ok) throw new Error('Failed to fetch collection details')
   return response.json()
 }
 
@@ -51,6 +92,7 @@ async function createRequest(data: {
   seriesStatus?: 'returning' | 'ended' | 'upcoming' | 'unknown'
   fetchEpisodes?: boolean
   releaseDate?: string
+  monitoringPreset?: MonitoringPreset
 }): Promise<{ success: boolean }> {
   const response = await fetch('/api/requests', {
     method: 'POST',
@@ -74,14 +116,28 @@ export function SimpleRequestModal({
 }: SimpleRequestModalProps) {
   const [quality, setQuality] = useState(defaultQuality)
   const [selectedSeason, setSelectedSeason] = useState<number | 'all' | undefined>(undefined)
+  const [monitoringPreset, setMonitoringPreset] = useState<MonitoringPreset>('all')
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [showCollectionPrompt, setShowCollectionPrompt] = useState(false)
   const queryClient = useQueryClient()
 
   const { data: tvDetails, isLoading: isLoadingTvDetails } = useQuery({
     queryKey: ['tv-details', media.id],
     queryFn: () => getTvDetails(media.id),
     enabled: media.type === 'tv',
+  })
+
+  const { data: movieDetails } = useQuery({
+    queryKey: ['movie-details', media.id],
+    queryFn: () => getMovieDetails(media.id),
+    enabled: media.type === 'movie',
+  })
+
+  const { data: collectionDetails } = useQuery({
+    queryKey: ['collection-details', movieDetails?.collection?.id],
+    queryFn: () => getCollectionDetails(movieDetails!.collection!.id),
+    enabled: !!movieDetails?.collection?.id,
   })
 
   const requestMutation = useMutation({
@@ -101,6 +157,7 @@ export function SimpleRequestModal({
           season: selectedSeason === 'all' ? undefined : selectedSeason,
           seriesStatus: tvDetails?.status,
           fetchEpisodes: true,
+          monitoringPreset,
         }),
       })
     },
@@ -121,6 +178,46 @@ export function SimpleRequestModal({
   function getPosterUrl(path?: string) {
     if (!path) return '/placeholder-poster.png'
     return `https://image.tmdb.org/t/p/w185${path}`
+  }
+
+  function handleRequest() {
+    // If movie has a collection and we haven't shown the prompt, show it
+    if (media.type === 'movie' && movieDetails?.collection && !showCollectionPrompt) {
+      setShowCollectionPrompt(true)
+      return
+    }
+    requestMutation.mutate()
+  }
+
+  function handleRequestJustThisMovie() {
+    setShowCollectionPrompt(false)
+    requestMutation.mutate()
+  }
+
+  async function handleRequestCollection() {
+    if (!collectionDetails) return
+
+    setShowCollectionPrompt(false)
+
+    // Request each movie in the collection
+    for (const movie of collectionDetails.movies) {
+      await createRequest({
+        title: movie.title,
+        year: movie.releaseDate ? new Date(movie.releaseDate).getFullYear() : undefined,
+        type: 'movie',
+        tmdbId: movie.id.toString(),
+        posterPath: movie.posterPath,
+        overview: movie.overview,
+        minQuality: quality === 'any' ? null : quality,
+      })
+    }
+
+    queryClient.invalidateQueries({ queryKey: ['requests'] })
+    setSuccessMessage(`Added ${collectionDetails.movies.length} movies from "${collectionDetails.name}"!`)
+    setTimeout(() => {
+      setSuccessMessage(null)
+      onClose()
+    }, 2000)
   }
 
   return (
@@ -212,6 +309,13 @@ export function SimpleRequestModal({
                 ? 'All available seasons will be requested.'
                 : 'Only this season will be requested.'}
             </p>
+            <div className="mt-4">
+              <MonitoringPresetSelector
+                value={monitoringPreset}
+                onChange={setMonitoringPreset}
+                seriesStatus={tvDetails?.status}
+              />
+            </div>
           </div>
         )}
 
@@ -236,31 +340,84 @@ export function SimpleRequestModal({
           </p>
         </div>
 
-        {/* Actions */}
-        <div className="flex gap-3 p-4 pt-0">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 rounded-md px-4 py-2.5 text-sm font-medium text-muted border border-border hover:text-foreground hover:border-foreground/30 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={() => requestMutation.mutate()}
-            disabled={requestMutation.isPending || !!successMessage}
-            className="flex-1 rounded-md bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent/90 transition-colors disabled:opacity-50"
-          >
-            {requestMutation.isPending ? (
-              <span className="flex items-center justify-center gap-2">
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                Requesting...
-              </span>
-            ) : (
-              'Request'
+        {/* Collection Prompt */}
+        {showCollectionPrompt && movieDetails?.collection && (
+          <div className="mx-4 mb-4 p-4 rounded-lg bg-background border border-accent/30">
+            <p className="text-sm text-foreground mb-2">
+              <span className="font-medium">{media.title}</span> is part of{' '}
+              <span className="text-accent font-medium">{movieDetails.collection.name}</span>
+            </p>
+
+            {collectionDetails && (
+              <div className="mb-3">
+                <p className="text-xs text-muted mb-1.5">
+                  {collectionDetails.movies.length} movies in collection:
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {collectionDetails.movies.map((movie) => (
+                    <span
+                      key={movie.id}
+                      className={`text-xs px-1.5 py-0.5 rounded ${
+                        movie.id.toString() === media.id
+                          ? 'bg-accent/20 text-accent'
+                          : 'bg-card text-muted'
+                      }`}
+                    >
+                      {movie.title}
+                    </span>
+                  ))}
+                </div>
+              </div>
             )}
-          </button>
-        </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleRequestJustThisMovie}
+                disabled={requestMutation.isPending}
+                className="flex-1 px-3 py-2 rounded-md bg-card border border-border text-sm font-medium text-foreground hover:bg-background transition-colors disabled:opacity-50"
+              >
+                Just this movie
+              </button>
+              <button
+                type="button"
+                onClick={handleRequestCollection}
+                disabled={!collectionDetails || requestMutation.isPending}
+                className="flex-1 px-3 py-2 rounded-md bg-accent text-sm font-medium text-white hover:bg-accent/90 transition-colors disabled:opacity-50"
+              >
+                {!collectionDetails ? 'Loading...' : `All ${collectionDetails.movies.length}`}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Actions */}
+        {!showCollectionPrompt && (
+          <div className="flex gap-3 p-4 pt-0">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 rounded-md px-4 py-2.5 text-sm font-medium text-muted border border-border hover:text-foreground hover:border-foreground/30 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleRequest}
+              disabled={requestMutation.isPending || !!successMessage}
+              className="flex-1 rounded-md bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent/90 transition-colors disabled:opacity-50"
+            >
+              {requestMutation.isPending ? (
+                <span className="flex items-center justify-center gap-2">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  Requesting...
+                </span>
+              ) : (
+                'Request'
+              )}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -243,6 +243,61 @@ metadata.get('/tmdb/tv/on_the_air', async (c) => {
   }
 })
 
+// Get collection details
+metadata.get('/tmdb/collections/:id', async (c) => {
+  const user = c.get('user')
+  if (!requireAuth(user)) {
+    return c.json({ error: 'Authentication required' }, 401)
+  }
+
+  const collectionId = parseInt(c.req.param('id'), 10)
+  if (isNaN(collectionId)) {
+    return c.json({ error: 'Invalid collection ID' }, 400)
+  }
+
+  try {
+    const service = getService()
+    const details = await service.getCollectionDetails(collectionId)
+
+    if (details === null) {
+      return c.json({ error: 'No provider supports collection details' }, 501)
+    }
+
+    return c.json(details)
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to fetch collection details' },
+      500
+    )
+  }
+})
+
+// Get movie details with runtime and IMDB ID
+metadata.get('/tmdb/movies/:id', async (c) => {
+  const user = c.get('user')
+  if (!requireAuth(user)) {
+    return c.json({ error: 'Authentication required' }, 401)
+  }
+
+  const tmdbId = c.req.param('id')
+
+  try {
+    const service = getService()
+    const details = await service.getMovieDetails(tmdbId)
+
+    if (details === null) {
+      return c.json({ error: 'No provider supports movie details' }, 501)
+    }
+
+    return c.json(details)
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to fetch movie details' },
+      500
+    )
+  }
+})
+
 // Get TV series details with seasons info
 metadata.get('/tmdb/tv/:id', async (c) => {
   const user = c.get('user')

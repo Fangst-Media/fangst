@@ -11,12 +11,47 @@ export type MetadataCapability =
   | 'search'
   | 'trending'
   | 'tvDetails'
+  | 'movieDetails'
   | 'seasonDetails'
+  | 'collectionDetails'
   | 'popular'
   | 'upcoming'
   | 'nowPlaying'
   | 'topRated'
   | 'onAir'
+
+export type MovieDetails = {
+  id: string
+  title: string
+  year?: number
+  overview?: string
+  poster?: string
+  backdrop?: string
+  rating?: number
+  runtime?: number
+  imdbId?: string
+  collection?: {
+    id: number
+    name: string
+    posterPath?: string
+    backdropPath?: string
+  }
+}
+
+export type CollectionDetails = {
+  id: number
+  name: string
+  overview?: string
+  posterPath?: string
+  backdropPath?: string
+  movies: {
+    id: number
+    title: string
+    overview?: string
+    releaseDate?: string
+    posterPath?: string
+  }[]
+}
 
 export interface MetadataProvider {
   name: string
@@ -34,7 +69,9 @@ export interface MetadataProvider {
   getTopRatedTv?(): Promise<MetadataRelayResult[]>
   getOnAirTv?(): Promise<MetadataRelayResult[]>
   getTvDetails?(tmdbId: string | number): Promise<TvSeriesDetails>
+  getMovieDetails?(tmdbId: string | number): Promise<MovieDetails>
   getSeasonDetails?(tmdbId: string | number, seasonNumber: number): Promise<SeasonDetails>
+  getCollectionDetails?(collectionId: number): Promise<CollectionDetails>
 }
 
 // Wraps the existing MetadataRelayClient
@@ -80,7 +117,9 @@ class TmdbProvider implements MetadataProvider {
     'search',
     'trending',
     'tvDetails',
+    'movieDetails',
     'seasonDetails',
+    'collectionDetails',
     'popular',
     'upcoming',
     'nowPlaying',
@@ -284,6 +323,52 @@ class TmdbProvider implements MetadataProvider {
     }
   }
 
+  async getMovieDetails(tmdbId: string | number): Promise<MovieDetails> {
+    const data = await this.fetch<TmdbMovieDetails>(`/movie/${tmdbId}`, `movie-details-${tmdbId}`)
+
+    return {
+      id: data.id.toString(),
+      title: data.title,
+      year: data.release_date ? new Date(data.release_date).getFullYear() : undefined,
+      overview: data.overview,
+      poster: data.poster_path || undefined,
+      backdrop: data.backdrop_path || undefined,
+      rating: data.vote_average,
+      runtime: data.runtime,
+      imdbId: data.imdb_id,
+      collection: data.belongs_to_collection
+        ? {
+            id: data.belongs_to_collection.id,
+            name: data.belongs_to_collection.name,
+            posterPath: data.belongs_to_collection.poster_path || undefined,
+            backdropPath: data.belongs_to_collection.backdrop_path || undefined,
+          }
+        : undefined,
+    }
+  }
+
+  async getCollectionDetails(collectionId: number): Promise<CollectionDetails> {
+    const data = await this.fetch<TmdbCollection>(
+      `/collection/${collectionId}`,
+      `collection-${collectionId}`
+    )
+
+    return {
+      id: data.id,
+      name: data.name,
+      overview: data.overview,
+      posterPath: data.poster_path || undefined,
+      backdropPath: data.backdrop_path || undefined,
+      movies: data.parts.map((part) => ({
+        id: part.id,
+        title: part.title,
+        overview: part.overview,
+        releaseDate: part.release_date,
+        posterPath: part.poster_path || undefined,
+      })),
+    }
+  }
+
   private mapTmdbStatus(status?: string): 'returning' | 'ended' | 'upcoming' | 'unknown' {
     if (!status) return 'unknown'
     const normalized = status.toLowerCase()
@@ -364,6 +449,39 @@ type TmdbTvDetails = {
   seasons?: TmdbSeason[]
   next_episode_to_air?: TmdbEpisode | null
   last_episode_to_air?: TmdbEpisode | null
+}
+
+type TmdbMovieDetails = {
+  id: number
+  title: string
+  overview?: string
+  release_date?: string
+  poster_path?: string | null
+  backdrop_path?: string | null
+  vote_average?: number
+  runtime?: number
+  imdb_id?: string
+  belongs_to_collection?: {
+    id: number
+    name: string
+    poster_path?: string | null
+    backdrop_path?: string | null
+  } | null
+}
+
+type TmdbCollection = {
+  id: number
+  name: string
+  overview?: string
+  poster_path?: string | null
+  backdrop_path?: string | null
+  parts: {
+    id: number
+    title: string
+    overview?: string
+    release_date?: string
+    poster_path?: string | null
+  }[]
 }
 
 // Orchestrates providers with priority-based fallback
@@ -473,6 +591,18 @@ export class MetadataService {
     const provider = this.getProvider('seasonDetails')
     if (!provider?.getSeasonDetails) return null
     return provider.getSeasonDetails(tmdbId, seasonNumber)
+  }
+
+  async getMovieDetails(tmdbId: string | number): Promise<MovieDetails | null> {
+    const provider = this.getProvider('movieDetails')
+    if (!provider?.getMovieDetails) return null
+    return provider.getMovieDetails(tmdbId)
+  }
+
+  async getCollectionDetails(collectionId: number): Promise<CollectionDetails | null> {
+    const provider = this.getProvider('collectionDetails')
+    if (!provider?.getCollectionDetails) return null
+    return provider.getCollectionDetails(collectionId)
   }
 }
 
