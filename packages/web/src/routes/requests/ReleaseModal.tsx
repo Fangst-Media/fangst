@@ -916,27 +916,13 @@ export function ReleaseModal({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-border bg-background/50">
-          {!downloaders?.length && !isSearching ? (
+        {!downloaders?.length && !isSearching && (
+          <div className="px-6 py-4 border-t border-border bg-background/50">
             <p className="text-sm text-yellow-500">
               No downloaders configured. Add a downloader in Settings to send downloads.
             </p>
-          ) : (
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted">
-                Can't find what you need? Add to requests for automatic monitoring.
-              </p>
-              <button
-                type="button"
-                onClick={handleAddToRequests}
-                disabled={requestMutation.isPending}
-                className="text-sm text-accent hover:text-accent/80 font-medium transition-colors disabled:opacity-50"
-              >
-                {requestMutation.isPending ? 'Adding...' : 'Add to Requests'}
-              </button>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   )
