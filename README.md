@@ -40,10 +40,10 @@ Bun, Hono, React. In the future we might add some rust services to keep things s
 
 ```bash
 # Install dependencies
-pnpm install
+bun install
 
 # Start development servers
-pnpm dev
+bun run dev
 ```
 
 ## Contributing

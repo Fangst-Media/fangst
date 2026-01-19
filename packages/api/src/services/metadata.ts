@@ -4,6 +4,7 @@ import type {
   TvSeriesDetails,
   SeasonDetails,
 } from '@jaeger/shared/clients/metadata-relay'
+import { logger } from '../lib/logger'
 
 export type { MetadataRelayResult as MetadataResult, TvSeriesDetails, SeasonDetails }
 
@@ -513,105 +514,280 @@ export class MetadataService {
   }
 
   async searchMovie(query: string, year?: number): Promise<MetadataRelayResult[] | null> {
-    const provider = this.getProvider('search')
-    if (!provider?.searchMovie) return null
-    return provider.searchMovie(query, year)
+    for (const provider of this.providers) {
+      if (provider.capabilities.includes('search') && provider.searchMovie) {
+        try {
+          return await provider.searchMovie(query, year)
+        } catch (error) {
+          logger.warn(
+            { provider: provider.name, error: error instanceof Error ? error.message : error },
+            'Provider failed, trying next'
+          )
+          continue
+        }
+      }
+    }
+    return null
   }
 
   async searchTv(query: string, year?: number): Promise<MetadataRelayResult[] | null> {
-    const provider = this.getProvider('search')
-    if (!provider?.searchTv) return null
-    return provider.searchTv(query, year)
+    for (const provider of this.providers) {
+      if (provider.capabilities.includes('search') && provider.searchTv) {
+        try {
+          return await provider.searchTv(query, year)
+        } catch (error) {
+          logger.warn(
+            { provider: provider.name, error: error instanceof Error ? error.message : error },
+            'Provider failed, trying next'
+          )
+          continue
+        }
+      }
+    }
+    return null
   }
 
   async getTrendingMovies(): Promise<MetadataRelayResult[] | null> {
-    const provider = this.getProvider('trending')
-    if (!provider?.getTrendingMovies) return null
-    return provider.getTrendingMovies()
+    for (const provider of this.providers) {
+      if (provider.capabilities.includes('trending') && provider.getTrendingMovies) {
+        try {
+          return await provider.getTrendingMovies()
+        } catch (error) {
+          logger.warn(
+            { provider: provider.name, error: error instanceof Error ? error.message : error },
+            'Provider failed, trying next'
+          )
+          continue
+        }
+      }
+    }
+    return null
   }
 
   async getTrendingTv(): Promise<MetadataRelayResult[] | null> {
-    const provider = this.getProvider('trending')
-    if (!provider?.getTrendingTv) return null
-    return provider.getTrendingTv()
+    for (const provider of this.providers) {
+      if (provider.capabilities.includes('trending') && provider.getTrendingTv) {
+        try {
+          return await provider.getTrendingTv()
+        } catch (error) {
+          logger.warn(
+            { provider: provider.name, error: error instanceof Error ? error.message : error },
+            'Provider failed, trying next'
+          )
+          continue
+        }
+      }
+    }
+    return null
   }
 
   async getPopularMovies(): Promise<MetadataRelayResult[] | null> {
-    const provider = this.getProvider('popular')
-    if (!provider?.getPopularMovies) return null
-    return provider.getPopularMovies()
+    for (const provider of this.providers) {
+      if (provider.capabilities.includes('popular') && provider.getPopularMovies) {
+        try {
+          return await provider.getPopularMovies()
+        } catch (error) {
+          logger.warn(
+            { provider: provider.name, error: error instanceof Error ? error.message : error },
+            'Provider failed, trying next'
+          )
+          continue
+        }
+      }
+    }
+    return null
   }
 
   async getPopularTv(): Promise<MetadataRelayResult[] | null> {
-    const provider = this.getProvider('popular')
-    if (!provider?.getPopularTv) return null
-    return provider.getPopularTv()
+    for (const provider of this.providers) {
+      if (provider.capabilities.includes('popular') && provider.getPopularTv) {
+        try {
+          return await provider.getPopularTv()
+        } catch (error) {
+          logger.warn(
+            { provider: provider.name, error: error instanceof Error ? error.message : error },
+            'Provider failed, trying next'
+          )
+          continue
+        }
+      }
+    }
+    return null
   }
 
   async getUpcomingMovies(): Promise<MetadataRelayResult[] | null> {
-    const provider = this.getProvider('upcoming')
-    if (!provider?.getUpcomingMovies) return null
-    return provider.getUpcomingMovies()
+    for (const provider of this.providers) {
+      if (provider.capabilities.includes('upcoming') && provider.getUpcomingMovies) {
+        try {
+          return await provider.getUpcomingMovies()
+        } catch (error) {
+          logger.warn(
+            { provider: provider.name, error: error instanceof Error ? error.message : error },
+            'Provider failed, trying next'
+          )
+          continue
+        }
+      }
+    }
+    return null
   }
 
   async getNowPlayingMovies(): Promise<MetadataRelayResult[] | null> {
-    const provider = this.getProvider('nowPlaying')
-    if (!provider?.getNowPlayingMovies) return null
-    return provider.getNowPlayingMovies()
+    for (const provider of this.providers) {
+      if (provider.capabilities.includes('nowPlaying') && provider.getNowPlayingMovies) {
+        try {
+          return await provider.getNowPlayingMovies()
+        } catch (error) {
+          logger.warn(
+            { provider: provider.name, error: error instanceof Error ? error.message : error },
+            'Provider failed, trying next'
+          )
+          continue
+        }
+      }
+    }
+    return null
   }
 
   async getTopRatedMovies(): Promise<MetadataRelayResult[] | null> {
-    const provider = this.getProvider('topRated')
-    if (!provider?.getTopRatedMovies) return null
-    return provider.getTopRatedMovies()
+    for (const provider of this.providers) {
+      if (provider.capabilities.includes('topRated') && provider.getTopRatedMovies) {
+        try {
+          return await provider.getTopRatedMovies()
+        } catch (error) {
+          logger.warn(
+            { provider: provider.name, error: error instanceof Error ? error.message : error },
+            'Provider failed, trying next'
+          )
+          continue
+        }
+      }
+    }
+    return null
   }
 
   async getTopRatedTv(): Promise<MetadataRelayResult[] | null> {
-    const provider = this.getProvider('topRated')
-    if (!provider?.getTopRatedTv) return null
-    return provider.getTopRatedTv()
+    for (const provider of this.providers) {
+      if (provider.capabilities.includes('topRated') && provider.getTopRatedTv) {
+        try {
+          return await provider.getTopRatedTv()
+        } catch (error) {
+          logger.warn(
+            { provider: provider.name, error: error instanceof Error ? error.message : error },
+            'Provider failed, trying next'
+          )
+          continue
+        }
+      }
+    }
+    return null
   }
 
   async getOnAirTv(): Promise<MetadataRelayResult[] | null> {
-    const provider = this.getProvider('onAir')
-    if (!provider?.getOnAirTv) return null
-    return provider.getOnAirTv()
+    for (const provider of this.providers) {
+      if (provider.capabilities.includes('onAir') && provider.getOnAirTv) {
+        try {
+          return await provider.getOnAirTv()
+        } catch (error) {
+          logger.warn(
+            { provider: provider.name, error: error instanceof Error ? error.message : error },
+            'Provider failed, trying next'
+          )
+          continue
+        }
+      }
+    }
+    return null
   }
 
   async getTvDetails(tmdbId: string | number): Promise<TvSeriesDetails | null> {
-    const provider = this.getProvider('tvDetails')
-    if (!provider?.getTvDetails) return null
-    return provider.getTvDetails(tmdbId)
+    for (const provider of this.providers) {
+      if (provider.capabilities.includes('tvDetails') && provider.getTvDetails) {
+        try {
+          return await provider.getTvDetails(tmdbId)
+        } catch (error) {
+          logger.warn(
+            { provider: provider.name, error: error instanceof Error ? error.message : error },
+            'Provider failed, trying next'
+          )
+          continue
+        }
+      }
+    }
+    return null
   }
 
   async getSeasonDetails(
     tmdbId: string | number,
     seasonNumber: number
   ): Promise<SeasonDetails | null> {
-    const provider = this.getProvider('seasonDetails')
-    if (!provider?.getSeasonDetails) return null
-    return provider.getSeasonDetails(tmdbId, seasonNumber)
+    for (const provider of this.providers) {
+      if (provider.capabilities.includes('seasonDetails') && provider.getSeasonDetails) {
+        try {
+          return await provider.getSeasonDetails(tmdbId, seasonNumber)
+        } catch (error) {
+          logger.warn(
+            { provider: provider.name, error: error instanceof Error ? error.message : error },
+            'Provider failed, trying next'
+          )
+          continue
+        }
+      }
+    }
+    return null
   }
 
   async getMovieDetails(tmdbId: string | number): Promise<MovieDetails | null> {
-    const provider = this.getProvider('movieDetails')
-    if (!provider?.getMovieDetails) return null
-    return provider.getMovieDetails(tmdbId)
+    for (const provider of this.providers) {
+      if (provider.capabilities.includes('movieDetails') && provider.getMovieDetails) {
+        try {
+          return await provider.getMovieDetails(tmdbId)
+        } catch (error) {
+          logger.warn(
+            { provider: provider.name, error: error instanceof Error ? error.message : error },
+            'Provider failed, trying next'
+          )
+          continue
+        }
+      }
+    }
+    return null
   }
 
   async getCollectionDetails(collectionId: number): Promise<CollectionDetails | null> {
-    const provider = this.getProvider('collectionDetails')
-    if (!provider?.getCollectionDetails) return null
-    return provider.getCollectionDetails(collectionId)
+    for (const provider of this.providers) {
+      if (provider.capabilities.includes('collectionDetails') && provider.getCollectionDetails) {
+        try {
+          return await provider.getCollectionDetails(collectionId)
+        } catch (error) {
+          logger.warn(
+            { provider: provider.name, error: error instanceof Error ? error.message : error },
+            'Provider failed, trying next'
+          )
+          continue
+        }
+      }
+    }
+    return null
   }
 }
 
-// Singleton instance
+// Singleton instance (disabled for now to support hot reload)
 let metadataService: MetadataService | null = null
 
 export function getMetadataService(config: { relayUrl: string; tmdbApiKey?: string }): MetadataService {
-  if (!metadataService) {
-    metadataService = new MetadataService(config)
-  }
+  // Always create new instance until hot reload issue is resolved
+  metadataService = new MetadataService(config)
+
+  logger.info(
+    {
+      providers: metadataService['providers'].map((p) => ({
+        name: p.name,
+        capabilities: p.capabilities,
+      })),
+    },
+    'Initialized metadata providers'
+  )
+
   return metadataService
 }

@@ -411,7 +411,6 @@ export function ReleaseModal({
         posterPath: media.posterPath,
         overview: media.overview,
         season: media.type === 'tv' ? selectedSeason : undefined,
-        downloading: true,
       })
       return sendToDownloader(downloadUrl, downloaderId, releaseName, category)
     },

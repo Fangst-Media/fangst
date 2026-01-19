@@ -8,8 +8,8 @@ services:
       - TZ=Europe/Copenhagen
     volumes:
       - sabnzbd-config:/config
-      - ./dev-data/incomplete:/incomplete
-      - ./dev-data/media:/media
+      - ./dev-data/incomplete:/config/Downloads/incomplete
+      - ./dev-data/media:/config/Downloads/complete
     ports:
       - "8080:8080"
     restart: unless-stopped

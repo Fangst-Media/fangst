@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import type { User } from '../services/auth'
 import { configService } from '../services/config'
 import { getMetadataService, type MetadataResult } from '../services/metadata'
+import { logger } from '../lib/logger'
 
 type AuthEnv = {
   Variables: {
@@ -16,9 +17,20 @@ function requireAuth(user: User | null): user is User {
 }
 
 function getService() {
+  const relayUrl = configService.getMetadataRelayUrl()
+  const tmdbApiKey = configService.getTmdbApiKey()
+
+  logger.debug(
+    {
+      relayUrl,
+      tmdbApiKey: tmdbApiKey ? `${tmdbApiKey.substring(0, 8)}...` : 'NOT SET',
+    },
+    'Creating metadata service'
+  )
+
   return getMetadataService({
-    relayUrl: configService.getMetadataRelayUrl(),
-    tmdbApiKey: configService.getTmdbApiKey() || undefined,
+    relayUrl,
+    tmdbApiKey: tmdbApiKey || undefined,
   })
 }
 
@@ -272,59 +284,7 @@ metadata.get('/tmdb/collections/:id', async (c) => {
   }
 })
 
-// Get movie details with runtime and IMDB ID
-metadata.get('/tmdb/movies/:id', async (c) => {
-  const user = c.get('user')
-  if (!requireAuth(user)) {
-    return c.json({ error: 'Authentication required' }, 401)
-  }
-
-  const tmdbId = c.req.param('id')
-
-  try {
-    const service = getService()
-    const details = await service.getMovieDetails(tmdbId)
-
-    if (details === null) {
-      return c.json({ error: 'No provider supports movie details' }, 501)
-    }
-
-    return c.json(details)
-  } catch (error) {
-    return c.json(
-      { error: error instanceof Error ? error.message : 'Failed to fetch movie details' },
-      500
-    )
-  }
-})
-
-// Get TV series details with seasons info
-metadata.get('/tmdb/tv/:id', async (c) => {
-  const user = c.get('user')
-  if (!requireAuth(user)) {
-    return c.json({ error: 'Authentication required' }, 401)
-  }
-
-  const tmdbId = c.req.param('id')
-
-  try {
-    const service = getService()
-    const details = await service.getTvDetails(tmdbId)
-
-    if (details === null) {
-      return c.json({ error: 'No provider supports TV details' }, 501)
-    }
-
-    return c.json(details)
-  } catch (error) {
-    return c.json(
-      { error: error instanceof Error ? error.message : 'Failed to fetch TV details' },
-      500
-    )
-  }
-})
-
-// Proxy movie and TV search requests
+// Search routes MUST be before :id routes to avoid matching "search" as an ID
 metadata.get('/tmdb/movies/search', async (c) => {
   const user = c.get('user')
   if (!requireAuth(user)) {
@@ -375,6 +335,58 @@ metadata.get('/tmdb/tv/search', async (c) => {
     return c.json({ results })
   } catch (error) {
     return c.json({ error: error instanceof Error ? error.message : 'Failed to search TV' }, 500)
+  }
+})
+
+// Get movie details with runtime and IMDB ID
+metadata.get('/tmdb/movies/:id', async (c) => {
+  const user = c.get('user')
+  if (!requireAuth(user)) {
+    return c.json({ error: 'Authentication required' }, 401)
+  }
+
+  const tmdbId = c.req.param('id')
+
+  try {
+    const service = getService()
+    const details = await service.getMovieDetails(tmdbId)
+
+    if (details === null) {
+      return c.json({ error: 'No provider supports movie details' }, 501)
+    }
+
+    return c.json(details)
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to fetch movie details' },
+      500
+    )
+  }
+})
+
+// Get TV series details with seasons info
+metadata.get('/tmdb/tv/:id', async (c) => {
+  const user = c.get('user')
+  if (!requireAuth(user)) {
+    return c.json({ error: 'Authentication required' }, 401)
+  }
+
+  const tmdbId = c.req.param('id')
+
+  try {
+    const service = getService()
+    const details = await service.getTvDetails(tmdbId)
+
+    if (details === null) {
+      return c.json({ error: 'No provider supports TV details' }, 501)
+    }
+
+    return c.json(details)
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to fetch TV details' },
+      500
+    )
   }
 })
 

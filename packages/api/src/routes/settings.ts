@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { configService } from '../services/config'
 import type { SettingsUpdate, SettingsResponse } from '@jaeger/shared/types/settings'
 import type { User } from '../services/auth'
+import { logger } from '../lib/logger'
 
 type AuthEnv = {
   Variables: {
@@ -14,6 +15,34 @@ const settings = new Hono<AuthEnv>()
 function maskApiKey(key: string): string {
   if (key.length <= 8) return '********'
   return `${key.slice(0, 4)}********${key.slice(-4)}`
+}
+
+async function validateTmdbApiKey(apiKey: string): Promise<boolean> {
+  try {
+    const response = await fetch(
+      `https://api.themoviedb.org/3/configuration?api_key=${apiKey}`,
+      { signal: AbortSignal.timeout(5000) }
+    )
+    return response.ok
+  } catch (error) {
+    logger.error({ error }, 'Failed to validate TMDB API key')
+    return false
+  }
+}
+
+async function validateTvdbApiKey(apiKey: string): Promise<boolean> {
+  try {
+    const response = await fetch('https://api4.thetvdb.com/v4/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apikey: apiKey }),
+      signal: AbortSignal.timeout(5000),
+    })
+    return response.ok
+  } catch (error) {
+    logger.error({ error }, 'Failed to validate TVDB API key')
+    return false
+  }
 }
 
 // GET /api/settings - Get all settings with lock status (admin only)
@@ -69,6 +98,39 @@ settings.patch('/', async (c) => {
 
   try {
     const updates = (await c.req.json()) as SettingsUpdate
+
+    // Validate TMDB API key if it's being updated
+    if (updates.metadata?.tmdb?.apiKey) {
+      const isValid = await validateTmdbApiKey(updates.metadata.tmdb.apiKey)
+      if (!isValid) {
+        logger.warn('Invalid TMDB API key provided in settings update')
+        return c.json(
+          {
+            error:
+              'Invalid TMDB API key. Please verify your key at https://www.themoviedb.org/settings/api',
+          },
+          400
+        )
+      }
+      logger.info('TMDB API key validated successfully')
+    }
+
+    // Validate TVDB API key if it's being updated
+    if (updates.metadata?.tvdb?.apiKey) {
+      const isValid = await validateTvdbApiKey(updates.metadata.tvdb.apiKey)
+      if (!isValid) {
+        logger.warn('Invalid TVDB API key provided in settings update')
+        return c.json(
+          {
+            error:
+              'Invalid TVDB API key. Please verify your key at https://thetvdb.com/dashboard/account/apikeys',
+          },
+          400
+        )
+      }
+      logger.info('TVDB API key validated successfully')
+    }
+
     const newSettings = await configService.update(updates)
     const locked = configService.getLocked()
 

@@ -10,7 +10,8 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
-    "clean": "bun run --filter \"./packages/**\" clean"
+    "clean": "bun run --filter \"./packages/**\" clean",
+    "setup": "bun install && cd packages/api && bun run db:push"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",

@@ -93,6 +93,15 @@ class ConfigService {
     console.log(`[Config] Locked settings: ${Object.keys(this.locked).length > 0 ? JSON.stringify(this.locked) : 'none'}`)
     console.log(`[Config] Loaded ${this.downloaders.length} downloader(s)`)
     console.log(`[Config] Loaded ${this.indexers.length} indexer(s)`)
+    console.log(
+      `[Config] Metadata configuration:`,
+      JSON.stringify({
+        providers: this.settings.metadata.providers,
+        relayUrl: this.settings.metadata.relay.url,
+        tmdbApiKey: this.settings.metadata.tmdb.apiKey ? 'SET' : 'NOT SET',
+        tvdbApiKey: this.settings.metadata.tvdb.apiKey ? 'SET' : 'NOT SET',
+      })
+    )
   }
 
   private loadYamlConfig(): YamlConfig {

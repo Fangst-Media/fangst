@@ -18,8 +18,10 @@ import { requestLogger } from './middleware/logging'
 import { configService } from './services/config'
 import { logger } from './lib/logger'
 import { startScheduler } from './lib/scheduler'
+import { initializeDatabase } from './db/init'
 
-// Initialize config before starting server
+// Initialize database and config before starting server
+await initializeDatabase()
 await configService.initialize()
 
 const app = new Hono()

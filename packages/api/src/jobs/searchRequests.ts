@@ -209,11 +209,8 @@ async function processRequest(request: RequestWithUser): Promise<'found' | 'not_
     const downloaded = await downloadRelease(bestRelease, request.id, request.type)
 
     if (downloaded) {
-      // For movies, mark as completed after download starts. For TV, keep monitoring
-      if (request.type === 'movie') {
-        await requestService.updateStatus(request.id, 'completed')
-      }
-
+      // Download started successfully - status set to "downloading" by downloadRelease
+      // Download monitor will update to "completed" when finished
       return 'found'
     }
 
