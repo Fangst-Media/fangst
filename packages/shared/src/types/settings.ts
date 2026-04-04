@@ -23,6 +23,12 @@ export const jellyfinSettingsSchema = z.object({
   syncAdminFromProvider: z.boolean().default(true),
 })
 
+// Local auth settings
+export const localAuthSettingsSchema = z.object({
+  enabled: z.boolean().default(true),
+  registrationEnabled: z.boolean().default(true),
+})
+
 // Mock auth settings
 export const mockAuthSettingsSchema = z.object({
   enabled: z.boolean().default(false),
@@ -30,8 +36,9 @@ export const mockAuthSettingsSchema = z.object({
 
 // Auth settings
 export const authSettingsSchema = z.object({
-  provider: z.enum(['jellyfin', 'mock']).default('jellyfin'),
+  provider: z.enum(['jellyfin', 'local', 'mock']).default('local'),
   jellyfin: jellyfinSettingsSchema.default({}),
+  local: localAuthSettingsSchema.default({}),
   mock: mockAuthSettingsSchema.default({}),
 })
 

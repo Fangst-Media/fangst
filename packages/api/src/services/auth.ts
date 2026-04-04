@@ -11,7 +11,7 @@ export type PreferredRequestMode = 'simple' | 'detailed'
 export type User = {
   id: string
   providerId: string
-  provider: 'jellyfin' | 'plex'
+  provider: 'jellyfin' | 'plex' | 'local'
   name: string
   role: UserRole
   preferredRequestMode: PreferredRequestMode
@@ -85,6 +85,93 @@ export class AuthService {
     const user = await this.upsertUser(mockUser, 'jellyfin')
     const session = await this.createSession(user.id, ipAddress, userAgent)
 
+    return { user, session }
+  }
+
+  async registerLocal(
+    username: string,
+    password: string,
+    ipAddress: string,
+    userAgent?: string
+  ): Promise<{ user: User; session: Session }> {
+    const existing = await db
+      .select()
+      .from(users)
+      .where(and(eq(users.provider, 'local'), eq(users.name, username)))
+      .get()
+
+    if (existing) {
+      throw new Error('Username already taken')
+    }
+
+    const passwordHash = await Bun.password.hash(password, { algorithm: 'bcrypt', cost: 10 })
+    const isFirst = await this.isFirstUser()
+    const role: UserRole = isFirst ? 'admin' : 'member'
+    const id = generateId()
+    const now = new Date()
+
+    await db.insert(users).values({
+      id,
+      providerId: `local-${id}`,
+      provider: 'local',
+      name: username,
+      passwordHash,
+      role,
+      createdAt: now,
+      lastSeenAt: now,
+    })
+
+    const user: User = {
+      id,
+      providerId: `local-${id}`,
+      provider: 'local',
+      name: username,
+      role,
+      preferredRequestMode: 'simple',
+      createdAt: now,
+      lastSeenAt: now,
+    }
+
+    const session = await this.createSession(user.id, ipAddress, userAgent)
+    return { user, session }
+  }
+
+  async loginWithLocal(
+    username: string,
+    password: string,
+    ipAddress: string,
+    userAgent?: string
+  ): Promise<{ user: User; session: Session }> {
+    const existing = await db
+      .select()
+      .from(users)
+      .where(and(eq(users.provider, 'local'), eq(users.name, username)))
+      .get()
+
+    if (!existing || !existing.passwordHash) {
+      throw new Error('Invalid username or password')
+    }
+
+    const valid = await Bun.password.verify(password, existing.passwordHash)
+    if (!valid) {
+      throw new Error('Invalid username or password')
+    }
+
+    const now = new Date()
+    await db.update(users).set({ lastSeenAt: now }).where(eq(users.id, existing.id))
+
+    const user: User = {
+      id: existing.id,
+      providerId: existing.providerId,
+      provider: 'local',
+      name: existing.name,
+      role: existing.role as UserRole,
+      preferredRequestMode: (existing.preferredRequestMode ?? 'simple') as PreferredRequestMode,
+      createdAt: existing.createdAt,
+      lastSeenAt: now,
+    }
+
+    const session = await this.createSession(user.id, ipAddress, userAgent)
     return { user, session }
   }
 
@@ -224,6 +311,7 @@ export class AuthService {
     this.ensureInitialized()
     if (configService.isMockAuth()) return ['mock']
     const providers: string[] = []
+    if (configService.isLocalAuthEnabled()) providers.push('local')
     if (this.jellyfinClient) providers.push('jellyfin')
     return providers
   }

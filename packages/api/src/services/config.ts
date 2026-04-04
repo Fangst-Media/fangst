@@ -27,6 +27,8 @@ const ENV_MAPPING: Record<string, string> = {
   SESSION_EXPIRY_DAYS: 'security.sessionExpiryDays',
   JELLYFIN_URL: 'auth.jellyfin.url',
   SYNC_ADMIN_FROM_PROVIDER: 'auth.jellyfin.syncAdminFromProvider',
+  LOCAL_AUTH: 'auth.local.enabled',
+  LOCAL_REGISTRATION: 'auth.local.registrationEnabled',
   MOCK_AUTH: 'auth.mock.enabled',
   MEDIA_PATH: 'media.path',
   MOCK_FILESYSTEM: 'media.mockFilesystem',
@@ -138,7 +140,7 @@ class ConfigService {
 
   private parseEnvValue(key: string, value: string): unknown {
     // Boolean conversions
-    if (['MOCK_FILESYSTEM', 'MOCK_AUTH', 'SYNC_ADMIN_FROM_PROVIDER'].includes(key)) {
+    if (['MOCK_FILESYSTEM', 'MOCK_AUTH', 'LOCAL_AUTH', 'LOCAL_REGISTRATION', 'SYNC_ADMIN_FROM_PROVIDER'].includes(key)) {
       return value === 'true'
     }
     // Number conversions
@@ -328,6 +330,14 @@ class ConfigService {
 
   isMockAuth(): boolean {
     return this.get().auth.mock.enabled
+  }
+
+  isLocalAuthEnabled(): boolean {
+    return this.get().auth.local.enabled
+  }
+
+  isLocalRegistrationEnabled(): boolean {
+    return this.get().auth.local.registrationEnabled
   }
 
   getJellyfinUrl(): string {

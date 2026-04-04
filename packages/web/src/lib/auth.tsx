@@ -20,6 +20,7 @@ type AuthContextType = {
   canChooseRequestMode: boolean
   setRequestMode: (mode: RequestMode) => Promise<void>
   login: (provider: string, username: string, password: string) => Promise<void>
+  register: (username: string, password: string) => Promise<void>
   logout: () => Promise<void>
 }
 
@@ -64,6 +65,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user)
   }
 
+  async function register(username: string, password: string) {
+    const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ username, password }),
+    })
+
+    if (!response.ok) {
+      const data = await response.json()
+      throw new Error(data.error || 'Registration failed')
+    }
+
+    const data = await response.json()
+    setUser(data.user)
+  }
+
   async function logout() {
     await fetch(`${API_BASE_URL}/api/auth/logout`, {
       method: 'POST',
@@ -97,6 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         canChooseRequestMode: user?.canChooseRequestMode ?? false,
         setRequestMode,
         login,
+        register,
         logout,
       }}
     >

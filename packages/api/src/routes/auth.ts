@@ -10,9 +10,14 @@ const auth = new Hono()
 const SESSION_COOKIE = 'jaeger_session'
 
 const loginSchema = z.object({
-  provider: z.enum(['jellyfin', 'plex']),
+  provider: z.enum(['jellyfin', 'plex', 'local']),
   username: z.string().min(1),
   password: z.string().default(''),
+})
+
+const registerSchema = z.object({
+  username: z.string().min(1).max(50),
+  password: z.string().min(8).max(128),
 })
 
 auth.post('/login', zValidator('json', loginSchema), async (c) => {
@@ -24,7 +29,9 @@ auth.post('/login', zValidator('json', loginSchema), async (c) => {
   try {
     let result: Awaited<ReturnType<typeof authService.loginWithJellyfin>>
 
-    if (provider === 'jellyfin') {
+    if (provider === 'local') {
+      result = await authService.loginWithLocal(username, password, ipAddress, userAgent)
+    } else if (provider === 'jellyfin') {
       result = await authService.loginWithJellyfin(username, password, ipAddress, userAgent)
     } else {
       return c.json({ error: 'Plex authentication not yet implemented' }, 501)
@@ -117,9 +124,58 @@ auth.post('/logout', async (c) => {
   return c.json({ success: true })
 })
 
+auth.post('/register', zValidator('json', registerSchema), async (c) => {
+  if (!configService.isLocalAuthEnabled() || !configService.isLocalRegistrationEnabled()) {
+    return c.json({ error: 'Registration is disabled' }, 403)
+  }
+
+  const { username, password } = c.req.valid('json')
+  const ipAddress = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown'
+  const userAgent = c.req.header('user-agent')
+
+  try {
+    const result = await authService.registerLocal(username, password, ipAddress, userAgent)
+
+    setCookie(c, SESSION_COOKIE, result.session.id, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'Lax',
+      path: '/',
+      expires: result.session.expiresAt,
+    })
+
+    const settings = configService.get()
+    const rolePermission =
+      result.user.role === 'admin'
+        ? settings.requests.adminRequestMode
+        : settings.requests.memberRequestMode
+
+    let effectiveRequestMode: 'simple' | 'detailed'
+    if (rolePermission === 'user_choice') {
+      effectiveRequestMode = result.user.preferredRequestMode ?? 'simple'
+    } else {
+      effectiveRequestMode = rolePermission === 'simple_only' ? 'simple' : 'detailed'
+    }
+
+    return c.json({
+      user: {
+        id: result.user.id,
+        name: result.user.name,
+        role: result.user.role,
+        requestMode: effectiveRequestMode,
+        canChooseRequestMode: rolePermission === 'user_choice',
+      },
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Registration failed'
+    return c.json({ error: message }, 400)
+  }
+})
+
 auth.get('/providers', (c) => {
   const providers = authService.getEnabledProviders()
-  return c.json({ providers })
+  const registrationEnabled = configService.isLocalAuthEnabled() && configService.isLocalRegistrationEnabled()
+  return c.json({ providers, registrationEnabled })
 })
 
 export default auth

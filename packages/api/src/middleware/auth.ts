@@ -15,7 +15,7 @@ type AuthEnv = {
 const API_KEY_USER: User = {
   id: 'api-key',
   providerId: 'api-key',
-  provider: 'jellyfin',
+  provider: 'local',
   name: 'API Key',
   role: 'admin',
   preferredRequestMode: 'detailed',

@@ -14,8 +14,9 @@ export const arrInstances = sqliteTable('arr_instances', {
 export const users = sqliteTable('users', {
   id: text('id').primaryKey(),
   providerId: text('provider_id').notNull(),
-  provider: text('provider', { enum: ['jellyfin', 'plex'] }).notNull(),
+  provider: text('provider', { enum: ['jellyfin', 'plex', 'local'] }).notNull(),
   name: text('name').notNull(),
+  passwordHash: text('password_hash'),
   role: text('role', { enum: ['member', 'admin'] }).notNull().default('member'),
   preferredRequestMode: text('preferred_request_mode', { enum: ['simple', 'detailed'] }).default('simple'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
