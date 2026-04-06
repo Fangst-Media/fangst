@@ -5,6 +5,7 @@ import {
   MonitoringPresetSelector,
   type MonitoringPreset,
 } from '../components/MonitoringPresetSelector'
+import { tvLanes, apiFetch, apiPost } from '../lib/api-client'
 
 type EpisodeFile = {
   id: string
@@ -61,17 +62,11 @@ type SeasonRequestResponse = {
 }
 
 async function getSeasonEpisodes(tmdbId: string, seasonNumber: number): Promise<SeasonWithEpisodes> {
-  const response = await fetch(`/api/library/tv/${tmdbId}/season/${seasonNumber}`, {
-    credentials: 'include',
-  })
-  if (!response.ok) throw new Error('Failed to fetch season')
-  return response.json()
+  return apiFetch(`/api/library/tv/${tmdbId}/season/${seasonNumber}`)
 }
 
 async function getSeriesBrief(tmdbId: string): Promise<SeriesBrief> {
-  const response = await fetch(`/api/metadata/tmdb/tv/${tmdbId}`, { credentials: 'include' })
-  if (!response.ok) throw new Error('Failed to fetch series info')
-  const data = await response.json()
+  const data = await tvLanes.getById(tmdbId)
   return {
     tmdbId: data.id,
     title: data.title,
@@ -84,11 +79,7 @@ async function getSeasonRequest(
   tmdbId: string,
   seasonNumber: number
 ): Promise<SeasonRequestResponse> {
-  const response = await fetch(`/api/requests/season/${tmdbId}/${seasonNumber}`, {
-    credentials: 'include',
-  })
-  if (!response.ok) throw new Error('Failed to check request status')
-  return response.json()
+  return apiFetch(`/api/requests/season/${tmdbId}/${seasonNumber}`)
 }
 
 async function createRequest(data: {
@@ -103,25 +94,11 @@ async function createRequest(data: {
   monitoringPreset?: MonitoringPreset
   fetchEpisodes?: boolean
 }): Promise<{ success: boolean; request: { id: string } }> {
-  const response = await fetch('/api/requests', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-    credentials: 'include',
-  })
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || 'Failed to create request')
-  }
-  return response.json()
+  return apiPost('/api/requests', data)
 }
 
 async function fetchEpisodesForRequest(requestId: string): Promise<void> {
-  const response = await fetch(`/api/requests/${requestId}/episodes/fetch`, {
-    method: 'POST',
-    credentials: 'include',
-  })
-  if (!response.ok) throw new Error('Failed to fetch episodes')
+  return apiPost(`/api/requests/${requestId}/episodes/fetch`, {})
 }
 
 async function toggleEpisodeMonitoring(
@@ -129,13 +106,11 @@ async function toggleEpisodeMonitoring(
   episodeId: string,
   monitored: boolean
 ): Promise<void> {
-  const response = await fetch(`/api/requests/${requestId}/episodes/${episodeId}`, {
+  return apiFetch(`/api/requests/${requestId}/episodes/${episodeId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ monitored }),
-    credentials: 'include',
   })
-  if (!response.ok) throw new Error('Failed to update episode')
 }
 
 function formatBytes(bytes?: number): string {

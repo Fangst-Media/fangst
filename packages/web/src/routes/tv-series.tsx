@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
+import { apiFetch } from '../lib/api-client'
 
 type SeasonProgress = {
   seasonNumber: number
@@ -28,9 +29,7 @@ type SeriesWithSeasons = {
 }
 
 async function getTvSeries(tmdbId: string): Promise<SeriesWithSeasons> {
-  const response = await fetch(`/api/library/tv/${tmdbId}`, { credentials: 'include' })
-  if (!response.ok) throw new Error('Failed to fetch series')
-  return response.json()
+  return apiFetch(`/api/library/tv/${tmdbId}`)
 }
 
 function getPosterUrl(path?: string): string {

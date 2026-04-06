@@ -1,9 +1,7 @@
-import { TrendingLane, type TrendingItem } from './TrendingLane'
+import type { LaneResponse, MetadataResult } from '@jaeger/shared/schemas/metadata'
+import { TrendingLane } from './TrendingLane'
 
-export type LaneResponse = {
-  results: TrendingItem[]
-  unsupported?: boolean
-}
+export type { LaneResponse }
 
 function UnsupportedLane({ title }: { title: string }) {
   return (
@@ -20,7 +18,7 @@ type ContentLaneProps = {
   title: string
   data: LaneResponse | undefined
   isAdmin: boolean
-  onSelect: (item: TrendingItem) => void
+  onSelect?: (item: MetadataResult) => void
 }
 
 export function ContentLane({ title, data, isAdmin, onSelect }: ContentLaneProps) {

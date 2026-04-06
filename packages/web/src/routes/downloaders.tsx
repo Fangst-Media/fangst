@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { Downloader, CreateDownloader } from '@jaeger/shared/types/settings'
-
-const API_BASE_URL = 'http://localhost:5001'
+import { apiFetch, apiPost } from '../lib/api-client'
 
 type DownloadersResponse = {
   downloaders: Downloader[]
@@ -15,44 +14,26 @@ type TestResult = {
 }
 
 async function fetchDownloaders(): Promise<DownloadersResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/downloaders`, {
-    credentials: 'include',
-  })
-  if (!response.ok) throw new Error('Failed to fetch downloaders')
-  return response.json()
+  return apiFetch('/api/downloaders')
 }
 
 async function addDownloader(data: CreateDownloader): Promise<{ downloader: Downloader }> {
-  const response = await fetch(`${API_BASE_URL}/api/downloaders`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(data),
-  })
-  if (!response.ok) throw new Error('Failed to add downloader')
-  return response.json()
+  return apiPost('/api/downloaders', data)
 }
 
 async function updateDownloader(
   id: string,
   updates: Partial<Downloader>
 ): Promise<{ downloader: Downloader }> {
-  const response = await fetch(`${API_BASE_URL}/api/downloaders/${id}`, {
+  return apiFetch(`/api/downloaders/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
     body: JSON.stringify(updates),
   })
-  if (!response.ok) throw new Error('Failed to update downloader')
-  return response.json()
 }
 
 async function deleteDownloader(id: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/downloaders/${id}`, {
-    method: 'DELETE',
-    credentials: 'include',
-  })
-  if (!response.ok) throw new Error('Failed to delete downloader')
+  return apiFetch(`/api/downloaders/${id}`, { method: 'DELETE' })
 }
 
 async function testConnection(data: {
@@ -60,14 +41,7 @@ async function testConnection(data: {
   url: string
   apiKey: string
 }): Promise<TestResult> {
-  const response = await fetch(`${API_BASE_URL}/api/downloaders/test`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(data),
-  })
-  if (!response.ok) throw new Error('Failed to test connection')
-  return response.json()
+  return apiPost('/api/downloaders/test', data)
 }
 
 type DownloaderFormData = {

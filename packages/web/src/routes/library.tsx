@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getMedia, triggerScan, type MediaItem } from '../lib/api'
+import { apiFetch } from '../lib/api-client'
 import { MediaCard } from '../components/MediaCard'
 import { TvShowCard } from '../components/TvShowCard'
 import { CollectionCard } from '../components/CollectionCard'
@@ -17,9 +18,7 @@ type CollectionOverview = {
 }
 
 async function getCollections(): Promise<{ collections: CollectionOverview[] }> {
-  const response = await fetch('/api/library/collections', { credentials: 'include' })
-  if (!response.ok) throw new Error('Failed to fetch collections')
-  return response.json()
+  return apiFetch('/api/library/collections')
 }
 
 type GroupedShow = {

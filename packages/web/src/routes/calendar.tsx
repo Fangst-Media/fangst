@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
+import { apiFetch } from '../lib/api-client'
 
 type CalendarItem = {
   date: string
@@ -19,11 +20,7 @@ type CalendarItem = {
 type ViewMode = 'week' | 'month'
 
 async function fetchCalendar(start: string, end: string): Promise<{ items: CalendarItem[] }> {
-  const response = await fetch(`/api/calendar?start=${start}&end=${end}`, {
-    credentials: 'include',
-  })
-  if (!response.ok) throw new Error('Failed to fetch calendar')
-  return response.json()
+  return apiFetch(`/api/calendar?start=${start}&end=${end}`)
 }
 
 function getPosterUrl(path: string | null, size = 'w92'): string {
@@ -100,7 +97,7 @@ function CalendarItemCard({ item }: { item: CalendarItem }) {
 
   return (
     <Link
-      to={`/requests`}
+      to={`/my-requests`}
       className="flex items-center gap-2 p-2 rounded-lg bg-background hover:bg-card border border-border transition-colors group"
     >
       <img

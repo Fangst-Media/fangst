@@ -1,15 +1,8 @@
+import type { MetadataResult } from '@jaeger/shared/schemas/metadata'
 import { useRef } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 
-export type TrendingItem = {
-  id: string
-  title: string
-  year?: number
-  releaseDate?: string
-  overview?: string
-  poster?: string
-  rating?: number
-  type: 'movie' | 'tv'
-}
+export type TrendingItem = MetadataResult
 
 function isNotReleased(releaseDate?: string): boolean {
   if (!releaseDate) return false
@@ -29,9 +22,10 @@ export function TrendingLane({
 }: {
   title: string
   items: TrendingItem[]
-  onSelect: (item: TrendingItem) => void
+  onSelect?: (item: TrendingItem) => void
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
+  const navigate = useNavigate()
 
   const scroll = (direction: 'left' | 'right') => {
     if (scrollRef.current) {
@@ -41,6 +35,15 @@ export function TrendingLane({
         behavior: 'smooth',
       })
     }
+  }
+
+  function handleSelect(item: TrendingItem) {
+    if (onSelect) {
+      onSelect(item)
+      return
+    }
+    const path = item.type === 'book' ? `/book/${item.id}` : item.type === 'movie' ? `/movie/${item.id}` : `/tv/${item.id}`
+    navigate({ to: path })
   }
 
   if (items.length === 0) return null
@@ -65,20 +68,20 @@ export function TrendingLane({
         </button>
         <div
           ref={scrollRef}
-          className="flex gap-3 overflow-x-auto scrollbar-hide pb-2"
+          className="flex gap-2 overflow-x-auto scrollbar-hide pb-2"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
           {items.slice(0, 20).map((item) => (
             <button
               key={item.id}
               type="button"
-              onClick={() => onSelect(item)}
-              className="flex-shrink-0 w-32 group/card text-left"
+              onClick={() => handleSelect(item)}
+              className="shrink-0 w-[168px] group/card text-left"
             >
               <div className="relative aspect-[2/3] rounded-lg overflow-hidden bg-card border border-border group-hover/card:border-accent/50 transition-colors">
                 {item.poster ? (
                   <img
-                    src={`https://image.tmdb.org/t/p/w185${item.poster}`}
+                    src={item.poster.startsWith('http') ? item.poster : `https://image.tmdb.org/t/p/w342${item.poster}`}
                     alt={item.title}
                     className="w-full h-full object-cover"
                     loading="lazy"
@@ -106,11 +109,12 @@ export function TrendingLane({
                   </div>
                 )}
                 <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity">
-                  <span className="text-xs text-white font-medium">Request</span>
+                  <span className="text-xs text-white font-medium">View Details</span>
                 </div>
               </div>
               <p className="mt-2 text-sm text-foreground truncate">{item.title}</p>
-              {item.year && <p className="text-xs text-muted">{item.year}</p>}
+              {item.author && <p className="text-xs text-muted truncate">{item.author}</p>}
+              {item.year && !item.author && <p className="text-xs text-muted">{item.year}</p>}
             </button>
           ))}
         </div>

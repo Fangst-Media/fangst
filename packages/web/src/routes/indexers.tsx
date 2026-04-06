@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { Indexer, CreateIndexer } from '@jaeger/shared/types/indexer'
-
-const API_BASE_URL = 'http://localhost:5001'
+import { apiFetch, apiPost } from '../lib/api-client'
 
 type IndexersResponse = {
   indexers: Indexer[]
@@ -19,52 +18,30 @@ type TestResult = {
 }
 
 async function fetchIndexers(): Promise<IndexersResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/indexers`, {
-    credentials: 'include',
-  })
-  if (!response.ok) throw new Error('Failed to fetch indexers')
-  return response.json()
+  return apiFetch('/api/indexers')
 }
 
 async function fetchRegistry(): Promise<RegistryResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/indexers/registry`, {
-    credentials: 'include',
-  })
-  if (!response.ok) throw new Error('Failed to fetch registry')
-  return response.json()
+  return apiFetch('/api/indexers/registry')
 }
 
 async function addIndexer(data: CreateIndexer): Promise<{ indexer: Indexer }> {
-  const response = await fetch(`${API_BASE_URL}/api/indexers`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(data),
-  })
-  if (!response.ok) throw new Error('Failed to add indexer')
-  return response.json()
+  return apiPost('/api/indexers', data)
 }
 
 async function updateIndexer(
   id: string,
   updates: Partial<Indexer>
 ): Promise<{ indexer: Indexer }> {
-  const response = await fetch(`${API_BASE_URL}/api/indexers/${id}`, {
+  return apiFetch(`/api/indexers/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
     body: JSON.stringify(updates),
   })
-  if (!response.ok) throw new Error('Failed to update indexer')
-  return response.json()
 }
 
 async function deleteIndexer(id: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/indexers/${id}`, {
-    method: 'DELETE',
-    credentials: 'include',
-  })
-  if (!response.ok) throw new Error('Failed to delete indexer')
+  return apiFetch(`/api/indexers/${id}`, { method: 'DELETE' })
 }
 
 async function testConnection(data: {
@@ -73,14 +50,7 @@ async function testConnection(data: {
   apiKey: string
   apiPath?: string
 }): Promise<TestResult> {
-  const response = await fetch(`${API_BASE_URL}/api/indexers/test`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(data),
-  })
-  if (!response.ok) throw new Error('Failed to test connection')
-  return response.json()
+  return apiPost('/api/indexers/test', data)
 }
 
 type IndexerFormData = {

@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:5001'
+import { apiFetch, apiPost } from './api-client'
 
 export type MediaItem = {
   id: string
@@ -47,24 +47,11 @@ export type ScanResponse = MediaResponse & {
 }
 
 export async function getMedia(): Promise<MediaResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/media`, {
-    credentials: 'include',
-  })
-  if (!response.ok) {
-    throw new Error(`Failed to fetch media: ${response.statusText}`)
-  }
-  return response.json()
+  return apiFetch('/api/media')
 }
 
 export async function triggerScan(): Promise<ScanResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/media/scan`, {
-    method: 'POST',
-    credentials: 'include',
-  })
-  if (!response.ok) {
-    throw new Error(`Failed to scan media: ${response.statusText}`)
-  }
-  return response.json()
+  return apiPost('/api/media/scan', {})
 }
 
 export function getPosterUrl(posterPath?: string, size: 'w185' | 'w342' | 'w500' = 'w342'): string {

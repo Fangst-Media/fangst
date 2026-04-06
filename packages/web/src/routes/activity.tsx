@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { apiFetch, apiPost } from '../lib/api-client'
 
 type QueueItem = {
   id: string
@@ -46,26 +47,19 @@ type ActivityResponse = {
 }
 
 async function fetchActivity(): Promise<ActivityResponse> {
-  const response = await fetch('/api/activity')
-  if (!response.ok) throw new Error('Failed to fetch activity')
-  return response.json()
+  return apiFetch('/api/activity')
 }
 
 async function pauseDownloads(): Promise<void> {
-  const response = await fetch('/api/activity/pause', { method: 'POST' })
-  if (!response.ok) throw new Error('Failed to pause')
+  return apiPost('/api/activity/pause', {})
 }
 
 async function resumeDownloads(): Promise<void> {
-  const response = await fetch('/api/activity/resume', { method: 'POST' })
-  if (!response.ok) throw new Error('Failed to resume')
+  return apiPost('/api/activity/resume', {})
 }
 
 async function deleteItem(id: string, downloaderId: string): Promise<void> {
-  const response = await fetch(`/api/activity/${id}?downloaderId=${downloaderId}`, {
-    method: 'DELETE',
-  })
-  if (!response.ok) throw new Error('Failed to delete')
+  return apiFetch(`/api/activity/${id}?downloaderId=${downloaderId}`, { method: 'DELETE' })
 }
 
 function formatSpeed(speed: string): string {

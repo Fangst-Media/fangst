@@ -1,43 +1,26 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { SettingsResponse, SettingsUpdate } from '@jaeger/shared/types/settings'
-
-const API_BASE_URL = 'http://localhost:5001'
+import { apiFetch, apiPost } from '../lib/api-client'
 
 async function fetchSettings(): Promise<SettingsResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/settings`, {
-    credentials: 'include',
-  })
-  if (!response.ok) throw new Error('Failed to fetch settings')
-  return response.json()
+  return apiFetch('/api/settings')
 }
 
 async function updateSettings(updates: SettingsUpdate): Promise<SettingsResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/settings`, {
+  return apiFetch('/api/settings', {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
     body: JSON.stringify(updates),
   })
-  if (!response.ok) throw new Error('Failed to update settings')
-  return response.json()
 }
 
 async function regenerateApiKey(): Promise<{ apiKey: string }> {
-  const response = await fetch(`${API_BASE_URL}/api/settings/api-key/regenerate`, {
-    method: 'POST',
-    credentials: 'include',
-  })
-  if (!response.ok) throw new Error('Failed to regenerate API key')
-  return response.json()
+  return apiPost('/api/settings/api-key/regenerate', {})
 }
 
 async function getApiKey(): Promise<{ apiKey: string; locked: boolean }> {
-  const response = await fetch(`${API_BASE_URL}/api/settings/api-key`, {
-    credentials: 'include',
-  })
-  if (!response.ok) throw new Error('Failed to get API key')
-  return response.json()
+  return apiFetch('/api/settings/api-key')
 }
 
 function LockedIndicator({ locked }: { locked: boolean }) {
@@ -154,6 +137,7 @@ export default function Settings() {
   const isLocked = (path: string): boolean => {
     const [category, ...rest] = path.split('.')
     const key = rest.join('.')
+    if (!category) return false
     return !!(locked as Record<string, Record<string, boolean>>)?.[category]?.[key]
   }
 

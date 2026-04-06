@@ -1,4 +1,5 @@
 import type { ParsedReleaseInfo } from '@jaeger/shared/types/indexer'
+import type { TvSeriesDetails } from '@jaeger/shared/schemas/metadata'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import {
@@ -6,6 +7,7 @@ import {
   type MonitoringPreset,
 } from '../../components/MonitoringPresetSelector'
 import { QualityDetails, QualitySummary } from '../../components/quality'
+import { movieLanes, tvLanes, collections, apiFetch, apiPost } from '../../lib/api-client'
 
 export type SearchResult = {
   id: string
@@ -37,73 +39,7 @@ type Downloader = {
   enabled: boolean
 }
 
-type TvSeasonInfo = {
-  seasonNumber: number
-  name: string
-  episodeCount: number
-  airDate?: string
-}
-
-type TvDetailsResponse = {
-  id: string
-  title: string
-  status: 'returning' | 'ended' | 'upcoming' | 'unknown'
-  numberOfSeasons: number
-  seasons: TvSeasonInfo[]
-}
-
 type QualityFilter = '2160p' | '1080p' | '720p' | 'all'
-
-type MovieCollection = {
-  id: number
-  name: string
-  posterPath?: string
-  backdropPath?: string
-}
-
-type MovieDetailsResponse = {
-  imdbId?: string
-  runtime?: number
-  collection?: MovieCollection
-}
-
-async function getMovieDetails(tmdbId: string): Promise<MovieDetailsResponse> {
-  const response = await fetch(`/api/metadata/tmdb/movies/${tmdbId}`)
-  if (!response.ok) throw new Error('Failed to fetch movie details')
-  const data = await response.json()
-  return {
-    imdbId: data.imdbId,
-    runtime: data.runtime ?? undefined,
-    collection: data.collection,
-  }
-}
-
-type CollectionDetails = {
-  id: number
-  name: string
-  overview?: string
-  posterPath?: string
-  backdropPath?: string
-  movies: {
-    id: number
-    title: string
-    overview?: string
-    releaseDate?: string
-    posterPath?: string
-  }[]
-}
-
-async function getCollectionDetails(collectionId: number): Promise<CollectionDetails> {
-  const response = await fetch(`/api/metadata/tmdb/collections/${collectionId}`)
-  if (!response.ok) throw new Error('Failed to fetch collection details')
-  return response.json()
-}
-
-async function getTvDetails(tmdbId: string): Promise<TvDetailsResponse> {
-  const response = await fetch(`/api/metadata/tmdb/tv/${tmdbId}`)
-  if (!response.ok) throw new Error('Failed to fetch TV details')
-  return response.json()
-}
 
 async function searchIndexers(params: {
   imdbId?: string
@@ -112,41 +48,12 @@ async function searchIndexers(params: {
   runtime?: number
   season?: number
 }): Promise<{ results: IndexerResult[]; errors?: { indexer: string; error: string }[] }> {
-  const response = await fetch('/api/search', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(params),
-  })
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || 'Search failed')
-  }
-  return response.json()
+  return apiPost('/api/search', params)
 }
 
 async function getDownloaders(): Promise<Downloader[]> {
-  const response = await fetch('/api/downloaders')
-  if (!response.ok) throw new Error('Failed to fetch downloaders')
-  const data = await response.json()
-  return data.downloaders.filter((d: Downloader) => d.enabled)
-}
-
-async function sendToDownloader(
-  downloadUrl: string,
-  downloaderId: string,
-  releaseName: string,
-  category?: string
-): Promise<{ success: boolean; nzoId?: string }> {
-  const response = await fetch('/api/search/download', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ downloadUrl, downloaderId, releaseName, category }),
-  })
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || 'Download failed')
-  }
-  return response.json()
+  const data = await apiFetch<{ downloaders: Downloader[] }>('/api/downloaders')
+  return data.downloaders.filter((d) => d.enabled)
 }
 
 async function createRequest(data: {
@@ -160,16 +67,26 @@ async function createRequest(data: {
   season?: number
   downloading?: boolean
 }): Promise<{ success: boolean }> {
-  const response = await fetch('/api/requests', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  })
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || 'Failed to create request')
+  return apiPost('/api/requests', data)
+}
+
+async function downloadRelease(data: {
+  downloadUrl: string
+  downloaderId: string
+  releaseName: string
+  category?: string
+  media: {
+    title: string
+    year?: number
+    type: 'movie' | 'tv'
+    tmdbId?: string
+    imdbId?: string
+    posterPath?: string
+    overview?: string
+    season?: number
   }
-  return response.json()
+}): Promise<{ success: boolean; nzoId?: string; request: unknown }> {
+  return apiPost('/api/search/download-release', data)
 }
 
 async function requestSeasonWithEpisodes(data: {
@@ -179,19 +96,10 @@ async function requestSeasonWithEpisodes(data: {
   posterPath?: string
   overview?: string
   season: number
-  seriesStatus: 'returning' | 'ended' | 'upcoming' | 'unknown'
+  seriesStatus: TvSeriesDetails['status']
   monitoringPreset?: MonitoringPreset
 }): Promise<{ success: boolean; request: { id: string } }> {
-  const response = await fetch('/api/requests', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...data, type: 'tv', fetchEpisodes: true }),
-  })
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || 'Failed to create request')
-  }
-  return response.json()
+  return apiPost('/api/requests', { ...data, type: 'tv', fetchEpisodes: true })
 }
 
 function formatBytes(bytes: number): string {
@@ -208,21 +116,40 @@ function matchesQualityFilter(parsed: ParsedReleaseInfo | undefined, filter: Qua
   return parsed.resolution === filter
 }
 
-function formatAge(dateString: string): string {
+function formatCompactAge(dateString: string): string {
   const date = new Date(dateString)
   const now = new Date()
   const diffMs = now.getTime() - date.getTime()
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+  const diffMins = Math.floor(diffMs / (1000 * 60))
 
-  if (diffDays === 0) return 'Today'
-  if (diffDays === 1) return '1 day ago'
-  if (diffDays < 30) return `${diffDays} days ago`
-  if (diffDays < 365) {
-    const months = Math.floor(diffDays / 30)
-    return `${months} ${months === 1 ? 'month' : 'months'} ago`
-  }
-  const years = Math.floor(diffDays / 365)
-  return `${years} ${years === 1 ? 'year' : 'years'} ago`
+  if (diffMins < 1) return 'now'
+  if (diffMins < 60) return `${diffMins}m`
+  const diffHours = Math.floor(diffMins / 60)
+  if (diffHours < 24) return `${diffHours}h`
+  const diffDays = Math.floor(diffHours / 24)
+  if (diffDays < 30) return `${diffDays}d`
+  const diffMonths = Math.floor(diffDays / 30)
+  if (diffMonths < 12) return `${diffMonths}mo`
+  const diffYears = Math.floor(diffDays / 365)
+  return `${diffYears}y`
+}
+
+function formatFullAge(dateString: string): string {
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / (1000 * 60))
+
+  if (diffMins < 1) return 'Just now'
+  if (diffMins < 60) return `${diffMins} minute${diffMins === 1 ? '' : 's'} ago`
+  const diffHours = Math.floor(diffMins / 60)
+  if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`
+  const diffDays = Math.floor(diffHours / 24)
+  if (diffDays < 30) return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`
+  const diffMonths = Math.floor(diffDays / 30)
+  if (diffMonths < 12) return `${diffMonths} month${diffMonths === 1 ? '' : 's'} ago`
+  const diffYears = Math.floor(diffDays / 365)
+  return `${diffYears} year${diffYears === 1 ? '' : 's'} ago`
 }
 
 export function ReleaseModal({
@@ -255,19 +182,19 @@ export function ReleaseModal({
 
   const { data: movieDetails } = useQuery({
     queryKey: ['movie-details', media.id],
-    queryFn: () => getMovieDetails(media.id),
+    queryFn: () => movieLanes.getById(media.id),
     enabled: media.type === 'movie',
   })
 
   const { data: collectionDetails } = useQuery({
     queryKey: ['collection-details', movieDetails?.collection?.id],
-    queryFn: () => getCollectionDetails(movieDetails!.collection!.id),
+    queryFn: () => collections.getById(movieDetails!.collection!.id.toString()),
     enabled: !!movieDetails?.collection?.id,
   })
 
   const { data: tvDetails } = useQuery({
     queryKey: ['tv-details', media.id],
-    queryFn: () => getTvDetails(media.id),
+    queryFn: () => tvLanes.getById(media.id),
     enabled: media.type === 'tv',
   })
 
@@ -402,17 +329,22 @@ export function ReleaseModal({
       releaseName,
       category,
     }: { downloadUrl: string; downloaderId: string; releaseName: string; category?: string }) => {
-      await createRequest({
-        title: media.title,
-        year: media.year,
-        type: media.type,
-        tmdbId: media.id,
-        imdbId,
-        posterPath: media.posterPath,
-        overview: media.overview,
-        season: media.type === 'tv' ? selectedSeason : undefined,
+      return downloadRelease({
+        downloadUrl,
+        downloaderId,
+        releaseName,
+        category,
+        media: {
+          title: media.title,
+          year: media.year,
+          type: media.type,
+          tmdbId: media.id,
+          imdbId,
+          posterPath: media.posterPath,
+          overview: media.overview,
+          season: media.type === 'tv' ? selectedSeason : undefined,
+        },
       })
-      return sendToDownloader(downloadUrl, downloaderId, releaseName, category)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['requests'] })
@@ -460,7 +392,7 @@ export function ReleaseModal({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div>
-            <h2 id="release-modal-title" className="text-lg font-semibold text-foreground">
+            <h2 id="release-modal-title" className="text-lg font-semibold text-foreground truncate" title={`${media.title}${media.year ? ` (${media.year})` : ''}`}>
               {media.title}
               {media.year && <span className="text-muted ml-2">({media.year})</span>}
             </h2>
@@ -867,8 +799,8 @@ export function ReleaseModal({
                             </div>
                             <div className="text-sm text-muted">{result.grabs ?? '-'}</div>
                             <div className="flex items-center justify-between gap-2">
-                              <span className="text-sm text-muted">
-                                {formatAge(result.pubDate)}
+                              <span className="text-sm text-muted" title={formatFullAge(result.pubDate)}>
+                                {formatCompactAge(result.pubDate)}
                               </span>
                               <button
                                 type="button"

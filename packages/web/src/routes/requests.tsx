@@ -1,41 +1,22 @@
+import type { MetadataResult } from '@jaeger/shared/schemas/metadata'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { SimpleRequestModal } from '../components/SimpleRequestModal'
 import { useAuth } from '../lib/auth'
-import { ContentLane, type LaneResponse } from './requests/ContentLane'
+import { movieLanes, tvLanes } from '../lib/api-client'
+import { ContentLane } from './requests/ContentLane'
 import { ReleaseModal, type SearchResult } from './requests/ReleaseModal'
-import type { TrendingItem } from './requests/TrendingLane'
-
-async function fetchLane(endpoint: string): Promise<LaneResponse> {
-  const response = await fetch(`/api/metadata/tmdb/${endpoint}`, { credentials: 'include' })
-  if (!response.ok) return { results: [] }
-  return response.json()
-}
-
-type MetadataResult = {
-  id: string
-  title: string
-  year?: number
-  releaseDate?: string
-  overview?: string
-  poster?: string
-  type: 'movie' | 'tv'
-}
 
 async function searchContent(query: string): Promise<SearchResult[]> {
   if (!query.trim()) return []
 
   const [movies, tv] = await Promise.all([
-    fetch(`/api/metadata/tmdb/movies/search?query=${encodeURIComponent(query)}`, {
-      credentials: 'include',
-    }).then((r) => r.json()),
-    fetch(`/api/metadata/tmdb/tv/search?query=${encodeURIComponent(query)}`, {
-      credentials: 'include',
-    }).then((r) => r.json()),
+    movieLanes.search(query),
+    tvLanes.search(query),
   ])
 
   const movieResults: SearchResult[] =
-    movies.results?.slice(0, 5).map((m: MetadataResult) => ({
+    movies.results.slice(0, 5).map((m) => ({
       id: m.id,
       title: m.title,
       year: m.year,
@@ -43,17 +24,17 @@ async function searchContent(query: string): Promise<SearchResult[]> {
       overview: m.overview,
       posterPath: m.poster,
       type: 'movie' as const,
-    })) || []
+    }))
 
   const tvResults: SearchResult[] =
-    tv.results?.slice(0, 5).map((t: MetadataResult) => ({
+    tv.results.slice(0, 5).map((t) => ({
       id: t.id,
       title: t.title,
       year: t.year,
       overview: t.overview,
       posterPath: t.poster,
       type: 'tv' as const,
-    })) || []
+    }))
 
   return [...movieResults, ...tvResults]
 }
@@ -78,56 +59,56 @@ export default function Requests() {
   // Movie lanes
   const { data: trendingMovies } = useQuery({
     queryKey: ['trending-movies'],
-    queryFn: () => fetchLane('movies/trending'),
+    queryFn: movieLanes.trending,
     staleTime: 1000 * 60 * 10,
   })
 
   const { data: upcomingMovies } = useQuery({
     queryKey: ['upcoming-movies'],
-    queryFn: () => fetchLane('movies/upcoming'),
+    queryFn: movieLanes.upcoming,
     staleTime: 1000 * 60 * 60,
   })
 
   const { data: nowPlayingMovies } = useQuery({
     queryKey: ['now-playing-movies'],
-    queryFn: () => fetchLane('movies/now_playing'),
+    queryFn: movieLanes.nowPlaying,
     staleTime: 1000 * 60 * 60,
   })
 
   const { data: popularMovies } = useQuery({
     queryKey: ['popular-movies'],
-    queryFn: () => fetchLane('movies/popular'),
+    queryFn: movieLanes.popular,
     staleTime: 1000 * 60 * 60,
   })
 
   const { data: topRatedMovies } = useQuery({
     queryKey: ['top-rated-movies'],
-    queryFn: () => fetchLane('movies/top_rated'),
+    queryFn: movieLanes.topRated,
     staleTime: 1000 * 60 * 60,
   })
 
   // TV lanes
   const { data: trendingTv } = useQuery({
     queryKey: ['trending-tv'],
-    queryFn: () => fetchLane('tv/trending'),
+    queryFn: tvLanes.trending,
     staleTime: 1000 * 60 * 10,
   })
 
   const { data: onAirTv } = useQuery({
     queryKey: ['on-air-tv'],
-    queryFn: () => fetchLane('tv/on_the_air'),
+    queryFn: tvLanes.onTheAir,
     staleTime: 1000 * 60 * 60,
   })
 
   const { data: popularTv } = useQuery({
     queryKey: ['popular-tv'],
-    queryFn: () => fetchLane('tv/popular'),
+    queryFn: tvLanes.popular,
     staleTime: 1000 * 60 * 60,
   })
 
   const { data: topRatedTv } = useQuery({
     queryKey: ['top-rated-tv'],
-    queryFn: () => fetchLane('tv/top_rated'),
+    queryFn: tvLanes.topRated,
     staleTime: 1000 * 60 * 60,
   })
 
@@ -151,7 +132,7 @@ export default function Requests() {
     setSelectedMedia(result)
   }
 
-  function handleTrendingSelect(item: TrendingItem) {
+  function handleTrendingSelect(item: MetadataResult) {
     setSelectedMedia({
       id: item.id,
       title: item.title,
@@ -159,7 +140,7 @@ export default function Requests() {
       releaseDate: item.releaseDate,
       overview: item.overview,
       posterPath: item.poster,
-      type: item.type,
+      type: item.type as 'movie' | 'tv',
     })
   }
 

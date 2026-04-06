@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { getPosterUrl, parseMediaSlug, type MediaItem } from '../lib/api'
+import { apiFetch } from '../lib/api-client'
 
 type MediaDetailsProps = {
   slug: string
@@ -8,22 +9,17 @@ type MediaDetailsProps = {
 
 async function fetchMediaItem(slug: string): Promise<MediaItem | null> {
   const id = parseMediaSlug(slug)
-  const response = await fetch(`http://localhost:5001/api/media`, {
-    credentials: 'include',
-  })
-  if (!response.ok) return null
-  const data = await response.json()
-
-  return data.results.find((item: MediaItem) => item.id === id) ?? null
+  try {
+    const data = await apiFetch<{ results: MediaItem[] }>('/api/media')
+    return data.results.find((item) => item.id === id) ?? null
+  } catch {
+    return null
+  }
 }
 
 async function fetchJellyfinUrl(): Promise<string | null> {
   try {
-    const response = await fetch(`http://localhost:5001/api/settings`, {
-      credentials: 'include',
-    })
-    if (!response.ok) return null
-    const data = await response.json()
+    const data = await apiFetch<{ settings?: { auth?: { jellyfin?: { url?: string } } } }>('/api/settings')
     return data.settings?.auth?.jellyfin?.url ?? null
   } catch {
     return null
@@ -33,11 +29,7 @@ async function fetchJellyfinUrl(): Promise<string | null> {
 async function fetchExternalIds(tmdbId: string, isTV: boolean): Promise<{ imdbId?: string } | null> {
   try {
     const type = isTV ? 'tv/shows' : 'movies'
-    const response = await fetch(`http://localhost:5001/api/metadata/tmdb/${type}/${tmdbId}/external_ids`, {
-      credentials: 'include',
-    })
-    if (!response.ok) return null
-    const data = await response.json()
+    const data = await apiFetch<{ imdb_id?: string }>(`/api/metadata/tmdb/${type}/${tmdbId}/external_ids`)
     return { imdbId: data.imdb_id }
   } catch {
     return null

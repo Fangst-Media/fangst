@@ -1,21 +1,9 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../lib/auth'
+import { apiFetch, apiPost } from '../lib/api-client'
 
-type RequestStatus =
-  | 'pending_approval'
-  | 'approved'
-  | 'searching'
-  | 'found'
-  | 'fetching_nzb'
-  | 'nzb_downloaded'
-  | 'sent_to_downloader'
-  | 'downloading'
-  | 'download_complete'
-  | 'importing'
-  | 'completed'
-  | 'rejected'
-  | 'failed'
+import type { RequestStatus } from '../hooks/useRequestStatus'
 
 type RequestingUser = {
   id: string
@@ -54,48 +42,35 @@ type FilterTab = 'all' | 'pending' | 'searching' | 'completed'
 
 async function fetchRequests(status?: string): Promise<{ requests: MediaRequest[] }> {
   const params = status ? `?status=${status}` : ''
-  const response = await fetch(`/api/requests${params}`)
-  if (!response.ok) throw new Error('Failed to fetch requests')
-  return response.json()
+  return apiFetch(`/api/requests${params}`)
 }
 
 async function approveRequest(id: string): Promise<void> {
-  const response = await fetch(`/api/requests/${id}/approve`, { method: 'POST' })
-  if (!response.ok) throw new Error('Failed to approve request')
+  return apiPost(`/api/requests/${id}/approve`, {})
 }
 
 async function rejectRequest(id: string): Promise<void> {
-  const response = await fetch(`/api/requests/${id}/reject`, { method: 'POST' })
-  if (!response.ok) throw new Error('Failed to reject request')
+  return apiPost(`/api/requests/${id}/reject`, {})
 }
 
 async function deleteRequest(id: string): Promise<void> {
-  const response = await fetch(`/api/requests/${id}`, { method: 'DELETE' })
-  if (!response.ok) throw new Error('Failed to delete request')
+  return apiFetch(`/api/requests/${id}`, { method: 'DELETE' })
 }
 
 async function runSearchJob(): Promise<{ searched: number; found: number; errors: number }> {
-  const response = await fetch('/api/requests/search-job', { method: 'POST' })
-  if (!response.ok) throw new Error('Failed to run search job')
-  return response.json()
+  return apiPost('/api/requests/search-job', {})
 }
 
 async function runMonitorJob(): Promise<{ checked: number; completed: number; failed: number }> {
-  const response = await fetch('/api/requests/monitor-job', { method: 'POST' })
-  if (!response.ok) throw new Error('Failed to run monitor job')
-  return response.json()
+  return apiPost('/api/requests/monitor-job', {})
 }
 
 async function runEpisodeSearchJob(): Promise<{ checked: number; found: number; errors: number; seasonPacks: number }> {
-  const response = await fetch('/api/requests/episode-search-job', { method: 'POST' })
-  if (!response.ok) throw new Error('Failed to run episode search job')
-  return response.json()
+  return apiPost('/api/requests/episode-search-job', {})
 }
 
 async function runAirDateMonitor(): Promise<{ requestsChecked: number; episodesAdded: number; statusUpdates: number; errors: number }> {
-  const response = await fetch('/api/requests/air-date-monitor', { method: 'POST' })
-  if (!response.ok) throw new Error('Failed to run air date monitor')
-  return response.json()
+  return apiPost('/api/requests/air-date-monitor', {})
 }
 
 async function fetchEpisodesFromTmdb(requestId: string): Promise<{ success: boolean; episodesAdded: number; seriesStatus: string }> {
@@ -104,19 +79,42 @@ async function fetchEpisodesFromTmdb(requestId: string): Promise<{ success: bool
   return response.json()
 }
 
-function formatRelativeTime(dateString: string | null): string {
+function formatCompactTime(dateString: string | null): string {
   if (!dateString) return '-'
   const date = new Date(dateString)
   const now = new Date()
   const diffMs = now.getTime() - date.getTime()
   const diffMins = Math.floor(diffMs / (1000 * 60))
 
-  if (diffMins < 1) return 'Just now'
-  if (diffMins < 60) return `${diffMins}m ago`
+  if (diffMins < 1) return 'now'
+  if (diffMins < 60) return `${diffMins}m`
   const diffHours = Math.floor(diffMins / 60)
-  if (diffHours < 24) return `${diffHours}h ago`
+  if (diffHours < 24) return `${diffHours}h`
   const diffDays = Math.floor(diffHours / 24)
-  return `${diffDays}d ago`
+  if (diffDays < 30) return `${diffDays}d`
+  const diffMonths = Math.floor(diffDays / 30)
+  if (diffMonths < 12) return `${diffMonths}mo`
+  const diffYears = Math.floor(diffDays / 365)
+  return `${diffYears}y`
+}
+
+function formatFullTime(dateString: string | null): string {
+  if (!dateString) return 'Never'
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / (1000 * 60))
+
+  if (diffMins < 1) return 'Just now'
+  if (diffMins < 60) return `${diffMins} minute${diffMins === 1 ? '' : 's'} ago`
+  const diffHours = Math.floor(diffMins / 60)
+  if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`
+  const diffDays = Math.floor(diffHours / 24)
+  if (diffDays < 30) return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`
+  const diffMonths = Math.floor(diffDays / 30)
+  if (diffMonths < 12) return `${diffMonths} month${diffMonths === 1 ? '' : 's'} ago`
+  const diffYears = Math.floor(diffDays / 365)
+  return `${diffYears} year${diffYears === 1 ? '' : 's'} ago`
 }
 
 function SeriesStatusBadge({ status }: { status: 'returning' | 'ended' | 'upcoming' | 'unknown' }) {
@@ -420,11 +418,11 @@ export default function RequestsList() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <h3 className="font-medium text-foreground">
+                      <h3 className="font-medium text-foreground truncate" title={`${request.title}${request.year ? ` (${request.year})` : ''}`}>
                         {request.title}
                         {request.year && <span className="text-muted ml-1">({request.year})</span>}
                       </h3>
-                      <div className="flex items-center gap-2 mt-1 text-xs text-muted flex-wrap">
+                      <div className="flex items-center gap-1.5 mt-1 text-xs text-muted flex-wrap">
                         <span className="capitalize">{request.type}</span>
                         {request.season && <span>· Season {request.season}</span>}
                         {request.seriesStatus && (
@@ -468,14 +466,18 @@ export default function RequestsList() {
                   </div>
 
                   <div className="flex items-center gap-4 mt-3 text-xs text-muted">
-                    <span>Requested {formatRelativeTime(request.createdAt)}</span>
+                    <span title={formatFullTime(request.createdAt)}>
+                      Requested {formatCompactTime(request.createdAt)}
+                    </span>
                     {request.minQuality && (
                       <span className="px-1.5 py-0.5 rounded bg-black/30 text-foreground">
                         Min: {request.minQuality}
                       </span>
                     )}
                     {request.lastSearchedAt && (
-                      <span>· Last searched {formatRelativeTime(request.lastSearchedAt)}</span>
+                      <span title={formatFullTime(request.lastSearchedAt)}>
+                        · Last searched {formatCompactTime(request.lastSearchedAt)}
+                      </span>
                     )}
                   </div>
 

@@ -1,5 +1,7 @@
+import type { TvSeriesDetails } from '@jaeger/shared/schemas/metadata'
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { movieLanes, tvLanes, collections, apiPost } from '../lib/api-client'
 import { MonitoringPresetSelector, type MonitoringPreset } from './MonitoringPresetSelector'
 
 type SearchResult = {
@@ -20,66 +22,6 @@ type SimpleRequestModalProps = {
   onSwitchMode?: () => void
 }
 
-type TvSeasonInfo = {
-  seasonNumber: number
-  name: string
-  episodeCount: number
-}
-
-type TvDetailsResponse = {
-  id: string
-  title: string
-  status: 'returning' | 'ended' | 'upcoming' | 'unknown'
-  numberOfSeasons: number
-  seasons: TvSeasonInfo[]
-}
-
-type MovieCollection = {
-  id: number
-  name: string
-  posterPath?: string
-  backdropPath?: string
-}
-
-type MovieDetailsResponse = {
-  imdbId?: string
-  runtime?: number
-  collection?: MovieCollection
-}
-
-type CollectionDetails = {
-  id: number
-  name: string
-  overview?: string
-  posterPath?: string
-  backdropPath?: string
-  movies: {
-    id: number
-    title: string
-    overview?: string
-    releaseDate?: string
-    posterPath?: string
-  }[]
-}
-
-async function getTvDetails(tmdbId: string): Promise<TvDetailsResponse> {
-  const response = await fetch(`/api/metadata/tmdb/tv/${tmdbId}`, { credentials: 'include' })
-  if (!response.ok) throw new Error('Failed to fetch TV details')
-  return response.json()
-}
-
-async function getMovieDetails(tmdbId: string): Promise<MovieDetailsResponse> {
-  const response = await fetch(`/api/metadata/tmdb/movies/${tmdbId}`, { credentials: 'include' })
-  if (!response.ok) throw new Error('Failed to fetch movie details')
-  return response.json()
-}
-
-async function getCollectionDetails(collectionId: number): Promise<CollectionDetails> {
-  const response = await fetch(`/api/metadata/tmdb/collections/${collectionId}`, { credentials: 'include' })
-  if (!response.ok) throw new Error('Failed to fetch collection details')
-  return response.json()
-}
-
 async function createRequest(data: {
   title: string
   year?: number
@@ -89,22 +31,12 @@ async function createRequest(data: {
   overview?: string
   minQuality?: string | null
   season?: number
-  seriesStatus?: 'returning' | 'ended' | 'upcoming' | 'unknown'
+  seriesStatus?: TvSeriesDetails['status']
   fetchEpisodes?: boolean
   releaseDate?: string
   monitoringPreset?: MonitoringPreset
 }): Promise<{ success: boolean }> {
-  const response = await fetch('/api/requests', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-    credentials: 'include',
-  })
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || 'Failed to create request')
-  }
-  return response.json()
+  return apiPost<{ success: boolean }>('/api/requests', data)
 }
 
 export function SimpleRequestModal({
@@ -124,19 +56,19 @@ export function SimpleRequestModal({
 
   const { data: tvDetails, isLoading: isLoadingTvDetails } = useQuery({
     queryKey: ['tv-details', media.id],
-    queryFn: () => getTvDetails(media.id),
+    queryFn: () => tvLanes.getById(media.id),
     enabled: media.type === 'tv',
   })
 
   const { data: movieDetails } = useQuery({
     queryKey: ['movie-details', media.id],
-    queryFn: () => getMovieDetails(media.id),
+    queryFn: () => movieLanes.getById(media.id),
     enabled: media.type === 'movie',
   })
 
   const { data: collectionDetails } = useQuery({
     queryKey: ['collection-details', movieDetails?.collection?.id],
-    queryFn: () => getCollectionDetails(movieDetails!.collection!.id),
+    queryFn: () => collections.getById(movieDetails!.collection!.id.toString()),
     enabled: !!movieDetails?.collection?.id,
   })
 
@@ -181,7 +113,6 @@ export function SimpleRequestModal({
   }
 
   function handleRequest() {
-    // If movie has a collection and we haven't shown the prompt, show it
     if (media.type === 'movie' && movieDetails?.collection && !showCollectionPrompt) {
       setShowCollectionPrompt(true)
       return
@@ -199,7 +130,6 @@ export function SimpleRequestModal({
 
     setShowCollectionPrompt(false)
 
-    // Request each movie in the collection
     for (const movie of collectionDetails.movies) {
       await createRequest({
         title: movie.title,
@@ -242,7 +172,7 @@ export function SimpleRequestModal({
             className="w-16 h-24 rounded object-cover bg-background"
           />
           <div className="flex-1 min-w-0">
-            <h2 id="simple-request-title" className="font-semibold text-foreground line-clamp-2">
+            <h2 id="simple-request-title" className="font-semibold text-foreground truncate" title={`${media.title}${media.year ? ` (${media.year})` : ''}`}>
               {media.title}
             </h2>
             {media.year && <p className="text-sm text-muted mt-0.5">({media.year})</p>}

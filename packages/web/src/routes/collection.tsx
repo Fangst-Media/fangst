@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
+import { apiFetch } from '../lib/api-client'
 
 type CollectionMovie = {
   tmdbId: number
@@ -32,11 +33,7 @@ type CollectionData = {
 }
 
 async function getCollectionData(tmdbCollectionId: string): Promise<CollectionData> {
-  const response = await fetch(`/api/library/collections/${tmdbCollectionId}`, {
-    credentials: 'include',
-  })
-  if (!response.ok) throw new Error('Failed to fetch collection')
-  return response.json()
+  return apiFetch(`/api/library/collections/${tmdbCollectionId}`)
 }
 
 function formatBytes(bytes: number): string {
