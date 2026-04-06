@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { SettingsResponse, SettingsUpdate } from '@jaeger/shared/types/settings'
+import type { SettingsResponse, SettingsUpdate, ExternalLink } from '@jaeger/shared/types/settings'
 import { apiFetch, apiPost } from '../lib/api-client'
 
 async function fetchSettings(): Promise<SettingsResponse> {
@@ -72,6 +72,232 @@ function SettingsSection({ title, description, children }: SettingsSectionProps)
       {description && <p className="text-sm text-muted mb-4">{description}</p>}
       <div>{children}</div>
     </div>
+  )
+}
+
+const MEDIA_TYPE_LABELS: Record<string, string> = {
+  movie: 'Movies',
+  tv: 'TV Shows',
+  book: 'Books',
+}
+
+function ExternalLinksSection({
+  links,
+  onUpdate,
+}: {
+  links: ExternalLink[]
+  onUpdate: (links: ExternalLink[]) => void
+}) {
+  const [adding, setAdding] = useState(false)
+  const [editId, setEditId] = useState<string | null>(null)
+  const [form, setForm] = useState({
+    name: '',
+    urlTemplate: '',
+    mediaTypes: [] as string[],
+  })
+
+  function toggleLink(id: string) {
+    onUpdate(links.map((l) => (l.id === id ? { ...l, enabled: !l.enabled } : l)))
+  }
+
+  function removeLink(id: string) {
+    onUpdate(links.filter((l) => l.id !== id))
+  }
+
+  function startAdd() {
+    setForm({ name: '', urlTemplate: '', mediaTypes: [] })
+    setAdding(true)
+    setEditId(null)
+  }
+
+  function startEdit(link: ExternalLink) {
+    setForm({
+      name: link.name,
+      urlTemplate: link.urlTemplate,
+      mediaTypes: [...link.mediaTypes],
+    })
+    setEditId(link.id)
+    setAdding(false)
+  }
+
+  function saveForm() {
+    if (!form.name || !form.urlTemplate || form.mediaTypes.length === 0) return
+
+    if (editId) {
+      onUpdate(
+        links.map((l) =>
+          l.id === editId
+            ? { ...l, name: form.name, urlTemplate: form.urlTemplate, mediaTypes: form.mediaTypes as ExternalLink['mediaTypes'] }
+            : l
+        )
+      )
+      setEditId(null)
+    } else {
+      const id = form.name.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now()
+      onUpdate([
+        ...links,
+        {
+          id,
+          name: form.name,
+          urlTemplate: form.urlTemplate,
+          mediaTypes: form.mediaTypes as ExternalLink['mediaTypes'],
+          enabled: true,
+        },
+      ])
+      setAdding(false)
+    }
+    setForm({ name: '', urlTemplate: '', mediaTypes: [] })
+  }
+
+  function cancelForm() {
+    setAdding(false)
+    setEditId(null)
+    setForm({ name: '', urlTemplate: '', mediaTypes: [] })
+  }
+
+  function toggleMediaType(type: string) {
+    setForm((f) => ({
+      ...f,
+      mediaTypes: f.mediaTypes.includes(type)
+        ? f.mediaTypes.filter((t) => t !== type)
+        : [...f.mediaTypes, type],
+    }))
+  }
+
+  const isEditing = adding || editId !== null
+
+  return (
+    <SettingsSection
+      title="External Links"
+      description="Configure 'where to watch/read' links shown on detail pages. Use {title}, {author}, {year}, {tmdbId}, {imdbId}, {openLibraryId} as placeholders in URLs."
+    >
+      <div className="space-y-2">
+        {links.map((link) => (
+          <div
+            key={link.id}
+            className="flex items-center gap-3 py-3 border-b border-border last:border-0"
+          >
+            <button
+              type="button"
+              onClick={() => toggleLink(link.id)}
+              className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+                link.enabled ? 'bg-accent' : 'bg-border'
+              }`}
+            >
+              <span
+                className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                  link.enabled ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                }`}
+              />
+            </button>
+
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-foreground">{link.name}</span>
+                {link.mediaTypes.map((t) => (
+                  <span
+                    key={t}
+                    className="px-1.5 py-0.5 text-[10px] rounded bg-foreground/10 text-muted"
+                  >
+                    {MEDIA_TYPE_LABELS[t] ?? t}
+                  </span>
+                ))}
+              </div>
+              <p className="text-xs text-muted truncate">{link.urlTemplate}</p>
+            </div>
+
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={() => startEdit(link)}
+                className="p-1.5 text-muted hover:text-foreground transition-colors"
+                title="Edit"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={() => removeLink(link.id)}
+                className="p-1.5 text-muted hover:text-red-400 transition-colors"
+                title="Remove"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {isEditing && (
+        <div className="mt-4 p-4 rounded-lg bg-background border border-border space-y-3">
+          <input
+            type="text"
+            placeholder="Name (e.g. Saxo)"
+            className="w-full rounded-md bg-card border border-border px-3 py-1.5 text-foreground text-sm"
+            value={form.name}
+            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+          />
+          <input
+            type="text"
+            placeholder="URL template (e.g. https://www.saxo.com/dk/search?query={title})"
+            className="w-full rounded-md bg-card border border-border px-3 py-1.5 text-foreground text-sm font-mono text-xs"
+            value={form.urlTemplate}
+            onChange={(e) => setForm((f) => ({ ...f, urlTemplate: e.target.value }))}
+          />
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted">Applies to:</span>
+            {(['movie', 'tv', 'book'] as const).map((type) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => toggleMediaType(type)}
+                className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+                  form.mediaTypes.includes(type)
+                    ? 'bg-accent text-white'
+                    : 'bg-foreground/10 text-muted hover:text-foreground'
+                }`}
+              >
+                {MEDIA_TYPE_LABELS[type]}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={saveForm}
+              disabled={!form.name || !form.urlTemplate || form.mediaTypes.length === 0}
+              className="px-3 py-1.5 rounded-md bg-accent text-white text-sm font-medium hover:bg-accent/90 transition-colors disabled:opacity-50"
+            >
+              {editId ? 'Save' : 'Add'}
+            </button>
+            <button
+              type="button"
+              onClick={cancelForm}
+              className="px-3 py-1.5 rounded-md border border-border text-sm text-muted hover:text-foreground transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!isEditing && (
+        <button
+          type="button"
+          onClick={startAdd}
+          className="mt-4 flex items-center gap-2 text-sm text-muted hover:text-foreground transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
+          Add link
+        </button>
+      )}
+    </SettingsSection>
   )
 }
 
@@ -488,6 +714,12 @@ export default function Settings() {
             />
           </SettingField>
         </SettingsSection>
+
+        {/* External Links */}
+        <ExternalLinksSection
+          links={settings.externalLinks?.links ?? []}
+          onUpdate={(links) => updateMutation.mutate({ externalLinks: { links } })}
+        />
       </div>
     </div>
   )

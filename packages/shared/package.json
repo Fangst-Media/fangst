@@ -8,6 +8,7 @@
     "./types/settings": "./src/types/settings.ts",
     "./types/config": "./src/types/config.ts",
     "./types/indexer": "./src/types/indexer.ts",
+    "./schemas/metadata": "./src/schemas/metadata.ts",
     "./utils": "./src/utils/index.ts",
     "./clients/tmdb": "./src/clients/tmdb.ts",
     "./clients/tvdb": "./src/clients/tvdb.ts",
@@ -24,7 +25,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "zod": "^3.23.8"
+    "zod": "4"
   },
   "devDependencies": {
     "typescript": "^5.7.2"

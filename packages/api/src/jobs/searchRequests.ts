@@ -113,7 +113,7 @@ async function saveNzbBackup(nzbContent: string, filename: string): Promise<void
 async function downloadRelease(
   release: SearchResult,
   requestId: string,
-  mediaType: 'movie' | 'tv'
+  mediaType: 'movie' | 'tv' | 'book'
 ): Promise<boolean> {
   const downloaders = configService.getEnabledDownloaders()
 
@@ -131,7 +131,11 @@ async function downloadRelease(
       await requestService.updateStatus(requestId, 'fetching_nzb')
       console.log(`[SearchJob] Fetching NZB: ${release.title}`)
 
-      const category = mediaType === 'movie' ? downloader.categories?.movies : downloader.categories?.tv
+      const category = mediaType === 'movie'
+        ? downloader.categories?.movies
+        : mediaType === 'book'
+          ? downloader.categories?.books
+          : downloader.categories?.tv
       const result = await client.addNzbFromUrl(release.downloadUrl, release.title, category)
 
       // Save backup if configured
@@ -164,18 +168,25 @@ async function processRequest(request: RequestWithUser): Promise<'found' | 'not_
     const runtime = await fetchRuntime(request)
 
     const searchParams: {
-      type: 'movie' | 'tv'
+      type: 'movie' | 'tv' | 'book' | 'general'
       imdbId?: string
       tvdbId?: number
       query?: string
       season?: number
       runtime?: number
+      categories?: number[]
     } = {
       type: request.type,
       runtime,
     }
 
-    if (request.imdbId) {
+    if (request.type === 'book') {
+      // Books search by title + author, with specific Newznab categories
+      const authorSuffix = request.author ? ` ${request.author}` : ''
+      searchParams.query = `${request.title}${authorSuffix}`
+      searchParams.categories = request.format === 'audiobook' ? [3030] : [7020]
+      searchParams.runtime = undefined
+    } else if (request.imdbId) {
       searchParams.imdbId = request.imdbId
     } else if (request.tvdbId) {
       searchParams.tvdbId = Number.parseInt(request.tvdbId, 10)

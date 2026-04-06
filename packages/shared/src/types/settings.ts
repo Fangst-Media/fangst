@@ -31,8 +31,8 @@ export const mockAuthSettingsSchema = z.object({
 // Auth settings
 export const authSettingsSchema = z.object({
   provider: z.enum(['jellyfin', 'mock']).default('jellyfin'),
-  jellyfin: jellyfinSettingsSchema.default({}),
-  mock: mockAuthSettingsSchema.default({}),
+  jellyfin: jellyfinSettingsSchema.default({ url: 'http://localhost:8096', syncAdminFromProvider: true }),
+  mock: mockAuthSettingsSchema.default({ enabled: false }),
 })
 
 // Media settings
@@ -56,9 +56,9 @@ export const tvdbSettingsSchema = z.object({
 
 export const metadataSettingsSchema = z.object({
   providers: z.array(z.enum(['relay', 'tmdb', 'tvdb'])).default(['relay', 'tmdb', 'tvdb']),
-  relay: relaySettingsSchema.default({}),
-  tmdb: tmdbSettingsSchema.default({}),
-  tvdb: tvdbSettingsSchema.default({}),
+  relay: relaySettingsSchema.default({ url: 'https://metadata-relay.dorninger.co' }),
+  tmdb: tmdbSettingsSchema.default({ apiKey: '' }),
+  tvdb: tvdbSettingsSchema.default({ apiKey: '' }),
 })
 
 // UI settings
@@ -70,9 +70,9 @@ export const uiSettingsSchema = z.object({
 
 // Request mode permission options
 export const requestModePermissionSchema = z.enum([
-  'simple_only',   // User can only use simple quality picker
-  'detailed_only', // User can only use detailed release browser
-  'user_choice',   // User can toggle between modes
+  'simple_only',
+  'detailed_only',
+  'user_choice',
 ])
 
 // Request settings
@@ -95,10 +95,20 @@ export const downloadSettingsSchema = z.object({
   nzbBackupPath: z.string().default(''),
 })
 
+// Metadata store settings
+export const metadataStoreSettingsSchema = z.object({
+  enabled: z.boolean().default(true),
+  itemTtlDays: z.number().min(1).max(365).default(30),
+  listTtlHours: z.number().min(1).max(168).default(4),
+  indexerTrendingTtlMinutes: z.number().min(15).max(1440).default(60),
+})
+
 // Downloader categories schema
 export const downloaderCategoriesSchema = z.object({
   movies: z.string().optional(),
   tv: z.string().optional(),
+  books: z.string().optional(),
+  audiobooks: z.string().optional(),
 })
 
 // Downloader schema
@@ -118,18 +128,95 @@ export const createDownloaderSchema = downloaderSchema.omit({ id: true })
 // Update schema (all fields optional except must have at least one)
 export const updateDownloaderSchema = downloaderSchema.partial().omit({ id: true })
 
+// External link providers
+export const externalLinkSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1),
+  urlTemplate: z.string().min(1),
+  mediaTypes: z.array(z.enum(['movie', 'tv', 'book'])).min(1),
+  enabled: z.boolean().default(true),
+})
+
+export const defaultExternalLinks: ExternalLink[] = [
+  {
+    id: 'ereolen',
+    name: 'eReolen',
+    urlTemplate: 'https://bibliotek.kk.dk/search?q={title}+{author}',
+    mediaTypes: ['book'],
+    enabled: false,
+  },
+  {
+    id: 'openlibrary',
+    name: 'Open Library',
+    urlTemplate: 'https://openlibrary.org/works/{openLibraryId}',
+    mediaTypes: ['book'],
+    enabled: true,
+  },
+  {
+    id: 'goodreads',
+    name: 'Goodreads',
+    urlTemplate: 'https://www.goodreads.com/search?q={title}',
+    mediaTypes: ['book'],
+    enabled: true,
+  },
+  {
+    id: 'tmdb-movie',
+    name: 'TMDB',
+    urlTemplate: 'https://www.themoviedb.org/movie/{tmdbId}',
+    mediaTypes: ['movie'],
+    enabled: true,
+  },
+  {
+    id: 'tmdb-tv',
+    name: 'TMDB',
+    urlTemplate: 'https://www.themoviedb.org/tv/{tmdbId}',
+    mediaTypes: ['tv'],
+    enabled: true,
+  },
+  {
+    id: 'imdb',
+    name: 'IMDb',
+    urlTemplate: 'https://www.imdb.com/title/{imdbId}',
+    mediaTypes: ['movie', 'tv'],
+    enabled: true,
+  },
+]
+
+export const externalLinksSettingsSchema = z.object({
+  links: z.array(externalLinkSchema),
+})
+
 // Complete settings schema
 export const settingsSchema = z.object({
-  server: serverSettingsSchema.default({}),
-  database: databaseSettingsSchema.default({}),
+  server: serverSettingsSchema.default({ port: 5001, corsOrigin: 'http://localhost:5173' }),
+  database: databaseSettingsSchema.default({ url: './data/jaeger.db' }),
   security: securitySettingsSchema,
-  auth: authSettingsSchema.default({}),
-  media: mediaSettingsSchema.default({}),
-  metadata: metadataSettingsSchema.default({}),
-  ui: uiSettingsSchema.default({}),
-  requests: requestSettingsSchema.default({}),
-  sizeFilter: sizeFilterSettingsSchema.default({}),
-  download: downloadSettingsSchema.default({}),
+  auth: authSettingsSchema.default({
+    provider: 'jellyfin',
+    jellyfin: { url: 'http://localhost:8096', syncAdminFromProvider: true },
+    mock: { enabled: false },
+  }),
+  media: mediaSettingsSchema.default({ path: '/media', mockFilesystem: false }),
+  metadata: metadataSettingsSchema.default({
+    providers: ['relay', 'tmdb', 'tvdb'],
+    relay: { url: 'https://metadata-relay.dorninger.co' },
+    tmdb: { apiKey: '' },
+    tvdb: { apiKey: '' },
+  }),
+  ui: uiSettingsSchema.default({ theme: 'system', language: 'en', defaultLibraryView: 'grid' }),
+  requests: requestSettingsSchema.default({
+    memberRequestMode: 'simple_only',
+    adminRequestMode: 'detailed_only',
+    defaultSimpleQuality: '1080p',
+  }),
+  sizeFilter: sizeFilterSettingsSchema.default({
+    enabled: true, minMbPerMin720p: 12.5, minMbPerMin1080p: 12.5, minMbPerMin2160p: 34.5,
+  }),
+  download: downloadSettingsSchema.default({ nzbBackupPath: '' }),
+  metadataStore: metadataStoreSettingsSchema.default({
+    enabled: true, itemTtlDays: 30, listTtlHours: 4, indexerTrendingTtlMinutes: 60,
+  }),
+  externalLinks: externalLinksSettingsSchema.default({ links: defaultExternalLinks }),
 })
 
 // Inferred types
@@ -145,7 +232,10 @@ export type RequestSettings = z.infer<typeof requestSettingsSchema>
 export type RequestModePermission = z.infer<typeof requestModePermissionSchema>
 export type SizeFilterSettings = z.infer<typeof sizeFilterSettingsSchema>
 export type DownloadSettings = z.infer<typeof downloadSettingsSchema>
+export type MetadataStoreSettings = z.infer<typeof metadataStoreSettingsSchema>
 export type Downloader = z.infer<typeof downloaderSchema>
+export type ExternalLink = z.infer<typeof externalLinkSchema>
+export type ExternalLinksSettings = z.infer<typeof externalLinksSettingsSchema>
 export type DownloaderCategories = z.infer<typeof downloaderCategoriesSchema>
 export type CreateDownloader = z.infer<typeof createDownloaderSchema>
 export type UpdateDownloader = z.infer<typeof updateDownloaderSchema>
@@ -174,4 +264,6 @@ export type SettingsUpdate = Partial<{
   requests: Partial<RequestSettings>
   sizeFilter: Partial<SizeFilterSettings>
   download: Partial<DownloadSettings>
+  metadataStore: Partial<MetadataStoreSettings>
+  externalLinks: Partial<ExternalLinksSettings>
 }>

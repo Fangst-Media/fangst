@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { OpenAPIHono } from '@hono/zod-openapi'
 import { configService } from '../services/config'
 import { SABnzbdClient } from '@jaeger/shared/clients/sabnzbd'
 import type { User } from '../services/auth'
@@ -9,7 +9,7 @@ type AuthEnv = {
   }
 }
 
-const activity = new Hono<AuthEnv>()
+const activity = new OpenAPIHono<AuthEnv>()
 
 function requireAuth(user: User | null): user is User {
   return user !== null

@@ -1,5 +1,6 @@
-import { Hono } from 'hono'
+import { OpenAPIHono } from '@hono/zod-openapi'
 import { cors } from 'hono/cors'
+import { apiReference } from '@scalar/hono-api-reference'
 import activity from './routes/activity'
 import auth from './routes/auth'
 import calendarRouter from './routes/calendar'
@@ -9,6 +10,7 @@ import libraryRouter from './routes/library'
 import logsRouter from './routes/logs'
 import media from './routes/media'
 import metadata from './routes/metadata'
+import booksRouter from './routes/books'
 import requestsRouter from './routes/requests'
 import search from './routes/search'
 import settings from './routes/settings'
@@ -24,7 +26,7 @@ import { initializeDatabase } from './db/init'
 await initializeDatabase()
 await configService.initialize()
 
-const app = new Hono()
+const app = new OpenAPIHono()
 
 // Request logging (before auth so we log all requests)
 app.use('*', requestLogger)
@@ -51,6 +53,21 @@ app.get('/health', (c) => {
   return c.json({ status: 'ok' })
 })
 
+// API Documentation
+app.doc('/api/openapi.json', {
+  openapi: '3.1.0',
+  info: {
+    title: 'Jæger API',
+    version: '0.1.0',
+    description: 'Media management and acquisition API',
+  },
+})
+
+app.get('/api/docs', apiReference({
+  url: '/api/openapi.json',
+  pageTitle: 'Jæger API',
+}))
+
 app.route('/api/auth', auth)
 app.route('/api/logs', logsRouter)
 app.route('/api/media', media)
@@ -60,6 +77,7 @@ app.route('/api/downloaders', downloaders)
 app.route('/api/indexers', indexers)
 app.route('/api/search', search)
 app.route('/api/metadata', metadata)
+app.route('/api/metadata/books', booksRouter)
 app.route('/api/activity', activity)
 app.route('/api/calendar', calendarRouter)
 app.route('/api/requests', requestsRouter)

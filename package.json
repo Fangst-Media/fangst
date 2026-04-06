@@ -11,11 +11,14 @@
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "clean": "bun run --filter \"./packages/**\" clean",
+    "generate:types": "cd packages/api && bun run generate:openapi && cd ../.. && bunx openapi-typescript packages/api/openapi.json -o packages/web/src/types/api.generated.ts",
     "setup": "bun install && cd packages/api && bun run db:push"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
+    "@hey-api/openapi-ts": "^0.95.0",
     "@types/bun": "^1.1.15",
+    "openapi-typescript": "^7.13.0",
     "typescript": "^5.7.2"
   },
   "workspaces": [

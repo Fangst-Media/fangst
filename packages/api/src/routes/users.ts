@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { OpenAPIHono } from '@hono/zod-openapi'
 import { z } from 'zod'
 import { zValidator } from '@hono/zod-validator'
 import { eq } from 'drizzle-orm'
@@ -11,7 +11,7 @@ type Variables = {
   user: User | null
 }
 
-const usersRouter = new Hono<{ Variables: Variables }>()
+const usersRouter = new OpenAPIHono<{ Variables: Variables }>()
 
 const updatePreferencesSchema = z.object({
   preferredRequestMode: z.enum(['simple', 'detailed']),

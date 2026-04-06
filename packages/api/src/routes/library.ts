@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { OpenAPIHono } from '@hono/zod-openapi'
 import type { User } from '../services/auth'
 import { collectionService } from '../services/collections'
 import { libraryService } from '../services/library'
@@ -9,7 +9,7 @@ type AuthEnv = {
   }
 }
 
-const libraryRouter = new Hono<AuthEnv>()
+const libraryRouter = new OpenAPIHono<AuthEnv>()
 
 function requireAuth(user: User | null): user is User {
   return user !== null

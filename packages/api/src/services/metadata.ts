@@ -1,4 +1,5 @@
 import { MetadataRelayClient } from '@jaeger/shared/clients/metadata-relay'
+import { OpenLibraryProvider } from './openlibrary'
 import type {
   MetadataRelayResult,
   TvSeriesDetails,
@@ -20,6 +21,11 @@ export type MetadataCapability =
   | 'nowPlaying'
   | 'topRated'
   | 'onAir'
+  | 'bookSearch'
+  | 'bookTrending'
+  | 'bookPopular'
+  | 'bookClassics'
+  | 'bookDetails'
 
 export type MovieDetails = {
   id: string
@@ -54,6 +60,19 @@ export type CollectionDetails = {
   }[]
 }
 
+export type BookDetails = {
+  id: string
+  title: string
+  author?: string
+  authorId?: string
+  year?: number
+  cover?: string
+  overview?: string
+  subjects?: string[]
+  isbn?: string[]
+  numberOfPages?: number
+}
+
 export interface MetadataProvider {
   name: string
   capabilities: MetadataCapability[]
@@ -73,6 +92,11 @@ export interface MetadataProvider {
   getMovieDetails?(tmdbId: string | number): Promise<MovieDetails>
   getSeasonDetails?(tmdbId: string | number, seasonNumber: number): Promise<SeasonDetails>
   getCollectionDetails?(collectionId: number): Promise<CollectionDetails>
+  searchBooks?(query: string): Promise<MetadataRelayResult[]>
+  getTrendingBooks?(): Promise<MetadataRelayResult[]>
+  getPopularBooks?(): Promise<MetadataRelayResult[]>
+  getClassicBooks?(): Promise<MetadataRelayResult[]>
+  getBookDetails?(workId: string): Promise<BookDetails>
 }
 
 // Wraps the existing MetadataRelayClient
@@ -498,6 +522,9 @@ export class MetadataService {
     if (config.tmdbApiKey) {
       this.providers.push(new TmdbProvider(config.tmdbApiKey))
     }
+
+    // Open Library is always available (no API key needed)
+    this.providers.push(new OpenLibraryProvider())
   }
 
   private getProvider(capability: MetadataCapability): MetadataProvider | null {
@@ -764,6 +791,76 @@ export class MetadataService {
             { provider: provider.name, error: error instanceof Error ? error.message : error },
             'Provider failed, trying next'
           )
+          continue
+        }
+      }
+    }
+    return null
+  }
+
+  async searchBooks(query: string): Promise<MetadataRelayResult[] | null> {
+    for (const provider of this.providers) {
+      if (provider.capabilities.includes('bookSearch') && provider.searchBooks) {
+        try {
+          return await provider.searchBooks(query)
+        } catch (error) {
+          logger.warn({ provider: provider.name, error: error instanceof Error ? error.message : error }, 'Provider failed, trying next')
+          continue
+        }
+      }
+    }
+    return null
+  }
+
+  async getTrendingBooks(): Promise<MetadataRelayResult[] | null> {
+    for (const provider of this.providers) {
+      if (provider.capabilities.includes('bookTrending') && provider.getTrendingBooks) {
+        try {
+          return await provider.getTrendingBooks()
+        } catch (error) {
+          logger.warn({ provider: provider.name, error: error instanceof Error ? error.message : error }, 'Provider failed, trying next')
+          continue
+        }
+      }
+    }
+    return null
+  }
+
+  async getPopularBooks(): Promise<MetadataRelayResult[] | null> {
+    for (const provider of this.providers) {
+      if (provider.capabilities.includes('bookPopular') && provider.getPopularBooks) {
+        try {
+          return await provider.getPopularBooks()
+        } catch (error) {
+          logger.warn({ provider: provider.name, error: error instanceof Error ? error.message : error }, 'Provider failed, trying next')
+          continue
+        }
+      }
+    }
+    return null
+  }
+
+  async getClassicBooks(): Promise<MetadataRelayResult[] | null> {
+    for (const provider of this.providers) {
+      if (provider.capabilities.includes('bookClassics') && provider.getClassicBooks) {
+        try {
+          return await provider.getClassicBooks()
+        } catch (error) {
+          logger.warn({ provider: provider.name, error: error instanceof Error ? error.message : error }, 'Provider failed, trying next')
+          continue
+        }
+      }
+    }
+    return null
+  }
+
+  async getBookDetails(workId: string): Promise<BookDetails | null> {
+    for (const provider of this.providers) {
+      if (provider.capabilities.includes('bookDetails') && provider.getBookDetails) {
+        try {
+          return await provider.getBookDetails(workId)
+        } catch (error) {
+          logger.warn({ provider: provider.name, error: error instanceof Error ? error.message : error }, 'Provider failed, trying next')
           continue
         }
       }

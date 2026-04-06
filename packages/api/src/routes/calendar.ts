@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { OpenAPIHono } from '@hono/zod-openapi'
 import { and, eq, isNotNull, sql } from 'drizzle-orm'
 import { db } from '../db'
 import { episodes, requests } from '../db/schema'
@@ -24,7 +24,7 @@ export type CalendarItem = {
   posterPath: string | null
 }
 
-const calendarRouter = new Hono<AuthEnv>()
+const calendarRouter = new OpenAPIHono<AuthEnv>()
 
 function requireAuth(user: User | null): user is User {
   return user !== null

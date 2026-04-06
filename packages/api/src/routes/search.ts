@@ -1,8 +1,9 @@
-import { Hono } from 'hono'
+import { OpenAPIHono } from '@hono/zod-openapi'
 import { searchService } from '../services/search'
 import { configService } from '../services/config'
 import { searchRequestSchema } from '@jaeger/shared/types/indexer'
 import { SABnzbdClient } from '@jaeger/shared/clients/sabnzbd'
+import { requestService } from '../services/requests'
 import type { User } from '../services/auth'
 
 type AuthEnv = {
@@ -11,7 +12,7 @@ type AuthEnv = {
   }
 }
 
-const search = new Hono<AuthEnv>()
+const search = new OpenAPIHono<AuthEnv>()
 
 function requireAuth(user: User | null): user is User {
   return user !== null
@@ -81,6 +82,87 @@ search.post('/download', async (c) => {
   } catch (error) {
     return c.json(
       { error: error instanceof Error ? error.message : 'Failed to send to downloader' },
+      400
+    )
+  }
+})
+
+// POST /api/search/download-release - Download a specific release and create request
+search.post('/download-release', async (c) => {
+  const user = c.get('user')
+  if (!requireAuth(user)) {
+    return c.json({ error: 'Authentication required' }, 401)
+  }
+
+  try {
+    const body = await c.req.json()
+    const {
+      downloadUrl,
+      downloaderId,
+      releaseName,
+      category,
+      media,
+    } = body as {
+      downloadUrl: string
+      downloaderId: string
+      releaseName: string
+      category?: string
+      media: {
+        title: string
+        year?: number
+        type: 'movie' | 'tv'
+        tmdbId?: string
+        imdbId?: string
+        posterPath?: string
+        overview?: string
+        season?: number
+      }
+    }
+
+    if (!downloadUrl || !downloaderId || !releaseName || !media) {
+      return c.json(
+        { error: 'Missing required fields: downloadUrl, downloaderId, releaseName, media' },
+        400
+      )
+    }
+
+    if (!media.title) {
+      return c.json({ error: 'Missing media.title' }, 400)
+    }
+
+    // Validate downloader exists and is enabled
+    const downloader = configService.getDownloader(downloaderId)
+    if (!downloader) {
+      return c.json({ error: 'Downloader not found' }, 404)
+    }
+
+    if (!downloader.enabled) {
+      return c.json({ error: 'Downloader is disabled' }, 400)
+    }
+
+    // Create request with 'downloading' status to prevent auto-search
+    const isAdmin = user.role === 'admin'
+    const request = await requestService.create(media, user.id, isAdmin)
+
+    // Update status to 'downloading' to skip auto-search
+    await requestService.updateStatus(request.id, 'downloading')
+
+    // Send to downloader
+    if (downloader.type === 'sabnzbd') {
+      const client = new SABnzbdClient(downloader.url, downloader.apiKey)
+      const result = await client.addNzbFromUrl(downloadUrl, releaseName, category)
+
+      return c.json({
+        success: true,
+        nzoId: result.nzoId,
+        request: await requestService.getById(request.id),
+      })
+    }
+
+    return c.json({ error: 'Unknown downloader type' }, 400)
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to download release' },
       400
     )
   }

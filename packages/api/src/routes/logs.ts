@@ -1,7 +1,7 @@
-import { Hono } from 'hono'
+import { OpenAPIHono } from '@hono/zod-openapi'
 import { createServiceLogger } from '../lib/logger'
 
-const logsRouter = new Hono()
+const logsRouter = new OpenAPIHono()
 const log = createServiceLogger('frontend')
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error'

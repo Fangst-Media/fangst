@@ -94,7 +94,7 @@ console.log('Frontend dev server running on http://localhost:5173')
 watch('./src', { recursive: true }, async (eventType, filename) => {
   if (filename) {
     console.log(`File changed: ${filename}`)
-    if (filename.endsWith('.css')) {
+    if (filename.endsWith('.css') || filename.endsWith('.tsx') || filename.endsWith('.ts')) {
       await buildCSS()
     }
     for (const client of clients) {

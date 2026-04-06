@@ -103,7 +103,8 @@ export type MetadataRelayResult = {
   poster?: string
   backdrop?: string
   rating?: number
-  type: 'movie' | 'tv'
+  type: 'movie' | 'tv' | 'book'
+  author?: string
 }
 
 export type TvSeriesStatus = 'returning' | 'ended' | 'upcoming' | 'unknown'

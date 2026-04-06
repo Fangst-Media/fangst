@@ -14,6 +14,8 @@ export const indexerSchema = z.object({
     .object({
       movies: z.array(z.number()).optional(),
       tv: z.array(z.number()).optional(),
+      books: z.array(z.number()).optional(),
+      audiobooks: z.array(z.number()).optional(),
     })
     .optional(),
   apiPath: z.string().default('/api'),
@@ -70,7 +72,7 @@ export const searchRequestSchema = z.object({
   tvdbId: z.number().optional(),
   season: z.number().optional(),
   episode: z.number().optional(),
-  type: z.enum(['movie', 'tv', 'general']).default('general'),
+  type: z.enum(['movie', 'tv', 'book', 'general']).default('general'),
   categories: z.array(z.number()).optional(),
   runtime: z.number().optional(),
 })
@@ -106,6 +108,8 @@ export interface IndexerRegistryEntry {
   categories?: {
     movies?: number[]
     tv?: number[]
+    books?: number[]
+    audiobooks?: number[]
   }
   apiPath?: string
 }

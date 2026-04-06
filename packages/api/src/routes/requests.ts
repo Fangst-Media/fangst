@@ -1,5 +1,5 @@
 import { MetadataRelayClient } from '@jaeger/shared/clients/metadata-relay'
-import { Hono } from 'hono'
+import { OpenAPIHono } from '@hono/zod-openapi'
 import { runAirDateMonitor } from '../jobs/airDateMonitor'
 import { runDownloadMonitor } from '../jobs/downloadMonitor'
 import { runEpisodeSearchJob } from '../jobs/episodeSearch'
@@ -15,7 +15,7 @@ type AuthEnv = {
   }
 }
 
-const requestsRouter = new Hono<AuthEnv>()
+const requestsRouter = new OpenAPIHono<AuthEnv>()
 
 function requireAuth(user: User | null): user is User {
   return user !== null
@@ -33,13 +33,17 @@ requestsRouter.get('/', async (c) => {
   }
 
   const status = c.req.query('status') as RequestStatus | undefined
-  const type = c.req.query('type') as 'movie' | 'tv' | undefined
+  const type = c.req.query('type') as 'movie' | 'tv' | 'book' | undefined
   const mine = c.req.query('mine') === 'true'
+  const tmdbId = c.req.query('tmdbId')
+  const openLibraryId = c.req.query('openLibraryId')
 
   const filters: {
     status?: RequestStatus | RequestStatus[]
     userId?: string
-    type?: 'movie' | 'tv'
+    type?: 'movie' | 'tv' | 'book'
+    tmdbId?: string
+    openLibraryId?: string
   } = {}
 
   if (status) {
@@ -48,6 +52,14 @@ requestsRouter.get('/', async (c) => {
 
   if (type) {
     filters.type = type
+  }
+
+  if (tmdbId) {
+    filters.tmdbId = tmdbId
+  }
+
+  if (openLibraryId) {
+    filters.openLibraryId = openLibraryId
   }
 
   // Non-admins can only see their own requests by default

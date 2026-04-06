@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { OpenAPIHono } from '@hono/zod-openapi'
 import { configService } from '../services/config'
 import { createIndexerSchema, updateIndexerSchema } from '@jaeger/shared/types/indexer'
 import { NewznabClient } from '@jaeger/shared/clients/newznab'
@@ -11,7 +11,7 @@ type AuthEnv = {
   }
 }
 
-const indexers = new Hono<AuthEnv>()
+const indexers = new OpenAPIHono<AuthEnv>()
 
 function requireAdmin(user: User | null): user is User {
   return user !== null && user.role === 'admin'

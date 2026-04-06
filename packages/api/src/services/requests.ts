@@ -23,7 +23,7 @@ export type RequestStatus =
 export type CreateRequestData = {
   title: string
   year?: number
-  type: 'movie' | 'tv'
+  type: 'movie' | 'tv' | 'book'
   tmdbId?: string
   imdbId?: string
   tvdbId?: string
@@ -37,6 +37,10 @@ export type CreateRequestData = {
   monitoringPreset?: MonitoringPreset
   // Movie specific (for calendar)
   releaseDate?: string
+  // Book specific
+  openLibraryId?: string
+  author?: string
+  format?: 'ebook' | 'audiobook'
 }
 
 export type RequestingUser = {
@@ -49,10 +53,11 @@ export type RequestWithUser = {
   id: string
   title: string
   year: number | null
-  type: 'movie' | 'tv'
+  type: 'movie' | 'tv' | 'book'
   tmdbId: string | null
   imdbId: string | null
   tvdbId: string | null
+  openLibraryId: string | null
   season: number | null
   posterPath: string | null
   overview: string | null
@@ -67,6 +72,9 @@ export type RequestWithUser = {
   monitoringPreset: MonitoringPreset | null
   // Movie specific
   releaseDate: string | null
+  // Book specific
+  author: string | null
+  format: 'ebook' | 'audiobook' | null
   // Timestamps
   createdAt: Date
   approvedAt: Date | null
@@ -86,7 +94,23 @@ function generateId(): string {
 
 export class RequestService {
   private async findExistingRequest(data: CreateRequestData): Promise<string | null> {
-    // Find existing request for same media (by tmdbId or title+year+type+season)
+    // Books dedup on openLibraryId + format
+    if (data.type === 'book' && data.openLibraryId) {
+      const existing = await db
+        .select({ id: requests.id })
+        .from(requests)
+        .where(
+          and(
+            eq(requests.openLibraryId, data.openLibraryId),
+            eq(requests.type, 'book'),
+            data.format ? eq(requests.format, data.format) : isNull(requests.format)
+          )
+        )
+        .limit(1)
+      if (existing.length > 0) return existing[0]!.id
+    }
+
+    // Movies/TV dedup on tmdbId
     if (data.tmdbId) {
       const existing = await db
         .select({ id: requests.id })
@@ -128,6 +152,9 @@ export class RequestService {
     userId: string,
     isAdmin: boolean
   ): Promise<RequestWithUser> {
+    if (!data.title) {
+      throw new Error(`Cannot create request: title is required (received: ${JSON.stringify({ title: data.title, type: data.type, tmdbId: data.tmdbId })})`)
+    }
     const now = new Date()
 
     // Check for existing request for same media
@@ -162,6 +189,10 @@ export class RequestService {
       monitoringPreset: data.monitoringPreset ?? null,
       // Movie specific
       releaseDate: data.releaseDate ?? null,
+      // Book specific
+      openLibraryId: data.openLibraryId ?? null,
+      author: data.author ?? null,
+      format: data.format ?? null,
       requestedBy: userId,
       status,
       createdAt: now,
@@ -188,7 +219,9 @@ export class RequestService {
   async getAll(filters?: {
     status?: RequestStatus | RequestStatus[]
     userId?: string
-    type?: 'movie' | 'tv'
+    type?: 'movie' | 'tv' | 'book'
+    tmdbId?: string
+    openLibraryId?: string
   }): Promise<RequestWithUser[]> {
     const results = await db
       .select({
@@ -257,6 +290,14 @@ export class RequestService {
       filtered = filtered.filter((r) => r.request.type === filters.type)
     }
 
+    if (filters?.tmdbId) {
+      filtered = filtered.filter((r) => r.request.tmdbId === filters.tmdbId)
+    }
+
+    if (filters?.openLibraryId) {
+      filtered = filtered.filter((r) => r.request.openLibraryId === filters.openLibraryId)
+    }
+
     return filtered.map((row) => {
       const requestingUsers = requestUsersMap.get(row.request.id) ?? []
       // Sort by request date, earliest first
@@ -271,10 +312,11 @@ export class RequestService {
         id: row.request.id,
         title: row.request.title,
         year: row.request.year,
-        type: row.request.type as 'movie' | 'tv',
+        type: row.request.type as 'movie' | 'tv' | 'book',
         tmdbId: row.request.tmdbId,
         imdbId: row.request.imdbId,
         tvdbId: row.request.tvdbId,
+        openLibraryId: row.request.openLibraryId,
         season: row.request.season,
         posterPath: row.request.posterPath,
         overview: row.request.overview,
@@ -287,6 +329,8 @@ export class RequestService {
         downloadedEpisodes: row.request.downloadedEpisodes,
         monitoringPreset: row.request.monitoringPreset as MonitoringPreset | null,
         releaseDate: row.request.releaseDate,
+        author: row.request.author,
+        format: row.request.format as 'ebook' | 'audiobook' | null,
         createdAt: row.request.createdAt,
         approvedAt: row.request.approvedAt,
         lastSearchedAt: row.request.lastSearchedAt,

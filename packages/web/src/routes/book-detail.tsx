@@ -1,6 +1,7 @@
 import type { BookDetails } from '@jaeger/shared/schemas/metadata'
+import type { ExternalLink } from '@jaeger/shared/types/settings'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { bookLanes, apiPost } from '../lib/api-client'
+import { bookLanes, apiFetch, apiPost } from '../lib/api-client'
 import { useBookRequestStatus } from '../hooks/useRequestStatus'
 import { DownloadStatus } from '../components/DownloadStatus'
 
@@ -61,10 +62,22 @@ function RequestButton({
   )
 }
 
+function resolveUrl(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (_, key: string) =>
+    vars[key] !== undefined ? encodeURIComponent(vars[key]) : ''
+  )
+}
+
 export default function BookDetail({ openLibraryId }: { openLibraryId: string }) {
   const { data: book, isLoading } = useQuery({
     queryKey: ['book-details', openLibraryId],
     queryFn: () => bookLanes.getByWorkId(openLibraryId),
+  })
+
+  const { data: linksData } = useQuery({
+    queryKey: ['external-links'],
+    queryFn: () => apiFetch<{ links: ExternalLink[] }>('/api/settings/external-links'),
+    staleTime: 1000 * 60 * 30,
   })
 
   if (isLoading) {
@@ -83,10 +96,18 @@ export default function BookDetail({ openLibraryId }: { openLibraryId: string })
     )
   }
 
+  const bookLinks = (linksData?.links ?? []).filter((l) => l.mediaTypes.includes('book'))
+  const linkVars: Record<string, string> = {
+    title: book.title,
+    author: book.author ?? '',
+    year: book.year?.toString() ?? '',
+    openLibraryId,
+  }
+
   return (
     <div className="min-h-screen">
       {/* Hero — blurred cover as backdrop */}
-      <div className="relative h-[50vh] min-h-[350px] w-full overflow-hidden">
+      <div className="-mt-16 relative h-[50vh] min-h-[350px] w-full overflow-hidden">
         {book.cover ? (
           <img
             src={book.cover}
@@ -154,24 +175,21 @@ export default function BookDetail({ openLibraryId }: { openLibraryId: string })
             </div>
 
             {/* External links */}
-            <div className="flex items-center gap-3 mt-8">
-              <a
-                href={`https://openlibrary.org/works/${openLibraryId}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-3 py-1.5 rounded-md bg-card border border-border text-sm text-muted hover:text-foreground transition-colors"
-              >
-                Open Library
-              </a>
-              <a
-                href={`https://www.goodreads.com/search?q=${encodeURIComponent(book.title)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-3 py-1.5 rounded-md bg-card border border-border text-sm text-muted hover:text-foreground transition-colors"
-              >
-                Goodreads
-              </a>
-            </div>
+            {bookLinks.length > 0 && (
+              <div className="flex flex-wrap items-center gap-3 mt-8">
+                {bookLinks.map((link) => (
+                  <a
+                    key={link.id}
+                    href={resolveUrl(link.urlTemplate, linkVars)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 rounded-md bg-card border border-border text-sm text-muted hover:text-foreground transition-colors"
+                  >
+                    {link.name}
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

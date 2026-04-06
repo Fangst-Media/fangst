@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useAuth } from '../lib/auth'
 import { bookLanes } from '../lib/api-client'
-import { HeroSection } from '../components/HeroSection'
+import { BookHeroSection } from '../components/BookHeroSection'
 import { ContentLane } from './requests/ContentLane'
 
 type BookFormat = 'ebook' | 'audiobook'
@@ -33,7 +33,7 @@ export default function Books() {
 
   return (
     <div className="min-h-screen">
-      {heroItems.length > 0 && <HeroSection items={heroItems} />}
+      {heroItems.length > 0 && <BookHeroSection items={heroItems} />}
 
       <div className="px-6 pt-8 -mt-16 relative z-10">
         {/* Format toggle */}

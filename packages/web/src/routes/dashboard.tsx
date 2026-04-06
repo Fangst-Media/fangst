@@ -91,7 +91,7 @@ export default function Dashboard() {
               </Link>
 
               <Link
-                to="/requests"
+                to="/my-requests"
                 className="flex items-center gap-3 p-3 rounded-md hover:bg-background transition-colors"
               >
                 <div className="w-10 h-10 rounded-md bg-accent/10 flex items-center justify-center">

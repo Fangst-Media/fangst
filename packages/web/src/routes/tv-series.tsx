@@ -94,7 +94,7 @@ export default function TvSeriesPage({ tmdbId }: { tmdbId: string }) {
   return (
     <div className="min-h-screen">
       {/* Hero section with backdrop */}
-      <div className="relative">
+      <div className="-mt-16 relative">
         {hasBackdrop && (
           <div
             className="absolute inset-0 h-[400px] bg-cover bg-center"
@@ -104,7 +104,7 @@ export default function TvSeriesPage({ tmdbId }: { tmdbId: string }) {
           </div>
         )}
 
-        <div className={`relative ${hasBackdrop ? 'pt-24' : 'pt-6'} px-6 pb-6`}>
+        <div className={`relative ${hasBackdrop ? 'pt-32' : 'pt-22'} px-6 pb-6`}>
           {/* Breadcrumb */}
           <nav className="flex items-center gap-2 text-sm mb-6">
             <Link to="/library" className="text-muted hover:text-foreground transition-colors">

@@ -94,12 +94,17 @@ export const requests = sqliteTable('requests', {
   // Media identification
   title: text('title').notNull(),
   year: integer('year'),
-  type: text('type', { enum: ['movie', 'tv'] }).notNull(),
+  type: text('type', { enum: ['movie', 'tv', 'book'] }).notNull(),
 
   // External IDs for searching
   tmdbId: text('tmdb_id'),
   imdbId: text('imdb_id'),
   tvdbId: text('tvdb_id'),
+  openLibraryId: text('open_library_id'),
+
+  // Book-specific
+  author: text('author'),
+  format: text('format', { enum: ['ebook', 'audiobook'] }),
 
   // TV-specific
   season: integer('season'),
@@ -157,6 +162,69 @@ export const requestUsers = sqliteTable('request_users', {
   id: text('id').primaryKey(),
   requestId: text('request_id').notNull().references(() => requests.id),
   userId: text('user_id').notNull().references(() => users.id),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+})
+
+// --- Metadata Store ---
+
+export const movieMetadata = sqliteTable('movie_metadata', {
+  id: text('id').primaryKey(),
+  provider: text('provider').notNull(),
+  title: text('title').notNull(),
+  year: integer('year'),
+  overview: text('overview'),
+  posterPath: text('poster_path'),
+  backdropPath: text('backdrop_path'),
+  rating: real('rating'),
+  runtime: integer('runtime'),
+  imdbId: text('imdb_id'),
+  genres: text('genres'),
+  collectionJson: text('collection_json'),
+  releaseDate: text('release_date'),
+  lastRefreshedAt: integer('last_refreshed_at', { mode: 'timestamp' }).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+})
+
+export const tvMetadata = sqliteTable('tv_metadata', {
+  id: text('id').primaryKey(),
+  provider: text('provider').notNull(),
+  title: text('title').notNull(),
+  year: integer('year'),
+  overview: text('overview'),
+  posterPath: text('poster_path'),
+  backdropPath: text('backdrop_path'),
+  rating: real('rating'),
+  status: text('status', { enum: ['returning', 'ended', 'upcoming', 'unknown'] }),
+  genres: text('genres'),
+  numberOfSeasons: integer('number_of_seasons'),
+  seasonsJson: text('seasons_json'),
+  lastRefreshedAt: integer('last_refreshed_at', { mode: 'timestamp' }).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+})
+
+export const bookMetadata = sqliteTable('book_metadata', {
+  id: text('id').primaryKey(),
+  provider: text('provider').notNull(),
+  title: text('title').notNull(),
+  author: text('author'),
+  authorId: text('author_id'),
+  year: integer('year'),
+  overview: text('overview'),
+  coverUrl: text('cover_url'),
+  subjects: text('subjects'),
+  isbn: text('isbn'),
+  pageCount: integer('page_count'),
+  lastRefreshedAt: integer('last_refreshed_at', { mode: 'timestamp' }).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+})
+
+export const metadataLists = sqliteTable('metadata_lists', {
+  id: text('id').primaryKey(),
+  listType: text('list_type').notNull(),
+  mediaType: text('media_type').notNull(),
+  provider: text('provider'),
+  resultsJson: text('results_json').notNull(),
+  lastRefreshedAt: integer('last_refreshed_at', { mode: 'timestamp' }).notNull(),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 })
 

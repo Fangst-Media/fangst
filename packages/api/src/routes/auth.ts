@@ -1,11 +1,11 @@
-import { Hono } from 'hono'
+import { OpenAPIHono } from '@hono/zod-openapi'
 import { setCookie, getCookie, deleteCookie } from 'hono/cookie'
 import { z } from 'zod'
 import { zValidator } from '@hono/zod-validator'
 import { authService } from '../services/auth'
 import { configService } from '../services/config'
 
-const auth = new Hono()
+const auth = new OpenAPIHono()
 
 const SESSION_COOKIE = 'jaeger_session'
 

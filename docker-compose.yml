@@ -14,6 +14,24 @@ services:
       - "8080:8080"
     restart: unless-stopped
 
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: jaeger-qbittorrent
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Copenhagen
+      - WEBUI_PORT=8081
+    volumes:
+      - qbittorrent-config:/config
+      - ./dev-data/incomplete:/downloads/incomplete
+      - ./dev-data/media:/downloads
+    ports:
+      - "8081:8081"
+      - "6881:6881"
+      - "6881:6881/udp"
+    restart: unless-stopped
+
   jellyfin:
     image: jellyfin/jellyfin:latest
     container_name: jaeger-jellyfin
@@ -40,5 +58,6 @@ services:
 
 volumes:
   sabnzbd-config:
+  qbittorrent-config:
   jellyfin-config:
   jellyfin-cache:

@@ -59,7 +59,7 @@ export default function MovieDetail({ tmdbId }: { tmdbId: string }) {
   return (
     <div className="min-h-screen">
       {/* Hero backdrop */}
-      <div className="relative h-[60vh] min-h-[400px] w-full">
+      <div className="-mt-16 relative h-[60vh] min-h-[400px] w-full">
         {backdropUrl ? (
           <img src={backdropUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
         ) : (

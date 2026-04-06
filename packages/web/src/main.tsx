@@ -6,20 +6,27 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider, useAuth } from './lib/auth'
 import { ConnectionProvider } from './lib/connection'
 import { Layout } from './components/Layout'
+import { AdminLayout } from './components/AdminLayout'
 import Login from './routes/login'
-import Dashboard from './routes/dashboard'
+import Home from './routes/home'
+import Movies from './routes/movies'
+import TvShows from './routes/tv-shows'
+import Books from './routes/books'
+import BookDetail from './routes/book-detail'
+import Search from './routes/search'
 import Library from './routes/library'
 import MediaDetails from './routes/media-details'
 import TvSeriesPage from './routes/tv-series'
 import SeasonPage from './routes/season'
-import Requests from './routes/requests'
+import CollectionPage from './routes/collection'
 import RequestsList from './routes/requests-list'
 import Calendar from './routes/calendar'
+import Dashboard from './routes/dashboard'
 import Activity from './routes/activity'
 import Indexers from './routes/indexers'
 import Downloaders from './routes/downloaders'
 import Settings from './routes/settings'
-import CollectionPage from './routes/collection'
+import MovieDetail from './routes/movie-detail'
 
 const queryClient = new QueryClient()
 
@@ -28,7 +35,7 @@ const rootRoute = createRootRoute({
 })
 
 function IndexRedirect() {
-  const { user, isLoading, isAdmin } = useAuth()
+  const { user, isLoading } = useAuth()
 
   if (isLoading) {
     return (
@@ -42,11 +49,11 @@ function IndexRedirect() {
     return <Navigate to="/login" />
   }
 
-  if (isAdmin) {
-    return <Navigate to="/dashboard" />
-  }
-
-  return <Navigate to="/discover" />
+  return (
+    <Layout>
+      <Home />
+    </Layout>
+  )
 }
 
 function ProtectedRoute({ children, adminOnly = false }: { children: React.ReactNode; adminOnly?: boolean }) {
@@ -65,21 +72,45 @@ function ProtectedRoute({ children, adminOnly = false }: { children: React.React
   }
 
   if (adminOnly && !isAdmin) {
-    return <Navigate to="/discover" />
+    return <Navigate to="/" />
   }
 
   return <Layout>{children}</Layout>
 }
 
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { user, isLoading, isAdmin } = useAuth()
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+      </div>
+    )
+  }
+
+  if (!user) {
+    return <Navigate to="/login" />
+  }
+
+  if (!isAdmin) {
+    return <Navigate to="/" />
+  }
+
+  return <AdminLayout>{children}</AdminLayout>
+}
+
 function LoginPage() {
-  const { user, isAdmin } = useAuth()
+  const { user } = useAuth()
 
   if (user) {
-    return <Navigate to={isAdmin ? '/dashboard' : '/discover'} />
+    return <Navigate to="/" />
   }
 
   return <Login onSuccess={() => window.location.reload()} />
 }
+
+// --- Core routes ---
 
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -93,15 +124,95 @@ const loginRoute = createRoute({
   component: LoginPage,
 })
 
-const dashboardRoute = createRoute({
+const moviesRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/dashboard',
+  path: '/movies',
   component: () => (
-    <ProtectedRoute adminOnly>
-      <Dashboard />
+    <ProtectedRoute>
+      <Movies />
     </ProtectedRoute>
   ),
 })
+
+const tvShowsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/tv',
+  component: () => (
+    <ProtectedRoute>
+      <TvShows />
+    </ProtectedRoute>
+  ),
+})
+
+const movieDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/movie/$tmdbId',
+  component: function MovieDetailPage() {
+    const { tmdbId } = movieDetailRoute.useParams()
+    return (
+      <ProtectedRoute>
+        <MovieDetail tmdbId={tmdbId} />
+      </ProtectedRoute>
+    )
+  },
+})
+
+const booksRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/books',
+  component: () => (
+    <ProtectedRoute>
+      <Books />
+    </ProtectedRoute>
+  ),
+})
+
+const bookDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/book/$openLibraryId',
+  component: function BookDetailPage() {
+    const { openLibraryId } = bookDetailRoute.useParams()
+    return (
+      <ProtectedRoute>
+        <BookDetail openLibraryId={openLibraryId} />
+      </ProtectedRoute>
+    )
+  },
+})
+
+const searchRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/search',
+  component: () => (
+    <ProtectedRoute>
+      <Search />
+    </ProtectedRoute>
+  ),
+})
+
+// --- User routes ---
+
+const myRequestsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/my-requests',
+  component: () => (
+    <ProtectedRoute>
+      <RequestsList />
+    </ProtectedRoute>
+  ),
+})
+
+const calendarRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/calendar',
+  component: () => (
+    <ProtectedRoute>
+      <Calendar />
+    </ProtectedRoute>
+  ),
+})
+
+// --- Library routes ---
 
 const libraryRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -165,77 +276,93 @@ const collectionRoute = createRoute({
   },
 })
 
-const requestsRoute = createRoute({
+// --- Admin routes ---
+
+const adminDashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/discover',
+  path: '/admin',
   component: () => (
-    <ProtectedRoute>
-      <Requests />
-    </ProtectedRoute>
+    <AdminRoute>
+      <Dashboard />
+    </AdminRoute>
   ),
 })
 
-const requestsListRoute = createRoute({
+const adminRequestsRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/requests',
+  path: '/admin/requests',
   component: () => (
-    <ProtectedRoute>
+    <AdminRoute>
       <RequestsList />
-    </ProtectedRoute>
+    </AdminRoute>
   ),
 })
 
-const calendarRoute = createRoute({
+const adminActivityRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/calendar',
+  path: '/admin/activity',
   component: () => (
-    <ProtectedRoute>
-      <Calendar />
-    </ProtectedRoute>
-  ),
-})
-
-const activityRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/activity',
-  component: () => (
-    <ProtectedRoute adminOnly>
+    <AdminRoute>
       <Activity />
-    </ProtectedRoute>
+    </AdminRoute>
   ),
 })
 
-const indexersRoute = createRoute({
+const adminIndexersRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/indexers',
+  path: '/admin/indexers',
   component: () => (
-    <ProtectedRoute adminOnly>
+    <AdminRoute>
       <Indexers />
-    </ProtectedRoute>
+    </AdminRoute>
   ),
 })
 
-const downloadersRoute = createRoute({
+const adminDownloadersRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/downloaders',
+  path: '/admin/downloaders',
   component: () => (
-    <ProtectedRoute adminOnly>
+    <AdminRoute>
       <Downloaders />
-    </ProtectedRoute>
+    </AdminRoute>
   ),
 })
 
-const settingsRoute = createRoute({
+const adminSettingsRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/settings',
+  path: '/admin/settings',
   component: () => (
-    <ProtectedRoute adminOnly>
+    <AdminRoute>
       <Settings />
-    </ProtectedRoute>
+    </AdminRoute>
   ),
 })
 
-const routeTree = rootRoute.addChildren([indexRoute, loginRoute, dashboardRoute, libraryRoute, tvSeriesRoute, seasonRoute, collectionRoute, mediaDetailsRoute, requestsRoute, requestsListRoute, calendarRoute, activityRoute, indexersRoute, downloadersRoute, settingsRoute])
+// --- Router ---
+
+const routeTree = rootRoute.addChildren([
+  indexRoute,
+  loginRoute,
+  moviesRoute,
+  movieDetailRoute,
+  tvShowsRoute,
+  booksRoute,
+  bookDetailRoute,
+  searchRoute,
+  myRequestsRoute,
+  calendarRoute,
+  libraryRoute,
+  tvSeriesRoute,
+  seasonRoute,
+  collectionRoute,
+  mediaDetailsRoute,
+  adminDashboardRoute,
+  adminRequestsRoute,
+  adminActivityRoute,
+  adminIndexersRoute,
+  adminDownloadersRoute,
+  adminSettingsRoute,
+])
 
 const router = createRouter({
   routeTree,

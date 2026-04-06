@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { OpenAPIHono } from '@hono/zod-openapi'
 import { configService } from '../services/config'
 import { createDownloaderSchema, updateDownloaderSchema } from '@jaeger/shared/types/settings'
 import { SABnzbdClient } from '@jaeger/shared/clients/sabnzbd'
@@ -10,7 +10,7 @@ type AuthEnv = {
   }
 }
 
-const downloaders = new Hono<AuthEnv>()
+const downloaders = new OpenAPIHono<AuthEnv>()
 
 function requireAdmin(user: User | null): user is User {
   return user !== null && user.role === 'admin'

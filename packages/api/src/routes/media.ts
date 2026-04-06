@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { OpenAPIHono } from '@hono/zod-openapi'
 import { MediaScanner } from '../services/scanner'
 import { mediaService } from '../services/media'
 import { TmdbClient } from '@jaeger/shared/clients/tmdb'
@@ -8,7 +8,7 @@ import { MetadataProvider } from '@jaeger/shared/clients/metadata-provider'
 import { RealFilesystem, MockFilesystem } from '../services/filesystem'
 import { configService } from '../services/config'
 
-const media = new Hono()
+const media = new OpenAPIHono()
 
 export async function runLibraryScan(): Promise<{
   added: number

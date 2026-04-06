@@ -6,10 +6,12 @@
     "dev": "bun run server.ts",
     "build": "bun run build:css && bun build src/main.tsx --outdir ./dist --target browser --minify --sourcemap",
     "build:css": "tailwindcss -i ./src/index.css -o ./dist/index.css --minify",
+    "generate:api": "openapi-ts",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@hey-api/client-fetch": "^0.13.1",
     "@jaeger/shared": "workspace:*",
     "@tanstack/react-query": "^5.62.8",
     "@tanstack/react-router": "^1.91.5",

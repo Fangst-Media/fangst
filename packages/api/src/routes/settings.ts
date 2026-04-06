@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { OpenAPIHono } from '@hono/zod-openapi'
 import { configService } from '../services/config'
 import type { SettingsUpdate, SettingsResponse } from '@jaeger/shared/types/settings'
 import type { User } from '../services/auth'
@@ -10,7 +10,7 @@ type AuthEnv = {
   }
 }
 
-const settings = new Hono<AuthEnv>()
+const settings = new OpenAPIHono<AuthEnv>()
 
 function maskApiKey(key: string): string {
   if (key.length <= 8) return '********'
@@ -87,6 +87,17 @@ settings.get('/', async (c) => {
 settings.get('/ui', async (c) => {
   const settingsData = configService.get()
   return c.json({ ui: settingsData.ui })
+})
+
+// GET /api/settings/external-links - Public external links (auth required, not admin)
+settings.get('/external-links', async (c) => {
+  const user = c.get('user')
+  if (!user) {
+    return c.json({ error: 'Authentication required' }, 401)
+  }
+  const settingsData = configService.get()
+  const enabledLinks = settingsData.externalLinks.links.filter((l) => l.enabled)
+  return c.json({ links: enabledLinks })
 })
 
 // PATCH /api/settings - Update settings (admin only)
