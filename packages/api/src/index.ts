@@ -23,11 +23,13 @@ import { logger } from './lib/logger'
 import { startScheduler } from './lib/scheduler'
 import { initializeDatabase } from './db/init'
 import { profileService } from './services/profiles'
+import { migrateRequestsToDownloads } from './scripts/migrate-requests-to-downloads'
 
 // Initialize database and config before starting server
 await initializeDatabase()
 await configService.initialize()
 await profileService.seedDefaults()
+await migrateRequestsToDownloads()
 
 const app = new OpenAPIHono()
 

@@ -151,8 +151,10 @@ export const requests = sqliteTable('requests', {
 
   // Search preferences
   minQuality: text('min_quality'),
+  qualityProfileId: text('quality_profile_id').references(() => qualityProfiles.id),
+  mode: text('mode', { enum: ['auto', 'manual'] }).notNull().default('auto'),
 
-  // Download tracking
+  // Download tracking (deprecated — moving to downloads table)
   nzoId: text('nzo_id'),
   releaseName: text('release_name'),
 })
@@ -266,8 +268,38 @@ export const episodes = sqliteTable('episodes', {
     enum: ['pending', 'searching', 'downloading', 'completed', 'failed'],
   }).notNull().default('pending'),
   monitored: integer('monitored', { mode: 'boolean' }).notNull().default(true),
+  // Deprecated — moving to downloads table
   nzoId: text('nzo_id'),
   releaseName: text('release_name'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+})
+
+// Download attempts (fulfillment of requests)
+export const downloads = sqliteTable('downloads', {
+  id: text('id').primaryKey(),
+  requestId: text('request_id').notNull().references(() => requests.id, { onDelete: 'cascade' }),
+  episodeId: text('episode_id').references(() => episodes.id, { onDelete: 'cascade' }),
+  // Release info
+  releaseName: text('release_name').notNull(),
+  indexer: text('indexer'),
+  size: integer('size'),
+  // Parsed quality (denormalized for history)
+  resolution: text('resolution'),
+  source: text('source'),
+  videoCodec: text('video_codec'),
+  audioCodec: text('audio_codec'),
+  hdr: text('hdr'),
+  releaseGroup: text('release_group'),
+  qualityScore: integer('quality_score'),
+  // Download tracking
+  nzoId: text('nzo_id'),
+  status: text('status', {
+    enum: ['fetching', 'downloading', 'complete', 'failed', 'cancelled', 'replaced'],
+  }).notNull(),
+  failReason: text('fail_reason'),
+  replacedById: text('replaced_by_id'),
+  // Timestamps
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  completedAt: integer('completed_at', { mode: 'timestamp' }),
 })
