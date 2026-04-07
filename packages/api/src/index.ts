@@ -15,16 +15,19 @@ import requestsRouter from './routes/requests'
 import search from './routes/search'
 import settings from './routes/settings'
 import usersRouter from './routes/users'
+import profilesRouter from './routes/profiles'
 import { authMiddleware } from './middleware/auth'
 import { requestLogger } from './middleware/logging'
 import { configService } from './services/config'
 import { logger } from './lib/logger'
 import { startScheduler } from './lib/scheduler'
 import { initializeDatabase } from './db/init'
+import { profileService } from './services/profiles'
 
 // Initialize database and config before starting server
 await initializeDatabase()
 await configService.initialize()
+await profileService.seedDefaults()
 
 const app = new OpenAPIHono()
 
@@ -82,6 +85,7 @@ app.route('/api/activity', activity)
 app.route('/api/calendar', calendarRouter)
 app.route('/api/requests', requestsRouter)
 app.route('/api/users', usersRouter)
+app.route('/api/profiles', profilesRouter)
 
 const port = configService.getPort()
 logger.info({ port }, 'Server starting')

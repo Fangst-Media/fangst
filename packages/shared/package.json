@@ -8,6 +8,7 @@
     "./types/settings": "./src/types/settings.ts",
     "./types/config": "./src/types/config.ts",
     "./types/indexer": "./src/types/indexer.ts",
+    "./types/profiles": "./src/types/profiles.ts",
     "./schemas/metadata": "./src/schemas/metadata.ts",
     "./utils": "./src/utils/index.ts",
     "./clients/tmdb": "./src/clients/tmdb.ts",

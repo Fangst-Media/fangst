@@ -228,6 +228,32 @@ export const metadataLists = sqliteTable('metadata_lists', {
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 })
 
+// Quality profiles for release selection
+export const qualityProfiles = sqliteTable('quality_profiles', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  // Video
+  minResolution: text('min_resolution', { enum: ['720p', '1080p', '2160p'] }).notNull().default('720p'),
+  preferredResolution: text('preferred_resolution', { enum: ['720p', '1080p', '2160p'] }),
+  preferredSources: text('preferred_sources'), // JSON: ['remux','bluray','webdl']
+  // HDR
+  requireHdr: integer('require_hdr', { mode: 'boolean' }).notNull().default(false),
+  preferredHdr: text('preferred_hdr'), // JSON: ['dv','hdr10+','hdr10']
+  // Audio
+  preferredAudio: text('preferred_audio'), // JSON: ['atmos','truehd','dtshd']
+  // Size filter (overrides global when set)
+  sizeFilterEnabled: integer('size_filter_enabled', { mode: 'boolean' }),
+  sizeFilterMinMbPerMin: real('size_filter_min_mb_per_min'),
+  // Upgrade behavior
+  cutoffScore: integer('cutoff_score').notNull().default(80),
+  upgradeAllowed: integer('upgrade_allowed', { mode: 'boolean' }).notNull().default(false),
+  // Metadata
+  isDefault: integer('is_default', { mode: 'boolean' }).notNull().default(false),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+})
+
 // Episode tracking for TV requests
 export const episodes = sqliteTable('episodes', {
   id: text('id').primaryKey(),
