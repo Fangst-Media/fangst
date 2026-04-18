@@ -8,6 +8,7 @@ import type { User } from '../services/auth'
 import { configService } from '../services/config'
 import { episodeService, type MonitoringPreset } from '../services/episodes'
 import { type CreateRequestData, type RequestStatus, requestService } from '../services/requests'
+import { downloadService } from '../services/downloads'
 
 type AuthEnv = {
   Variables: {
@@ -230,6 +231,80 @@ requestsRouter.post('/:id/retry', async (c) => {
   } catch (error) {
     return c.json(
       { error: error instanceof Error ? error.message : 'Failed to retry request' },
+      400
+    )
+  }
+})
+
+// GET /api/requests/:id/downloads - Get download history for a request
+requestsRouter.get('/:id/downloads', async (c) => {
+  const user = c.get('user')
+  if (!requireAuth(user)) {
+    return c.json({ error: 'Authentication required' }, 401)
+  }
+
+  const id = c.req.param('id')
+  const request = await requestService.getById(id)
+
+  if (!request) {
+    return c.json({ error: 'Request not found' }, 404)
+  }
+
+  if (user.role !== 'admin' && !request.requestedByUsers.some((u) => u.id === user.id)) {
+    return c.json({ error: 'Not authorized' }, 403)
+  }
+
+  const downloads = await downloadService.getByRequestId(id)
+  return c.json({ downloads })
+})
+
+// POST /api/requests/:id/downloads - Manually attach a download to a request
+requestsRouter.post('/:id/downloads', async (c) => {
+  const user = c.get('user')
+  if (!requireAuth(user)) {
+    return c.json({ error: 'Authentication required' }, 401)
+  }
+
+  try {
+    const id = c.req.param('id')
+    const request = await requestService.getById(id)
+
+    if (!request) {
+      return c.json({ error: 'Request not found' }, 404)
+    }
+
+    if (user.role !== 'admin' && !request.requestedByUsers.some((u) => u.id === user.id)) {
+      return c.json({ error: 'Not authorized' }, 403)
+    }
+
+    const body = (await c.req.json()) as {
+      downloadUrl: string
+      downloaderId: string
+      releaseName: string
+      category?: string
+    }
+
+    if (!body.downloadUrl || !body.downloaderId || !body.releaseName) {
+      return c.json({ error: 'Missing required fields: downloadUrl, downloaderId, releaseName' }, 400)
+    }
+
+    // Create the download
+    const download = await downloadService.createForRequest(id, {
+      releaseName: body.releaseName,
+      downloadUrl: body.downloadUrl,
+    })
+
+    // Send to downloader
+    const result = await downloadService.sendToDownloader(download.id, body.downloadUrl, body.category)
+
+    return c.json({
+      success: true,
+      download: await downloadService.getById(download.id),
+      nzoId: result.nzoId,
+    })
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to create download' },
       400
     )
   }

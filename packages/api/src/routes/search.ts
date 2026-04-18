@@ -4,6 +4,7 @@ import { configService } from '../services/config'
 import { searchRequestSchema } from '@jaeger/shared/types/indexer'
 import { SABnzbdClient } from '@jaeger/shared/clients/sabnzbd'
 import { requestService } from '../services/requests'
+import { downloadService } from '../services/downloads'
 import type { User } from '../services/auth'
 
 type AuthEnv = {
@@ -88,6 +89,7 @@ search.post('/download', async (c) => {
 })
 
 // POST /api/search/download-release - Download a specific release and create request
+// Now a wrapper: creates request (manual mode) + creates download via DownloadService
 search.post('/download-release', async (c) => {
   const user = c.get('user')
   if (!requireAuth(user)) {
@@ -130,7 +132,6 @@ search.post('/download-release', async (c) => {
       return c.json({ error: 'Missing media.title' }, 400)
     }
 
-    // Validate downloader exists and is enabled
     const downloader = configService.getDownloader(downloaderId)
     if (!downloader) {
       return c.json({ error: 'Downloader not found' }, 404)
@@ -140,26 +141,27 @@ search.post('/download-release', async (c) => {
       return c.json({ error: 'Downloader is disabled' }, 400)
     }
 
-    // Create request with 'downloading' status to prevent auto-search
+    // Create request in manual mode
     const isAdmin = user.role === 'admin'
-    const request = await requestService.create(media, user.id, isAdmin)
+    const request = await requestService.create({ ...media, mode: 'manual' }, user.id, isAdmin)
 
-    // Update status to 'downloading' to skip auto-search
+    // Create download via DownloadService
+    const download = await downloadService.createForRequest(request.id, {
+      releaseName,
+      downloadUrl,
+    })
+
+    const result = await downloadService.sendToDownloader(download.id, downloadUrl, category)
+
+    // Update request status to downloading
     await requestService.updateStatus(request.id, 'downloading')
 
-    // Send to downloader
-    if (downloader.type === 'sabnzbd') {
-      const client = new SABnzbdClient(downloader.url, downloader.apiKey)
-      const result = await client.addNzbFromUrl(downloadUrl, releaseName, category)
-
-      return c.json({
-        success: true,
-        nzoId: result.nzoId,
-        request: await requestService.getById(request.id),
-      })
-    }
-
-    return c.json({ error: 'Unknown downloader type' }, 400)
+    return c.json({
+      success: true,
+      nzoId: result.nzoId,
+      request: await requestService.getById(request.id),
+      download: await downloadService.getById(download.id),
+    })
   } catch (error) {
     return c.json(
       { error: error instanceof Error ? error.message : 'Failed to download release' },

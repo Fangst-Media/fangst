@@ -31,6 +31,8 @@ export type CreateRequestData = {
   posterPath?: string
   overview?: string
   minQuality?: string
+  qualityProfileId?: string
+  mode?: 'auto' | 'manual'
   // TV series specific
   seriesStatus?: 'returning' | 'ended' | 'upcoming' | 'unknown'
   totalEpisodes?: number
@@ -185,6 +187,8 @@ export class RequestService {
       posterPath: data.posterPath ?? null,
       overview: data.overview ?? null,
       minQuality: data.minQuality ?? null,
+      qualityProfileId: data.qualityProfileId ?? null,
+      mode: data.mode ?? 'auto',
       // TV series specific
       seriesStatus: data.seriesStatus ?? null,
       totalEpisodes: data.totalEpisodes ?? null,
