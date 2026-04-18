@@ -1,7 +1,7 @@
 import { parseReleaseName } from '@jaeger/parser'
 import { db } from '../db'
 import { requests, downloads, episodes } from '../db/schema'
-import { eq, isNotNull } from 'drizzle-orm'
+import { isNotNull } from 'drizzle-orm'
 import { logger } from '../lib/logger'
 
 /**

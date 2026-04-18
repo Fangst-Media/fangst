@@ -1,11 +1,13 @@
-import { mkdir, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
 import { type ParsedRelease, parseReleaseName } from '@jaeger/parser'
-import { SABnzbdClient } from '@jaeger/shared/clients/sabnzbd'
 import type { SearchResult } from '@jaeger/shared/types/indexer'
+import type { QualityProfile } from '@jaeger/shared/types/profiles'
 import { configService } from '../services/config'
 import { type RequestWithUser, requestService } from '../services/requests'
+import { downloadService } from '../services/downloads'
+import { profileService } from '../services/profiles'
 import { searchService } from '../services/search'
+import { scoreReleaseWithProfile, meetsCutoff } from '../lib/profile-scoring'
+import { logger } from '../lib/logger'
 
 const QUALITY_ORDER = ['2160p', '1080p', '720p', '480p']
 
@@ -26,146 +28,98 @@ async function fetchRuntime(request: RequestWithUser): Promise<number | undefine
     if (request.type === 'movie') {
       return data.runtime ?? undefined
     }
-    // TV: use first episode_run_time if available
     return data.episode_run_time?.[0] ?? undefined
   } catch {
     return undefined
   }
 }
 
-interface ScoredResult {
-  result: SearchResult
-  parsed: ParsedRelease
-}
-
 function matchesQuality(parsed: ParsedRelease, minQuality?: string | null): boolean {
   if (!minQuality) return true
-
   const minIndex = QUALITY_ORDER.indexOf(minQuality)
   if (minIndex === -1) return true
-
   if (!parsed.resolution) return false
-
   const releaseIndex = QUALITY_ORDER.indexOf(parsed.resolution)
-  // Higher index = lower quality. Accept if release quality >= minimum
   return releaseIndex !== -1 && releaseIndex <= minIndex
 }
 
-function selectBestRelease(
+/**
+ * Select best release using a quality profile (preferred) or legacy minQuality fallback.
+ */
+export function selectBestRelease(
   results: SearchResult[],
+  profile: QualityProfile | null,
   minQuality?: string | null
 ): SearchResult | null {
-  // Parse all releases and calculate quality scores
-  const scored: ScoredResult[] = results.map((result) => ({
+  const scored = results.map((result) => ({
     result,
     parsed: parseReleaseName(result.title),
   }))
 
-  // Filter by minimum quality requirement
-  const filtered = scored.filter(({ parsed }) => matchesQuality(parsed, minQuality))
+  if (profile) {
+    const withScores = scored.map(({ result, parsed }) => {
+      const score = scoreReleaseWithProfile(parsed, profile)
+      return { result, parsed, ...score }
+    })
 
+    const eligible = withScores.filter((s) => !s.rejected)
+    if (eligible.length === 0) return null
+
+    eligible.sort((a, b) => {
+      if (a.totalScore !== b.totalScore) return b.totalScore - a.totalScore
+      const grabsA = a.result.grabs ?? 0
+      const grabsB = b.result.grabs ?? 0
+      if (grabsA !== grabsB) return grabsB - grabsA
+      return b.result.size - a.result.size
+    })
+
+    const best = eligible[0]
+    if (best) {
+      logger.info({ release: best.result.title, score: best.totalScore, base: best.baseScore, bonus: best.profileBonus }, 'Selected release with profile')
+    }
+    return best?.result ?? null
+  }
+
+  // Legacy fallback: filter by minQuality, sort by qualityScore
+  const filtered = scored.filter(({ parsed }) => matchesQuality(parsed, minQuality))
   if (filtered.length === 0) return null
 
-  // Sort by quality score (descending), then grabs as tiebreaker
   filtered.sort((a, b) => {
     const scoreA = a.parsed.qualityScore ?? 0
     const scoreB = b.parsed.qualityScore ?? 0
-
-    if (scoreA !== scoreB) {
-      return scoreB - scoreA // Higher score wins
-    }
-
-    // Tiebreaker: more grabs = more trusted
+    if (scoreA !== scoreB) return scoreB - scoreA
     const grabsA = a.result.grabs ?? 0
     const grabsB = b.result.grabs ?? 0
-    if (grabsA !== grabsB) {
-      return grabsB - grabsA
-    }
-
-    // Final tiebreaker: larger size
+    if (grabsA !== grabsB) return grabsB - grabsA
     return b.result.size - a.result.size
   })
 
   const best = filtered[0]
   if (best) {
-    console.log(
-      `[SearchJob] Selected: ${best.result.title} (score: ${best.parsed.qualityScore}, tier: ${best.parsed.releaseGroupTier ?? 'unknown'})`
-    )
+    logger.info({ release: best.result.title, score: best.parsed.qualityScore }, 'Selected release (legacy)')
   }
-
   return best?.result ?? null
 }
 
-async function saveNzbBackup(nzbContent: string, filename: string): Promise<void> {
-  const backupPath = configService.getNzbBackupPath()
-  if (!backupPath) return
-
-  try {
-    await mkdir(backupPath, { recursive: true })
-    const filePath = join(backupPath, filename.endsWith('.nzb') ? filename : `${filename}.nzb`)
-    await writeFile(filePath, nzbContent, 'utf-8')
-    console.log(`[SearchJob] NZB backed up to: ${filePath}`)
-  } catch (error) {
-    console.error('[SearchJob] Failed to save NZB backup:', error)
-  }
-}
-
-async function downloadRelease(
-  release: SearchResult,
-  requestId: string,
-  mediaType: 'movie' | 'tv' | 'book'
-): Promise<boolean> {
-  const downloaders = configService.getEnabledDownloaders()
-
-  if (downloaders.length === 0) {
-    console.log('[SearchJob] No downloaders configured')
-    return false
-  }
-
-  // Use first enabled downloader
-  const downloader = downloaders[0]!
-
-  if (downloader.type === 'sabnzbd') {
-    const client = new SABnzbdClient(downloader.url, downloader.apiKey)
-    try {
-      await requestService.updateStatus(requestId, 'fetching_nzb')
-      console.log(`[SearchJob] Fetching NZB: ${release.title}`)
-
-      const category = mediaType === 'movie'
-        ? downloader.categories?.movies
-        : mediaType === 'book'
-          ? downloader.categories?.books
-          : downloader.categories?.tv
-      const result = await client.addNzbFromUrl(release.downloadUrl, release.title, category)
-
-      // Save backup if configured
-      if (result.nzbContent) {
-        const safeFilename = release.title.replace(/[<>:"/\\|?*]/g, '_')
-        await saveNzbBackup(result.nzbContent, safeFilename)
-      }
-
-      if (result.nzoId) {
-        await requestService.updateDownloadInfo(requestId, result.nzoId, release.title)
-        await requestService.updateStatus(requestId, 'downloading')
-        console.log(`[SearchJob] Sent to ${downloader.name}: ${release.title} (nzoId: ${result.nzoId})`)
-        return true
-      }
-
-      return false
-    } catch (error) {
-      console.error(`[SearchJob] Failed to send to ${downloader.name}:`, error)
-      return false
-    }
-  }
-
-  return false
-}
-
 async function processRequest(request: RequestWithUser): Promise<'found' | 'not_found' | 'error'> {
-  console.log(`[SearchJob] Searching for: ${request.title} (${request.year ?? 'N/A'})`)
+  logger.info({ title: request.title, year: request.year }, 'Searching for request')
 
   try {
     const runtime = await fetchRuntime(request)
+
+    // Load quality profile
+    const profile = request.qualityProfileId
+      ? await profileService.getById(request.qualityProfileId)
+      : await profileService.getDefault()
+
+    // Check if this is an upgrade search
+    if (request.status === 'completed' as string) {
+      const bestDownload = await downloadService.getBestComplete(request.id)
+      if (bestDownload && profile && meetsCutoff(bestDownload.qualityScore ?? 0, profile)) {
+        logger.info({ title: request.title, score: bestDownload.qualityScore, cutoff: profile.cutoffScore }, 'Already meets cutoff, skipping')
+        return 'not_found'
+      }
+    }
 
     const searchParams: {
       type: 'movie' | 'tv' | 'book' | 'general'
@@ -181,7 +135,6 @@ async function processRequest(request: RequestWithUser): Promise<'found' | 'not_
     }
 
     if (request.type === 'book') {
-      // Books search by title + author, with specific Newznab categories
       const authorSuffix = request.author ? ` ${request.author}` : ''
       searchParams.query = `${request.title}${authorSuffix}`
       searchParams.categories = request.format === 'audiobook' ? [3030] : [7020]
@@ -201,50 +154,86 @@ async function processRequest(request: RequestWithUser): Promise<'found' | 'not_
     const response = await searchService.search(searchParams)
 
     if (response.results.length === 0) {
-      console.log(`[SearchJob] No results for: ${request.title}`)
+      logger.info({ title: request.title }, 'No results found')
       await requestService.updateLastSearched(request.id)
       return 'not_found'
     }
 
-    const bestRelease = selectBestRelease(response.results, request.minQuality)
+    const bestRelease = selectBestRelease(response.results, profile, request.minQuality)
 
     if (!bestRelease) {
-      console.log(`[SearchJob] No releases matching quality for: ${request.title}`)
+      logger.info({ title: request.title }, 'No releases matching quality')
       await requestService.updateLastSearched(request.id)
       return 'not_found'
     }
 
-    console.log(`[SearchJob] Found: ${bestRelease.title}`)
-    await requestService.updateStatus(request.id, 'found')
+    logger.info({ title: request.title, release: bestRelease.title }, 'Found release')
 
-    const downloaded = await downloadRelease(bestRelease, request.id, request.type)
+    // Create download via DownloadService
+    const download = await downloadService.createForRequest(request.id, {
+      releaseName: bestRelease.title,
+      downloadUrl: bestRelease.downloadUrl,
+      indexer: bestRelease.indexer,
+      size: bestRelease.size,
+    })
 
-    if (downloaded) {
-      // Download started successfully - status set to "downloading" by downloadRelease
-      // Download monitor will update to "completed" when finished
+    // Determine category for downloader
+    const downloaders = configService.getEnabledDownloaders()
+    const downloader = downloaders[0]
+    const category = request.type === 'movie'
+      ? downloader?.categories?.movies
+      : request.type === 'book'
+        ? (request.format === 'audiobook' ? downloader?.categories?.audiobooks : downloader?.categories?.books)
+        : downloader?.categories?.tv
+
+    try {
+      await downloadService.sendToDownloader(download.id, bestRelease.downloadUrl, category)
+
+      // If this is an upgrade, mark old downloads as replaced
+      if (request.status === 'completed' as string) {
+        const existingDownloads = await downloadService.getByRequestId(request.id)
+        for (const existing of existingDownloads) {
+          if (existing.id !== download.id && existing.status === 'complete') {
+            await downloadService.markReplaced(existing.id, download.id)
+          }
+        }
+      }
+
+      await requestService.updateStatus(request.id, 'downloading')
       return 'found'
+    } catch (error) {
+      logger.error({ error, title: request.title }, 'Failed to send to downloader')
+      await downloadService.updateStatus(download.id, 'failed', error instanceof Error ? error.message : 'Send failed')
+      await requestService.updateStatus(request.id, 'failed')
+      return 'error'
     }
-
-    await requestService.updateStatus(request.id, 'failed')
-    return 'error'
   } catch (error) {
-    console.error(`[SearchJob] Error processing ${request.title}:`, error)
+    logger.error({ error, title: request.title }, 'Error processing request')
     return 'error'
   }
 }
 
 export async function runSearchJob(): Promise<{ searched: number; found: number; errors: number }> {
-  console.log('[SearchJob] Starting search job...')
+  logger.info('Starting search job')
 
-  const requests = await requestService.getApprovedForSearch()
-  console.log(`[SearchJob] Found ${requests.length} requests to search`)
+  const pendingRequests = await requestService.getApprovedForSearch()
+
+  // Also check fulfilled requests eligible for upgrade
+  const allRequests = await requestService.getAll()
+  const upgradeEligible = allRequests.filter((r) => {
+    if (r.status !== 'completed') return false
+    if (!r.qualityProfileId) return false
+    return r.mode === 'auto'
+  })
+
+  const requests = [...pendingRequests, ...upgradeEligible]
+  logger.info({ count: requests.length, pending: pendingRequests.length, upgrades: upgradeEligible.length }, 'Requests to search')
 
   let searched = 0
   let found = 0
   let errors = 0
 
   for (const request of requests) {
-    // Update status to searching
     if (request.status === 'approved') {
       await requestService.updateStatus(request.id, 'searching')
     }
@@ -252,20 +241,15 @@ export async function runSearchJob(): Promise<{ searched: number; found: number;
     const result = await processRequest(request)
     searched++
 
-    if (result === 'found') {
-      found++
-    } else if (result === 'error') {
-      errors++
-    }
+    if (result === 'found') found++
+    else if (result === 'error') errors++
 
     // Small delay between requests to avoid hammering indexers
     await new Promise((resolve) => setTimeout(resolve, 1000))
   }
 
-  console.log(`[SearchJob] Complete: searched=${searched}, found=${found}, errors=${errors}`)
-
+  logger.info({ searched, found, errors }, 'Search job complete')
   return { searched, found, errors }
 }
 
-// For manual triggering via API or testing
-export { processRequest, selectBestRelease, matchesQuality }
+export { processRequest, matchesQuality }

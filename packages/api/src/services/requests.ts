@@ -63,6 +63,8 @@ export type RequestWithUser = {
   overview: string | null
   status: RequestStatus
   minQuality: string | null
+  qualityProfileId: string | null
+  mode: 'auto' | 'manual'
   nzoId: string | null
   releaseName: string | null
   // TV series specific
@@ -322,6 +324,8 @@ export class RequestService {
         overview: row.request.overview,
         status: row.request.status as RequestStatus,
         minQuality: row.request.minQuality,
+        qualityProfileId: row.request.qualityProfileId,
+        mode: (row.request.mode ?? 'auto') as 'auto' | 'manual',
         nzoId: row.request.nzoId,
         releaseName: row.request.releaseName,
         seriesStatus: row.request.seriesStatus as 'returning' | 'ended' | 'upcoming' | 'unknown' | null,

@@ -1,7 +1,9 @@
 import { requestService } from '../services/requests'
+import { downloadService } from '../services/downloads'
 import { configService } from '../services/config'
 import { SABnzbdClient, type SABnzbdHistorySlot } from '@jaeger/shared/clients/sabnzbd'
 import { runLibraryScan } from '../routes/media'
+import { logger } from '../lib/logger'
 
 export async function runDownloadMonitor(): Promise<{
   checked: number
@@ -9,18 +11,23 @@ export async function runDownloadMonitor(): Promise<{
   failed: number
   librarySync?: { added: number; updated: number; removed: number }
 }> {
-  console.log('[DownloadMonitor] Starting download monitor job...')
+  logger.info('Starting download monitor job')
 
-  const downloadingRequests = await requestService.getDownloading()
-  console.log(`[DownloadMonitor] Found ${downloadingRequests.length} downloading requests`)
+  // Check new-style downloads first
+  const activeDownloads = await downloadService.getActive()
 
-  if (downloadingRequests.length === 0) {
+  // Also check legacy requests that have nzoId but no download row
+  const legacyDownloading = await requestService.getDownloading()
+
+  const totalChecks = activeDownloads.length + legacyDownloading.length
+
+  if (totalChecks === 0) {
     return { checked: 0, completed: 0, failed: 0 }
   }
 
   const downloaders = configService.getEnabledDownloaders()
   if (downloaders.length === 0) {
-    console.log('[DownloadMonitor] No downloaders configured')
+    logger.warn('No downloaders configured')
     return { checked: 0, completed: 0, failed: 0 }
   }
 
@@ -37,63 +44,68 @@ export async function runDownloadMonitor(): Promise<{
         const history = await client.getHistory(50)
         allHistory.push(...history.slots)
       } catch (error) {
-        console.error(`[DownloadMonitor] Failed to get history from ${downloader.name}:`, error)
+        logger.error({ error, downloader: downloader.name }, 'Failed to get history from downloader')
       }
     }
   }
 
-  console.log(`[DownloadMonitor] Got ${allHistory.length} history items from SABnzbd`)
+  logger.info({ historyItems: allHistory.length }, 'Got SABnzbd history')
 
-  // Check each downloading request against history
-  for (const request of downloadingRequests) {
-    const match = findMatchingHistorySlot(request.nzoId, request.releaseName, request.title, allHistory)
+  // Check new-style downloads
+  for (const download of activeDownloads) {
+    if (!download.nzoId) continue
 
-    if (match) {
-      if (match.status === 'Completed') {
-        await requestService.updateStatus(request.id, 'completed')
-        console.log(`[DownloadMonitor] Completed: ${request.title}`)
-        completed++
-      } else if (match.status === 'Failed') {
-        await requestService.updateStatus(request.id, 'failed')
-        console.log(`[DownloadMonitor] Failed: ${request.title} - ${match.failMessage ?? 'Unknown error'}`)
-        failed++
-      }
+    const match = allHistory.find((slot) => slot.id === download.nzoId)
+    if (!match) continue
+
+    if (match.status === 'Completed') {
+      await downloadService.updateStatus(download.id, 'complete')
+      await downloadService.syncRequestStatus(download.requestId)
+      logger.info({ title: download.requestTitle, release: download.releaseName }, 'Download completed')
+      completed++
+    } else if (match.status === 'Failed') {
+      await downloadService.updateStatus(download.id, 'failed', match.failMessage ?? 'Download failed')
+      await downloadService.syncRequestStatus(download.requestId)
+      logger.info({ title: download.requestTitle, reason: match.failMessage }, 'Download failed')
+      failed++
     }
   }
 
-  console.log(`[DownloadMonitor] Complete: checked=${downloadingRequests.length}, completed=${completed}, failed=${failed}`)
+  // Check legacy requests (backward compat during transition)
+  for (const request of legacyDownloading) {
+    if (!request.nzoId) continue
+
+    // Skip if already tracked by a download row
+    const existingDownloads = await downloadService.getByRequestId(request.id)
+    const trackedByDownload = existingDownloads.some((d) => d.nzoId === request.nzoId && (d.status === 'downloading' || d.status === 'fetching'))
+    if (trackedByDownload) continue
+
+    const match = allHistory.find((slot) => slot.id === request.nzoId)
+    if (!match) continue
+
+    if (match.status === 'Completed') {
+      await requestService.updateStatus(request.id, 'completed')
+      logger.info({ title: request.title }, 'Legacy download completed')
+      completed++
+    } else if (match.status === 'Failed') {
+      await requestService.updateStatus(request.id, 'failed')
+      logger.info({ title: request.title, reason: match.failMessage }, 'Legacy download failed')
+      failed++
+    }
+  }
+
+  logger.info({ checked: totalChecks, completed, failed }, 'Download monitor complete')
 
   // Trigger library scan if any downloads completed
   let librarySync: { added: number; updated: number; removed: number } | undefined
   if (completed > 0) {
-    console.log('[DownloadMonitor] Triggering library scan...')
     try {
       librarySync = await runLibraryScan()
-      console.log(`[DownloadMonitor] Library scan: added=${librarySync.added}, updated=${librarySync.updated}, removed=${librarySync.removed}`)
+      logger.info({ ...librarySync }, 'Library scan after download completion')
     } catch (error) {
-      console.error('[DownloadMonitor] Library scan failed:', error)
+      logger.error({ error }, 'Library scan failed')
     }
   }
 
-  return { checked: downloadingRequests.length, completed, failed, librarySync }
-}
-
-function findMatchingHistorySlot(
-  nzoId: string | null,
-  _releaseName: string | null,
-  requestTitle: string,
-  history: SABnzbdHistorySlot[]
-): SABnzbdHistorySlot | undefined {
-  // Only match by nzoId - fuzzy matching causes false positives
-  if (nzoId) {
-    const match = history.find((slot) => slot.id === nzoId)
-    if (match) return match
-  }
-
-  // If no nzoId, we can't reliably match - log warning
-  if (!nzoId) {
-    console.warn(`[DownloadMonitor] No nzoId for "${requestTitle}" - cannot match in history`)
-  }
-
-  return undefined
+  return { checked: totalChecks, completed, failed, librarySync }
 }
