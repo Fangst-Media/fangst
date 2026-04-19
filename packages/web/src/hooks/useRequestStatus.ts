@@ -16,6 +16,18 @@ export type RequestStatus =
   | 'rejected'
   | 'failed'
 
+export type DownloadRecord = {
+  id: string
+  releaseName: string
+  status: 'fetching' | 'downloading' | 'complete' | 'failed' | 'cancelled' | 'replaced'
+  resolution: string | null
+  source: string | null
+  hdr: string | null
+  qualityScore: number | null
+  createdAt: string
+  completedAt: string | null
+}
+
 export type MediaRequest = {
   id: string
   title: string
@@ -26,9 +38,12 @@ export type MediaRequest = {
   format: 'ebook' | 'audiobook' | null
   nzoId: string | null
   releaseName: string | null
+  qualityProfileId: string | null
+  mode: 'auto' | 'manual'
   season: number | null
   posterPath: string | null
   createdAt: string
+  downloads?: DownloadRecord[]
 }
 
 type RequestsResponse = {

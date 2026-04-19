@@ -1,16 +1,23 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useAuth } from '../lib/auth'
-import { movieLanes, apiPost } from '../lib/api-client'
+import { movieLanes, apiFetch, apiPost } from '../lib/api-client'
 import { useRequestStatus } from '../hooks/useRequestStatus'
 import { DownloadStatus } from '../components/DownloadStatus'
 import { ReleaseModal } from './requests/ReleaseModal'
+import type { QualityProfile } from '@jaeger/shared/types/profiles'
 
 export default function MovieDetail({ tmdbId }: { tmdbId: string }) {
   const queryClient = useQueryClient()
   const { requestMode, canChooseRequestMode } = useAuth()
-  const [quality, setQuality] = useState('1080p')
+  const [selectedProfileId, setSelectedProfileId] = useState<string>('')
   const [showReleaseModal, setShowReleaseModal] = useState(false)
+
+  const { data: profilesData } = useQuery({
+    queryKey: ['profiles'],
+    queryFn: () => apiFetch<{ profiles: QualityProfile[] }>('/api/profiles'),
+    staleTime: 1000 * 60 * 30,
+  })
 
   const { data: movie, isLoading } = useQuery({
     queryKey: ['movie-details', tmdbId],
@@ -19,17 +26,23 @@ export default function MovieDetail({ tmdbId }: { tmdbId: string }) {
 
   const { request, isLoading: isLoadingRequest } = useRequestStatus(tmdbId, 'movie')
 
+  const profiles = profilesData?.profiles ?? []
+  const defaultProfile = profiles.find((p) => p.isDefault) ?? profiles[0]
+
   const requestMutation = useMutation({
-    mutationFn: () =>
-      apiPost<{ success: boolean }>('/api/requests', {
+    mutationFn: () => {
+      const profileId = selectedProfileId || defaultProfile?.id
+      return apiPost<{ success: boolean }>('/api/requests', {
         title: movie?.title,
         year: movie?.year,
         type: 'movie',
         tmdbId,
         posterPath: movie?.poster,
         overview: movie?.overview,
-        minQuality: quality === 'any' ? null : quality,
-      }),
+        qualityProfileId: profileId,
+        mode: 'auto',
+      })
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['request-status', tmdbId] })
       queryClient.invalidateQueries({ queryKey: ['requests'] })
@@ -122,16 +135,19 @@ export default function MovieDetail({ tmdbId }: { tmdbId: string }) {
                 <DownloadStatus status={request.status} />
               ) : (
                 <div className="flex flex-wrap items-center gap-3">
-                  <select
-                    value={quality}
-                    onChange={(e) => setQuality(e.target.value)}
-                    className="rounded-md bg-card border border-border px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-                  >
-                    <option value="2160p">4K (2160p)</option>
-                    <option value="1080p">1080p</option>
-                    <option value="720p">720p</option>
-                    <option value="any">Any Quality</option>
-                  </select>
+                  {profiles.length > 0 && (
+                    <select
+                      value={selectedProfileId || defaultProfile?.id || ''}
+                      onChange={(e) => setSelectedProfileId(e.target.value)}
+                      className="rounded-md bg-card border border-border px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                    >
+                      {profiles.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}{p.isDefault ? ' (default)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                   <button
                     type="button"
                     onClick={() => requestMutation.mutate()}

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { SettingsResponse, SettingsUpdate, ExternalLink } from '@jaeger/shared/types/settings'
+import type { QualityProfile, CreateProfile } from '@jaeger/shared/types/profiles'
 import { apiFetch, apiPost } from '../lib/api-client'
 
 async function fetchSettings(): Promise<SettingsResponse> {
@@ -71,6 +72,309 @@ function SettingsSection({ title, description, children }: SettingsSectionProps)
       <h2 className="text-lg font-semibold text-foreground mb-1">{title}</h2>
       {description && <p className="text-sm text-muted mb-4">{description}</p>}
       <div>{children}</div>
+    </div>
+  )
+}
+
+const RESOLUTION_OPTIONS = ['720p', '1080p', '2160p'] as const
+const SOURCE_OPTIONS = ['remux', 'bluray', 'webdl', 'webrip', 'hdtv'] as const
+const HDR_OPTIONS = ['dv', 'hdr10+', 'hdr10', 'hlg'] as const
+const AUDIO_OPTIONS = ['atmos', 'truehd', 'dtsx', 'dtshd', 'dts', 'ddp', 'dd'] as const
+
+function QualityProfilesSection() {
+  const queryClient = useQueryClient()
+  const [editingProfile, setEditingProfile] = useState<QualityProfile | null>(null)
+  const [adding, setAdding] = useState(false)
+
+  const { data } = useQuery({
+    queryKey: ['profiles'],
+    queryFn: () => apiFetch<{ profiles: QualityProfile[] }>('/api/profiles'),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiFetch(`/api/profiles/${id}`, { method: 'DELETE' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['profiles'] }),
+  })
+
+  const saveMutation = useMutation({
+    mutationFn: (profile: { id?: string } & CreateProfile) => {
+      if (profile.id) {
+        return apiFetch(`/api/profiles/${profile.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(profile),
+        })
+      }
+      return apiPost('/api/profiles', profile)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profiles'] })
+      setEditingProfile(null)
+      setAdding(false)
+    },
+  })
+
+  const profiles = data?.profiles ?? []
+
+  return (
+    <SettingsSection
+      title="Quality Profiles"
+      description="Define quality preferences for automated release selection. Profiles control resolution, source, HDR, and audio preferences."
+    >
+      <div className="space-y-2">
+        {profiles.map((profile) => (
+          <div
+            key={profile.id}
+            className="flex items-center gap-3 py-3 border-b border-border last:border-0"
+          >
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-foreground">{profile.name}</span>
+                {profile.isDefault && (
+                  <span className="px-1.5 py-0.5 text-[10px] rounded bg-accent/20 text-accent font-medium">
+                    Default
+                  </span>
+                )}
+                {profile.upgradeAllowed && (
+                  <span className="px-1.5 py-0.5 text-[10px] rounded bg-green-500/20 text-green-400 font-medium">
+                    Upgrades
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-muted">
+                Min: {profile.minResolution}
+                {profile.preferredResolution && ` · Preferred: ${profile.preferredResolution}`}
+                {profile.preferredSources && ` · ${profile.preferredSources.join(', ')}`}
+                {profile.requireHdr && ' · HDR required'}
+                {' · Cutoff: '}{profile.cutoffScore}
+              </p>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={() => setEditingProfile(profile)}
+                className="p-1.5 text-muted hover:text-foreground transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={() => deleteMutation.mutate(profile.id)}
+                className="p-1.5 text-muted hover:text-red-400 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {(editingProfile || adding) && (
+        <ProfileForm
+          profile={editingProfile}
+          onSave={(data) => saveMutation.mutate(editingProfile ? { id: editingProfile.id, ...data } : data)}
+          onCancel={() => { setEditingProfile(null); setAdding(false) }}
+          isPending={saveMutation.isPending}
+        />
+      )}
+
+      {!editingProfile && !adding && (
+        <button
+          type="button"
+          onClick={() => setAdding(true)}
+          className="mt-4 flex items-center gap-2 text-sm text-muted hover:text-foreground transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
+          Add profile
+        </button>
+      )}
+    </SettingsSection>
+  )
+}
+
+function ProfileForm({
+  profile,
+  onSave,
+  onCancel,
+  isPending,
+}: {
+  profile: QualityProfile | null
+  onSave: (data: CreateProfile) => void
+  onCancel: () => void
+  isPending: boolean
+}) {
+  const [form, setForm] = useState<CreateProfile>({
+    name: profile?.name ?? '',
+    minResolution: profile?.minResolution ?? '720p',
+    preferredResolution: profile?.preferredResolution,
+    preferredSources: profile?.preferredSources ?? [],
+    requireHdr: profile?.requireHdr ?? false,
+    preferredHdr: profile?.preferredHdr ?? [],
+    preferredAudio: profile?.preferredAudio ?? [],
+    cutoffScore: profile?.cutoffScore ?? 80,
+    upgradeAllowed: profile?.upgradeAllowed ?? false,
+    isDefault: profile?.isDefault ?? false,
+  })
+
+  function toggleArrayItem<T extends string>(arr: T[] | undefined, item: T): T[] {
+    const current = arr ?? []
+    return current.includes(item) ? current.filter((i) => i !== item) : [...current, item]
+  }
+
+  return (
+    <div className="mt-4 p-4 rounded-lg bg-background border border-border space-y-4">
+      <input
+        type="text"
+        placeholder="Profile name"
+        className="w-full rounded-md bg-card border border-border px-3 py-1.5 text-foreground text-sm"
+        value={form.name}
+        onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+      />
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="text-xs text-muted block mb-1">Min Resolution</label>
+          <select
+            className="w-full rounded-md bg-card border border-border px-3 py-1.5 text-foreground text-sm"
+            value={form.minResolution}
+            onChange={(e) => setForm((f) => ({ ...f, minResolution: e.target.value as typeof f.minResolution }))}
+          >
+            {RESOLUTION_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs text-muted block mb-1">Preferred Resolution</label>
+          <select
+            className="w-full rounded-md bg-card border border-border px-3 py-1.5 text-foreground text-sm"
+            value={form.preferredResolution ?? ''}
+            onChange={(e) => setForm((f) => ({ ...f, preferredResolution: e.target.value as typeof f.preferredResolution || undefined }))}
+          >
+            <option value="">Any</option>
+            {RESOLUTION_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label className="text-xs text-muted block mb-1">Preferred Sources (ordered)</label>
+        <div className="flex flex-wrap gap-1.5">
+          {SOURCE_OPTIONS.map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setForm((f) => ({ ...f, preferredSources: toggleArrayItem(f.preferredSources, s) }))}
+              className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+                form.preferredSources?.includes(s) ? 'bg-accent text-white' : 'bg-foreground/10 text-muted hover:text-foreground'
+              }`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <label className="text-xs text-muted block mb-1">Preferred HDR</label>
+        <div className="flex flex-wrap gap-1.5">
+          {HDR_OPTIONS.map((h) => (
+            <button
+              key={h}
+              type="button"
+              onClick={() => setForm((f) => ({ ...f, preferredHdr: toggleArrayItem(f.preferredHdr, h) }))}
+              className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+                form.preferredHdr?.includes(h) ? 'bg-accent text-white' : 'bg-foreground/10 text-muted hover:text-foreground'
+              }`}
+            >
+              {h}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <label className="text-xs text-muted block mb-1">Preferred Audio</label>
+        <div className="flex flex-wrap gap-1.5">
+          {AUDIO_OPTIONS.map((a) => (
+            <button
+              key={a}
+              type="button"
+              onClick={() => setForm((f) => ({ ...f, preferredAudio: toggleArrayItem(f.preferredAudio, a) }))}
+              className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+                form.preferredAudio?.includes(a) ? 'bg-accent text-white' : 'bg-foreground/10 text-muted hover:text-foreground'
+              }`}
+            >
+              {a}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="text-xs text-muted block mb-1">Cutoff Score (0-100)</label>
+          <input
+            type="number"
+            min="0"
+            max="100"
+            className="w-full rounded-md bg-card border border-border px-3 py-1.5 text-foreground text-sm"
+            value={form.cutoffScore}
+            onChange={(e) => setForm((f) => ({ ...f, cutoffScore: Number.parseInt(e.target.value, 10) }))}
+          />
+        </div>
+        <div className="flex flex-col gap-2 pt-4">
+          <label className="flex items-center gap-2 text-sm text-foreground">
+            <input
+              type="checkbox"
+              checked={form.requireHdr ?? false}
+              onChange={(e) => setForm((f) => ({ ...f, requireHdr: e.target.checked }))}
+              className="rounded"
+            />
+            Require HDR
+          </label>
+          <label className="flex items-center gap-2 text-sm text-foreground">
+            <input
+              type="checkbox"
+              checked={form.upgradeAllowed ?? false}
+              onChange={(e) => setForm((f) => ({ ...f, upgradeAllowed: e.target.checked }))}
+              className="rounded"
+            />
+            Allow upgrades
+          </label>
+          <label className="flex items-center gap-2 text-sm text-foreground">
+            <input
+              type="checkbox"
+              checked={form.isDefault ?? false}
+              onChange={(e) => setForm((f) => ({ ...f, isDefault: e.target.checked }))}
+              className="rounded"
+            />
+            Default profile
+          </label>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 pt-2">
+        <button
+          type="button"
+          onClick={() => onSave(form)}
+          disabled={!form.name || isPending}
+          className="px-3 py-1.5 rounded-md bg-accent text-white text-sm font-medium hover:bg-accent/90 transition-colors disabled:opacity-50"
+        >
+          {isPending ? 'Saving...' : profile ? 'Save' : 'Create'}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-3 py-1.5 rounded-md border border-border text-sm text-muted hover:text-foreground transition-colors"
+        >
+          Cancel
+        </button>
+      </div>
     </div>
   )
 }
@@ -714,6 +1018,9 @@ export default function Settings() {
             />
           </SettingField>
         </SettingsSection>
+
+        {/* Quality Profiles */}
+        <QualityProfilesSection />
 
         {/* External Links */}
         <ExternalLinksSection
