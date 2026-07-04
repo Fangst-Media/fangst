@@ -495,10 +495,6 @@ export class RequestService {
       .where(eq(requests.id, id))
   }
 
-  async updateDownloadInfo(id: string, nzoId: string, releaseName: string): Promise<void> {
-    await db.update(requests).set({ nzoId, releaseName }).where(eq(requests.id, id))
-  }
-
   async getApprovedForSearch(): Promise<RequestWithUser[]> {
     return this.getAll({ status: ['approved', 'searching'] })
   }
