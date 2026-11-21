@@ -1,0 +1,17 @@
+fangst-dl is starting. Reach the API with:
+
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "fangst.fullname" . }} {{ .Values.service.port }}
+  curl http://127.0.0.1:{{ .Values.service.port }}/api/v1/health
+
+The daemon does not serve the web app yet; use the API or the qBittorrent and SABnzbd adapters
+(--enable qbittorrent, --enable sabnzbd in extraArgs).
+{{- if not (or .Values.persistence.downloads.existingClaim .Values.persistence.downloads.hostPath) }}
+
+WARNING: persistence.downloads has no existingClaim or hostPath, so downloads live in an emptyDir
+and are lost when the pod is replaced.
+{{- end }}
+{{- if and .Values.torrent.enabled (eq .Values.torrent.service.type "ClusterIP") }}
+
+The torrent port is only reachable inside the cluster; peers can't connect in. Set
+torrent.service.type to LoadBalancer, or NodePort with torrent.service.nodePort.
+{{- end }}

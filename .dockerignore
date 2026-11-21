@@ -1,0 +1,8 @@
+# Only what deploy/docker/Dockerfile copies; everything else stays out of the build context.
+*
+!Cargo.toml
+!Cargo.lock
+!crates
+!tools
+!deploy/docker
+**/target

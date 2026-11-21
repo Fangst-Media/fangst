@@ -1,0 +1,25 @@
+# The Fangst download daemon. Start it with:
+#   FANGST_API_KEY=<at least 16 characters> docker compose -f fangst-dl.yml up -d
+# deploy/compose/README.md explains the settings.
+name: fangst
+
+services:
+  fangst-dl:
+    image: ghcr.io/fangst-media/fangst-dl:latest
+    container_name: fangst-dl
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Etc/UTC
+      # Required: becomes the first user's API key. Keep it in a .env file next to this one.
+      FANGST_API_KEY: ${FANGST_API_KEY:?set FANGST_API_KEY to at least 16 characters}
+    # Extra fangst-dl serve flags, for example a usenet server:
+    # command: --host news.example.com --user me --password-env NEWS_PASSWORD --connections 20
+    volumes:
+      - ./data:/data
+      - ./downloads:/downloads
+    ports:
+      - "7740:7740"
+      - "6881:6881"
+      - "6881:6881/udp"
+    restart: unless-stopped
