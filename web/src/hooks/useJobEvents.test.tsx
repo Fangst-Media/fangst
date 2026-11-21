@@ -112,6 +112,53 @@ describe('useJobEvents', () => {
     expect(queryClient.getQueryState(dlKeys.timeline(4))).toBeUndefined()
   })
 
+  it('patches progress into the list and the job without refetching the timeline', () => {
+    const running = makeJob({ id: 5, status: 'downloading', total_bytes: 1000 })
+    const other = makeJob({ id: 6 })
+    const { queryClient } = setup([other, running])
+    const socket = latestSocket()
+    // Opening refetches everything, so the caches are filled after it.
+    socket.open()
+    queryClient.setQueryData(dlKeys.job(5), running)
+    queryClient.setQueryData(dlKeys.timeline(5), [])
+
+    socket.send({
+      type: 'progress',
+      id: 5,
+      downloaded_bytes: 250,
+      rate_bytes_per_sec: 50,
+      eta_seconds: 15,
+    })
+
+    const jobs = queryClient.getQueryData<JobDto[]>(dlKeys.jobs)
+    expect(jobs?.find((job) => job.id === 5)).toMatchObject({
+      downloaded_bytes: 250,
+      rate_bytes_per_sec: 50,
+      eta_seconds: 15,
+    })
+    expect(jobs?.find((job) => job.id === 6)).toBe(other)
+    expect(queryClient.getQueryData<JobDto>(dlKeys.job(5))?.downloaded_bytes).toBe(250)
+    expect(queryClient.getQueryState(dlKeys.timeline(5))?.isInvalidated).toBe(false)
+  })
+
+  it('ignores progress for a job it does not know', () => {
+    const job = makeJob({ id: 1 })
+    const { queryClient } = setup([job])
+    const socket = latestSocket()
+    socket.open()
+
+    socket.send({
+      type: 'progress',
+      id: 99,
+      downloaded_bytes: 1,
+      rate_bytes_per_sec: 1,
+      eta_seconds: null,
+    })
+
+    expect(queryClient.getQueryData<JobDto[]>(dlKeys.jobs)).toEqual([job])
+    expect(queryClient.getQueryData(dlKeys.job(99))).toBeUndefined()
+  })
+
   it('leaves the list unloaded when an update arrives before the first fetch', () => {
     const queryClient = makeQueryClient()
     renderHook(() => useJobEvents(API_KEY), { wrapper: queryWrapper(queryClient) })

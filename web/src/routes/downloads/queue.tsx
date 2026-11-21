@@ -3,6 +3,7 @@ import { Link } from '@tanstack/react-router'
 import { listJobs } from '../../api-dl'
 import { ApiKeyForm } from '../../components/downloads/ApiKeyForm'
 import { JobActions } from '../../components/downloads/JobActions'
+import { JobProgress } from '../../components/downloads/JobProgress'
 import { JobStatusBadge } from '../../components/downloads/JobStatusBadge'
 import { UnauthorizedError, dlKeys, formatBytes, formatTime, unwrap } from '../../lib/dl-api'
 
@@ -70,6 +71,9 @@ export default function Queue() {
                   {job.category && <span>{job.category}</span>}
                   <span>Priority {job.priority}</span>
                   <span>Added {formatTime(job.added_at)}</span>
+                </div>
+                <div className="mt-2 max-w-xl empty:hidden">
+                  <JobProgress job={job} />
                 </div>
                 {job.status === 'failed' && job.error && (
                   <p className="mt-2 truncate text-xs text-red-400">{job.error}</p>

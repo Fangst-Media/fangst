@@ -27,6 +27,15 @@ export type ChangeDto = {
 } | {
     id: number;
     type: 'deleted';
+} | {
+    downloaded_bytes: number;
+    /**
+     * `null` while the rate or the size is unknown.
+     */
+    eta_seconds?: number | null;
+    id: number;
+    rate_bytes_per_sec: number;
+    type: 'progress';
 };
 
 export type EventDto = {
@@ -50,15 +59,28 @@ export type JobDto = {
     added_at: number;
     category?: string | null;
     /**
+     * Bytes on disk. Live while the job downloads, otherwise as last recorded; a completed job
+     * counts as `total_bytes`.
+     */
+    downloaded_bytes: number;
+    /**
      * Why the job failed, when it did.
      */
     error?: string | null;
+    /**
+     * Seconds left at the current rate; `null` when not downloading or not yet known.
+     */
+    eta_seconds?: number | null;
     finished_at?: number | null;
     id: number;
     kind: JobKind;
     name: string;
     output_path?: string | null;
     priority: number;
+    /**
+     * Averaged over the last few seconds; 0 unless the job is downloading.
+     */
+    rate_bytes_per_sec: number;
     status: JobStatus;
     total_bytes: number;
 };

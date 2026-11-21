@@ -679,6 +679,44 @@
                 ]
               }
             }
+          },
+          {
+            "type": "object",
+            "description": "Sent about once a second for each downloading job.",
+            "required": [
+              "id",
+              "downloaded_bytes",
+              "rate_bytes_per_sec",
+              "type"
+            ],
+            "properties": {
+              "downloaded_bytes": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "eta_seconds": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "int64",
+                "description": "`null` while the rate or the size is unknown."
+              },
+              "id": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "rate_bytes_per_sec": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "progress"
+                ]
+              }
+            }
           }
         ],
         "description": "A message on the event stream."
@@ -728,6 +766,8 @@
           "priority",
           "status",
           "total_bytes",
+          "downloaded_bytes",
+          "rate_bytes_per_sec",
           "added_at"
         ],
         "properties": {
@@ -742,12 +782,25 @@
               "null"
             ]
           },
+          "downloaded_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Bytes on disk. Live while the job downloads, otherwise as last recorded; a completed job\ncounts as `total_bytes`."
+          },
           "error": {
             "type": [
               "string",
               "null"
             ],
             "description": "Why the job failed, when it did."
+          },
+          "eta_seconds": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Seconds left at the current rate; `null` when not downloading or not yet known."
           },
           "finished_at": {
             "type": [
@@ -775,6 +828,11 @@
           "priority": {
             "type": "integer",
             "format": "int64"
+          },
+          "rate_bytes_per_sec": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Averaged over the last few seconds; 0 unless the job is downloading."
           },
           "status": {
             "$ref": "#/components/schemas/JobStatus"

@@ -3,10 +3,12 @@
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use fangst_postproc_par2::{self as par2, Set, Verification, Volume};
 use fangst_providers::{JobContext, PostProcessOutcome};
 
+use crate::progress::Meter;
 use crate::{Error, Job, Runner};
 
 /// NZB indices of recovery volumes that wait until verification asks for them. A set without an
@@ -45,10 +47,12 @@ struct Pass<'a> {
     by_name: HashMap<&'a str, usize>,
     /// NZB indices fetched so far in this run.
     downloaded: HashSet<usize>,
+    meter: &'a Arc<Meter>,
 }
 
 impl Runner {
     /// Verifies every PAR2 set and repairs the damaged ones. Returns why the job fails, if it does.
+    #[allow(clippy::too_many_arguments)]
     pub(crate) async fn verify_and_repair(
         &self,
         job_id: i64,
@@ -57,6 +61,7 @@ impl Runner {
         names: &[String],
         sets: &[Set],
         report: &fangst_usenet::Report,
+        meter: &Arc<Meter>,
     ) -> Result<Option<String>, Error> {
         let mut pass = Pass {
             job_id,
@@ -64,6 +69,7 @@ impl Runner {
             out,
             by_name: index_by_name(names),
             downloaded: report.files.iter().map(|f| f.index).collect(),
+            meter,
         };
         let mut covered: HashSet<String> = HashSet::new();
         for set in sets {
@@ -171,7 +177,7 @@ impl Runner {
                     )
                     .await?;
                 if let Err(e) = self
-                    .fetch(pass.job_id, pass.nzb, pass.out, &selected)
+                    .fetch(pass.job_id, pass.nzb, pass.out, &selected, pass.meter)
                     .await?
                 {
                     return Ok(Some(e.to_string()));

@@ -233,6 +233,13 @@ pub struct JobDto {
     pub error: Option<String>,
     pub output_path: Option<String>,
     pub total_bytes: i64,
+    /// Bytes on disk. Live while the job downloads, otherwise as last recorded; a completed job
+    /// counts as `total_bytes`.
+    pub downloaded_bytes: i64,
+    /// Averaged over the last few seconds; 0 unless the job is downloading.
+    pub rate_bytes_per_sec: i64,
+    /// Seconds left at the current rate; `null` when not downloading or not yet known.
+    pub eta_seconds: Option<i64>,
     /// Unix seconds.
     pub added_at: i64,
     pub finished_at: Option<i64>,
@@ -260,6 +267,9 @@ impl From<Job> for JobDto {
             error: job.error,
             output_path: job.output_path.map(|p| p.to_string_lossy().into_owned()),
             total_bytes: job.total_bytes,
+            downloaded_bytes: job.downloaded_bytes,
+            rate_bytes_per_sec: job.rate_bytes_per_sec,
+            eta_seconds: job.eta_seconds,
             added_at: job.added_at,
             finished_at: job.finished_at,
         }
@@ -288,8 +298,30 @@ impl From<Event> for EventDto {
 #[derive(Serialize, Deserialize, ToSchema, Debug, Clone, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum ChangeDto {
-    Updated { job: JobDto },
-    Deleted { id: i64 },
+    Updated {
+        job: JobDto,
+    },
+    Deleted {
+        id: i64,
+    },
+    /// Sent about once a second for each downloading job.
+    Progress {
+        id: i64,
+        downloaded_bytes: i64,
+        rate_bytes_per_sec: i64,
+        /// `null` while the rate or the size is unknown.
+        eta_seconds: Option<i64>,
+    },
+}
+
+fn progress_message(id: i64, progress: fangst_downloads::Progress) -> ChangeDto {
+    let signed = |n: u64| i64::try_from(n).unwrap_or(i64::MAX);
+    ChangeDto::Progress {
+        id,
+        downloaded_bytes: signed(progress.downloaded_bytes),
+        rate_bytes_per_sec: signed(progress.rate_bytes_per_sec),
+        eta_seconds: progress.eta_seconds.map(signed),
+    }
 }
 
 #[utoipa::path(get, path = "/api/v1/health", security(()), responses((status = 200, body = Health)))]
@@ -520,6 +552,7 @@ async fn stream_changes(mut socket: WebSocket, state: ApiState) {
                         Err(_) => continue,
                     },
                     Ok(Change::Deleted(id)) => ChangeDto::Deleted { id },
+                    Ok(Change::Progress(id, progress)) => progress_message(id, progress),
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
                     Err(tokio::sync::broadcast::error::RecvError::Closed) => return,
                 };

@@ -216,14 +216,14 @@ async fn serve(args: ServeArgs) -> anyhow::Result<ExitCode> {
         options: args.usenet.options(),
         post_processors: registry.post_processors.clone(),
     };
-    let service = fangst_downloads::Service::new(runner).with_notifications(
-        fangst_downloads::Notifications {
+    let service = fangst_downloads::Service::new(runner)
+        .with_notifications(fangst_downloads::Notifications {
             notifiers: registry.notifiers.clone(),
             timeout: defaults.notify.timeout(),
             min_free_bytes: defaults.disk.min_free_bytes,
             disk_check_interval: defaults.disk.check_interval(),
-        },
-    );
+        })
+        .with_progress(defaults.progress.clone());
 
     let listener = tokio::net::TcpListener::bind(&args.listen)
         .await

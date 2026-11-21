@@ -131,6 +131,9 @@ function isJobDto(value: unknown): value is JobDto {
     typeof value.name === 'string' &&
     typeof value.priority === 'number' &&
     typeof value.total_bytes === 'number' &&
+    typeof value.downloaded_bytes === 'number' &&
+    typeof value.rate_bytes_per_sec === 'number' &&
+    isOptionalNumber(value.eta_seconds) &&
     typeof value.added_at === 'number' &&
     isJobKind(value.kind) &&
     isJobStatus(value.status) &&
@@ -156,7 +159,40 @@ export function parseChange(raw: string): ChangeDto | null {
   if (value.type === 'deleted' && typeof value.id === 'number') {
     return { type: 'deleted', id: value.id }
   }
+  if (
+    value.type === 'progress' &&
+    typeof value.id === 'number' &&
+    typeof value.downloaded_bytes === 'number' &&
+    typeof value.rate_bytes_per_sec === 'number' &&
+    (value.eta_seconds === undefined ||
+      value.eta_seconds === null ||
+      typeof value.eta_seconds === 'number')
+  ) {
+    return {
+      type: 'progress',
+      id: value.id,
+      downloaded_bytes: value.downloaded_bytes,
+      rate_bytes_per_sec: value.rate_bytes_per_sec,
+      eta_seconds: value.eta_seconds,
+    }
+  }
   return null
+}
+
+export type ProgressChange = Extract<ChangeDto, { type: 'progress' }>
+
+export function applyProgress(job: JobDto, progress: ProgressChange): JobDto {
+  return {
+    ...job,
+    downloaded_bytes: progress.downloaded_bytes,
+    rate_bytes_per_sec: progress.rate_bytes_per_sec,
+    eta_seconds: progress.eta_seconds,
+  }
+}
+
+export function percentDone(job: JobDto): number {
+  if (job.total_bytes <= 0) return 0
+  return Math.min(100, Math.floor((job.downloaded_bytes / job.total_bytes) * 100))
 }
 
 export function eventsUrl(apiKey: string): string {
@@ -180,6 +216,27 @@ export function formatBytes(bytes: number): string {
     unit += 1
   }
   return `${value.toFixed(unit === 0 ? 0 : 1)} ${BYTE_UNITS[unit]}`
+}
+
+export function formatRate(bytesPerSecond: number): string {
+  return `${formatBytes(bytesPerSecond)}/s`
+}
+
+function twoDigits(n: number): string {
+  return String(n).padStart(2, '0')
+}
+
+/** The two largest units, which is as precise as an estimate from a moving average gets. */
+export function formatEta(seconds: number | null | undefined): string | null {
+  if (seconds === null || seconds === undefined) return null
+  const days = Math.floor(seconds / 86_400)
+  const hours = Math.floor((seconds % 86_400) / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  const secs = Math.floor(seconds % 60)
+  if (days > 0) return `${days}d ${twoDigits(hours)}h`
+  if (hours > 0) return `${hours}h ${twoDigits(minutes)}m`
+  if (minutes > 0) return `${minutes}m ${twoDigits(secs)}s`
+  return `${secs}s`
 }
 
 export function formatTime(unixSeconds: number): string {

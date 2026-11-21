@@ -303,13 +303,33 @@ async fn event_stream_reports_changes() {
         ChangeDto::Updated { job } => {
             assert_eq!((job.id, job.name.as_str()), (id, "over the wire"));
         }
-        ChangeDto::Deleted { .. } => panic!("expected an update"),
+        other => panic!("expected an update, got {other:?}"),
     }
 
     let refused =
         tokio_tungstenite::connect_async(format!("ws://{addr}/api/v1/events?api_key=nope")).await;
     assert!(refused.is_err());
     server.abort();
+}
+
+#[test]
+fn progress_messages_are_flat_json() {
+    let message = ChangeDto::Progress {
+        id: 7,
+        downloaded_bytes: 1000,
+        rate_bytes_per_sec: 250,
+        eta_seconds: None,
+    };
+    assert_eq!(
+        serde_json::to_value(&message).unwrap(),
+        serde_json::json!({
+            "type": "progress",
+            "id": 7,
+            "downloaded_bytes": 1000,
+            "rate_bytes_per_sec": 250,
+            "eta_seconds": null,
+        })
+    );
 }
 
 #[test]
