@@ -118,6 +118,7 @@ async fn everything_else_needs_the_right_key() {
         ("POST", "/api/v1/jobs/1/resume"),
         ("GET", "/api/v1/jobs/1/timeline"),
         ("GET", "/api/v1/events"),
+        ("POST", "/api/v1/servers/test"),
     ] {
         for key in [None, Some("wrong"), Some("test-key-12")] {
             let (status, _) = call(&h, method, uri, key, Body::empty()).await;
@@ -309,6 +310,7 @@ fn every_route_is_in_the_openapi_document() {
         ("/api/v1/jobs/{id}/resume", &["post"]),
         ("/api/v1/jobs/{id}/timeline", &["get"]),
         ("/api/v1/events", &["get"]),
+        ("/api/v1/servers/test", &["post"]),
     ] {
         for method in methods {
             assert!(
@@ -319,8 +321,72 @@ fn every_route_is_in_the_openapi_document() {
     }
     assert_eq!(
         paths.len(),
-        7,
+        8,
         "a route exists in the document but not in this test"
     );
     assert!(doc["components"]["securitySchemes"]["api_key"].is_object());
+}
+
+async fn test_server_call(h: &Harness, body: serde_json::Value) -> (StatusCode, serde_json::Value) {
+    let request = Request::builder()
+        .method("POST")
+        .uri("/api/v1/servers/test")
+        .header("x-api-key", KEY)
+        .header("content-type", "application/json")
+        .body(Body::from(body.to_string()))
+        .unwrap();
+    let response = router(h.service.clone(), KEY)
+        .oneshot(request)
+        .await
+        .unwrap();
+    let status = response.status();
+    let bytes = response.into_body().collect().await.unwrap().to_bytes();
+    (status, serde_json::from_slice(&bytes).unwrap())
+}
+
+#[tokio::test]
+async fn server_test_reports_success_and_causes() {
+    let h = harness().await;
+    let limited = MockServer::start(
+        Library::new(),
+        Config {
+            max_connections: 2,
+            ..Config::default()
+        },
+    )
+    .await
+    .unwrap();
+    let port = limited.addr.port();
+
+    let (status, ok) = test_server_call(
+        &h,
+        serde_json::json!({"host": "127.0.0.1", "port": port, "tls": false, "connections": 2}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(ok["ok"], true);
+    assert_eq!(ok["message"], "connected and logged in with 2 connections");
+
+    let (_, too_many) = test_server_call(
+        &h,
+        serde_json::json!({"host": "127.0.0.1", "port": port, "tls": false, "connections": 4}),
+    )
+    .await;
+    assert_eq!(too_many["ok"], false);
+    assert_eq!(too_many["cause"], "connection_limit");
+    assert_eq!(too_many["connections_accepted"], 2);
+
+    let (_, dns) = test_server_call(
+        &h,
+        serde_json::json!({"host": "nothing.invalid", "port": 119, "tls": false}),
+    )
+    .await;
+    assert_eq!(dns["cause"], "dns");
+
+    let (status, _) = test_server_call(
+        &h,
+        serde_json::json!({"host": "127.0.0.1", "port": port, "connections": 0}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
 }

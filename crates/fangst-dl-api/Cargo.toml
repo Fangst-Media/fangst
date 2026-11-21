@@ -14,6 +14,7 @@ workspace = true
 [dependencies]
 axum = { version = "0.8.9", features = ["ws", "macros"] }
 fangst-downloads = { version = "0.1.0", path = "../fangst-downloads" }
+fangst-nntp = { version = "0.1.0", path = "../fangst-nntp" }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 tokio = { version = "1.54.1", features = ["sync", "macros"] }

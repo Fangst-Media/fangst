@@ -54,3 +54,6 @@ dev-downloads/
 dev-media/
 dev-data/
 
+
+# Agent worktrees
+.claude/worktrees/
