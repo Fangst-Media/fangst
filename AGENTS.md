@@ -9,8 +9,8 @@ This file is for every coding agent (Claude Code, Codex, Cursor, Copilot, Gemini
 
 ## Pinned versions
 
-- Rust 1.95.0, pinned in `rust-toolchain.toml` (planned, #2).
-- Dev tools: `just` and `cargo-nextest` (#2), `cargo-deny` (#3), `changesetter` (#5).
+- Rust 1.95.0, pinned in `rust-toolchain.toml`.
+- Dev tools: `just`, `cargo-nextest`, Bun; later `cargo-deny` (#3) and `changesetter` (#5).
 - Bun for the JS side; the web app is React 19, TanStack Router and Query, Tailwind, TypeScript strict.
 
 When an API detail of a crate or upstream protocol is uncertain, check its docs or source instead of guessing, and say so.
@@ -21,14 +21,14 @@ Commands marked "planned" arrive with the issue named; until then they do not ex
 
 | What | Command |
 | --- | --- |
-| First setup | `just setup` (planned, #2) |
-| Fast gate (while coding) | `just check` (planned, #2): fmt, clippy, tests |
+| First setup | `just setup` |
+| Fast gate (while coding) | `just check`: fmt, clippy, tests |
 | Full gate (before every commit and merge) | `just check:full` (planned, #3): adds layer check, license check, regenerate-and-diff, changeset check |
-| Tests | `cargo nextest run --workspace` (planned, #2) |
+| Tests | `just test` (`cargo nextest run --workspace`) |
 | Add a changeset | `changesetter add` (planned, #5) |
-| Old TS stack | `bun run dev`, `bun run typecheck`, `bun run lint` (until milestone 2) |
+| Old TS stack | `bun run dev`; `just ts-check` for typecheck and lint, which fails on main until #66 (until milestone 2) |
 
-Until `just check:full` exists, the gate is whatever of these exists: `just check`, `bun run typecheck` and `bun run lint`. Run all that exist before committing.
+Until `just check:full` exists (#3), run `just check` before committing. If you touched TypeScript, also run `just ts-check` and make sure you added no new errors.
 
 ## Architecture rules
 
@@ -47,7 +47,7 @@ Until `just check:full` exists, the gate is whatever of these exists: `just chec
 3. **Providers for every extension point.** Traits live in `fangst-providers`; each built-in implementation is its own crate. Provider traits take and return plain serde data, never Rust handles or callbacks, so a WebAssembly component can implement them later.
 4. **Separate storage.** Each service owns its own database file. No service reads another service's tables.
 5. **Removable parts.** Every optional provider and adapter can be switched off in config. `just check:full` starts each binary with all of them off and fails if it doesn't come up healthy.
-6. **No magic numbers.** Tunables (connections, timeouts, backoff, seeding defaults) live in one defaults file, `crates/fangst-core/defaults.toml`, documented in `TUNING.md` at the repo root (both planned, #2).
+6. **No magic numbers.** Tunables (connections, timeouts, backoff, seeding defaults) live in one defaults file, `crates/fangst-core/defaults.toml`, documented in `TUNING.md` at the repo root.
 7. **Untrusted input at the edge.** NZB files, torrent metadata, adapter request parameters and file paths are validated where they enter. Paths stay inside configured roots; `..` and links that point outside are refused. Extraction never writes outside the job folder and blocks executables.
 
 ## Code style

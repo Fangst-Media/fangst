@@ -1,0 +1,12 @@
+[package]
+name = "fangst-core"
+description = "Shared plumbing for Fangst: errors, config helpers, tracing, path safety and the defaults file."
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
