@@ -17,4 +17,14 @@ Format for each entry:
 **Handled in:** `crates/<crate>/src/<file>.rs`, and the test that covers it.
 ```
 
-No entries yet.
+## yEnc line ending in a lone `=`
+
+**Symptom:** a decoder reads past the line end or panics on the last byte of a line.
+**Cause:** some encoders split an escape sequence across lines, leaving `=` as the last byte.
+**Handled in:** `crates/fangst-yenc/src/lib.rs` (`decode_line` drops the dangling `=`; the CRC check then reports the damage). Covered by the `arbitrary_text_after_header_never_panics` property test.
+
+## Dot-stuffing is not yEnc's job
+
+**Symptom:** decoded data has an extra `.` at the start of some lines.
+**Cause:** NNTP doubles a leading `.` on every line of a multi-line response. The NNTP client must undo it before yEnc decoding sees the body.
+**Handled in:** `fangst-nntp` (#10). `fangst-yenc` assumes it is already done.

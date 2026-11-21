@@ -8,7 +8,7 @@
 ignore = ["", "jaeger", "layercheck", "@jaeger/api", "@jaeger/shared", "@jaeger/parser"]
 
 [groups.fangst]
-fixed = ["fangst-core", "@jaeger/web"]
+fixed = ["fangst-core", "fangst-yenc", "@jaeger/web"]
 
 [changelog]
 file = "CHANGELOG.md"
