@@ -1,9 +1,12 @@
 import { describe, expect, test } from 'bun:test'
-import { MediaScanner } from '../services/scanner'
-import { MockFilesystem } from '../services/filesystem'
-import { MetadataProvider, type MetadataProviderConfig } from '@jaeger/shared/clients/metadata-provider'
-import { TmdbClient } from '@jaeger/shared/clients/tmdb'
+import {
+  MetadataProvider,
+  type MetadataProviderConfig,
+} from '@jaeger/shared/clients/metadata-provider'
 import { MetadataRelayClient } from '@jaeger/shared/clients/metadata-relay'
+import { TmdbClient } from '@jaeger/shared/clients/tmdb'
+import { MockFilesystem } from '../services/filesystem'
+import { MediaScanner } from '../services/scanner'
 
 describe('MediaScanner E2E', () => {
   test('scans mock filesystem and matches metadata', async () => {

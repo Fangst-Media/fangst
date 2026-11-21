@@ -1,6 +1,6 @@
+import type { CreateIndexer, Indexer } from '@jaeger/shared/types/indexer'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { Indexer, CreateIndexer } from '@jaeger/shared/types/indexer'
 import { apiFetch, apiPost } from '../lib/api-client'
 
 type IndexersResponse = {
@@ -29,10 +29,7 @@ async function addIndexer(data: CreateIndexer): Promise<{ indexer: Indexer }> {
   return apiPost('/api/indexers', data)
 }
 
-async function updateIndexer(
-  id: string,
-  updates: Partial<Indexer>
-): Promise<{ indexer: Indexer }> {
+async function updateIndexer(id: string, updates: Partial<Indexer>): Promise<{ indexer: Indexer }> {
   return apiFetch(`/api/indexers/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
@@ -185,6 +182,7 @@ function IndexerModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: the backdrop is not focusable; the Cancel button is the keyboard path */}
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative bg-card border border-border rounded-lg p-6 w-full max-w-md mx-4 shadow-xl">
         <h2 className="text-lg font-semibold text-foreground mb-4">
@@ -194,10 +192,14 @@ function IndexerModal({
         <form onSubmit={handleSubmit} className="space-y-4">
           {!initialData && (
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">
+              <label
+                htmlFor="indexers-select-from-known-indexers"
+                className="block text-sm font-medium text-foreground mb-1"
+              >
                 Select from Known Indexers
               </label>
               <input
+                id="indexers-select-from-known-indexers"
                 type="text"
                 className="w-full rounded-md bg-background border border-border px-3 py-2 text-foreground text-sm mb-2"
                 placeholder="Search indexers..."
@@ -211,7 +213,9 @@ function IndexerModal({
                     type="button"
                     onClick={() => handleRegistrySelect(entry.domain)}
                     className={`w-full text-left px-3 py-2 text-sm hover:bg-accent/10 transition-colors truncate ${
-                      selectedRegistry === entry.domain ? 'bg-accent/20 text-accent' : 'text-foreground'
+                      selectedRegistry === entry.domain
+                        ? 'bg-accent/20 text-accent'
+                        : 'text-foreground'
                     }`}
                   >
                     <span className="font-medium">{entry.name}</span>
@@ -227,8 +231,14 @@ function IndexerModal({
           )}
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1">Name</label>
+            <label
+              htmlFor="indexers-name"
+              className="block text-sm font-medium text-foreground mb-1"
+            >
+              Name
+            </label>
             <input
+              id="indexers-name"
               type="text"
               required
               className="w-full rounded-md bg-background border border-border px-3 py-2 text-foreground text-sm"
@@ -239,8 +249,14 @@ function IndexerModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1">Protocol</label>
+            <label
+              htmlFor="indexers-protocol"
+              className="block text-sm font-medium text-foreground mb-1"
+            >
+              Protocol
+            </label>
             <select
+              id="indexers-protocol"
               className="w-full rounded-md bg-background border border-border px-3 py-2 text-foreground text-sm"
               value={formData.protocol}
               onChange={(e) => setFormData({ ...formData, protocol: e.target.value as 'newznab' })}
@@ -250,8 +266,14 @@ function IndexerModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1">URL</label>
+            <label
+              htmlFor="indexers-url"
+              className="block text-sm font-medium text-foreground mb-1"
+            >
+              URL
+            </label>
             <input
+              id="indexers-url"
               type="url"
               required
               className="w-full rounded-md bg-background border border-border px-3 py-2 text-foreground text-sm"
@@ -262,9 +284,15 @@ function IndexerModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1">API Key</label>
+            <label
+              htmlFor="indexers-api-key"
+              className="block text-sm font-medium text-foreground mb-1"
+            >
+              API Key
+            </label>
             <div className="flex gap-2">
               <input
+                id="indexers-api-key"
                 type={showApiKey ? 'text' : 'password'}
                 required={!initialData}
                 className="flex-1 rounded-md bg-background border border-border px-3 py-2 text-foreground text-sm"
@@ -303,12 +331,18 @@ function IndexerModal({
               className="flex items-center gap-2 text-sm text-muted hover:text-foreground transition-colors"
             >
               <svg
+                aria-hidden="true"
                 className={`w-4 h-4 transition-transform ${showAdvanced ? 'rotate-90' : ''}`}
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5l7 7-7 7"
+                />
               </svg>
               Advanced Options
             </button>
@@ -316,31 +350,44 @@ function IndexerModal({
             {showAdvanced && (
               <div className="mt-3 space-y-3 pl-6 border-l border-border">
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">
+                  <label
+                    htmlFor="indexers-api-path"
+                    className="block text-sm font-medium text-foreground mb-1"
+                  >
                     API Path
                   </label>
                   <input
+                    id="indexers-api-path"
                     type="text"
                     className="w-full rounded-md bg-background border border-border px-3 py-2 text-foreground text-sm font-mono"
                     value={formData.apiPath}
                     onChange={(e) => setFormData({ ...formData, apiPath: e.target.value })}
                     placeholder="/api"
                   />
-                  <p className="text-xs text-muted mt-1">Custom API path for non-standard indexers</p>
+                  <p className="text-xs text-muted mt-1">
+                    Custom API path for non-standard indexers
+                  </p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">
+                  <label
+                    htmlFor="indexers-priority"
+                    className="block text-sm font-medium text-foreground mb-1"
+                  >
                     Priority
                   </label>
                   <input
+                    id="indexers-priority"
                     type="number"
                     min="1"
                     max="100"
                     className="w-24 rounded-md bg-background border border-border px-3 py-2 text-foreground text-sm"
                     value={formData.priority}
                     onChange={(e) =>
-                      setFormData({ ...formData, priority: Number.parseInt(e.target.value, 10) || 50 })
+                      setFormData({
+                        ...formData,
+                        priority: Number.parseInt(e.target.value, 10) || 50,
+                      })
                     }
                   />
                   <p className="text-xs text-muted mt-1">Lower = higher priority (1-100)</p>
@@ -348,10 +395,14 @@ function IndexerModal({
 
                 <div className="flex gap-4">
                   <div className="flex-1">
-                    <label className="block text-sm font-medium text-foreground mb-1">
+                    <label
+                      htmlFor="indexers-query-limit"
+                      className="block text-sm font-medium text-foreground mb-1"
+                    >
                       Query Limit
                     </label>
                     <input
+                      id="indexers-query-limit"
                       type="number"
                       min="1"
                       className="w-full rounded-md bg-background border border-border px-3 py-2 text-foreground text-sm"
@@ -362,10 +413,14 @@ function IndexerModal({
                     <p className="text-xs text-muted mt-1">Max queries/day</p>
                   </div>
                   <div className="flex-1">
-                    <label className="block text-sm font-medium text-foreground mb-1">
+                    <label
+                      htmlFor="indexers-grab-limit"
+                      className="block text-sm font-medium text-foreground mb-1"
+                    >
                       Grab Limit
                     </label>
                     <input
+                      id="indexers-grab-limit"
                       type="number"
                       min="1"
                       className="w-full rounded-md bg-background border border-border px-3 py-2 text-foreground text-sm"
@@ -441,9 +496,7 @@ function IndexerCard({ indexer, onEdit, onDelete, onToggle }: IndexerCardProps) 
             <h3 className="font-medium text-foreground">{indexer.name}</h3>
             <span
               className={`px-2 py-0.5 text-xs rounded-full ${
-                indexer.enabled
-                  ? 'bg-green-500/20 text-green-400'
-                  : 'bg-gray-500/20 text-gray-400'
+                indexer.enabled ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'
               }`}
             >
               {indexer.enabled ? 'Enabled' : 'Disabled'}
@@ -460,7 +513,13 @@ function IndexerCard({ indexer, onEdit, onDelete, onToggle }: IndexerCardProps) 
             title={indexer.enabled ? 'Disable' : 'Enable'}
           >
             {indexer.enabled ? (
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg
+                aria-hidden="true"
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -469,7 +528,13 @@ function IndexerCard({ indexer, onEdit, onDelete, onToggle }: IndexerCardProps) 
                 />
               </svg>
             ) : (
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg
+                aria-hidden="true"
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -485,7 +550,13 @@ function IndexerCard({ indexer, onEdit, onDelete, onToggle }: IndexerCardProps) 
             className="p-2 text-muted hover:text-foreground transition-colors"
             title="Edit"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg
+              aria-hidden="true"
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -500,7 +571,13 @@ function IndexerCard({ indexer, onEdit, onDelete, onToggle }: IndexerCardProps) 
             className="p-2 text-muted hover:text-red-400 transition-colors"
             title="Delete"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg
+              aria-hidden="true"
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -569,7 +646,7 @@ export default function Indexers() {
     if (editingIndexer) {
       const updates: Partial<Indexer> = { ...formData }
       if (!formData.apiKey) {
-        delete updates.apiKey
+        updates.apiKey = undefined
       }
       updateMutation.mutate({ id: editingIndexer.id, updates })
     } else {
@@ -620,7 +697,13 @@ export default function Indexers() {
           onClick={handleAdd}
           className="px-4 py-2 text-sm rounded-md bg-accent text-white hover:bg-accent/90 transition-colors flex items-center gap-2"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg
+            aria-hidden="true"
+            className="w-4 h-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
           Add Indexer
@@ -631,9 +714,7 @@ export default function Indexers() {
         {indexers.length === 0 ? (
           <div className="bg-card border border-border rounded-lg p-8 text-center">
             <div className="text-muted mb-2">No indexers configured</div>
-            <p className="text-sm text-muted">
-              Add an indexer to start searching for releases
-            </p>
+            <p className="text-sm text-muted">Add an indexer to start searching for releases</p>
           </div>
         ) : (
           <div className="space-y-4">

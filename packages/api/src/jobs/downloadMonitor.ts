@@ -1,9 +1,9 @@
-import { requestService } from '../services/requests'
-import { downloadService } from '../services/downloads'
-import { configService } from '../services/config'
 import { SABnzbdClient, type SABnzbdHistorySlot } from '@jaeger/shared/clients/sabnzbd'
-import { runLibraryScan } from '../routes/media'
 import { logger } from '../lib/logger'
+import { runLibraryScan } from '../routes/media'
+import { configService } from '../services/config'
+import { downloadService } from '../services/downloads'
+import { requestService } from '../services/requests'
 
 export async function runDownloadMonitor(): Promise<{
   checked: number
@@ -44,7 +44,10 @@ export async function runDownloadMonitor(): Promise<{
         const history = await client.getHistory(50)
         allHistory.push(...history.slots)
       } catch (error) {
-        logger.error({ error, downloader: downloader.name }, 'Failed to get history from downloader')
+        logger.error(
+          { error, downloader: downloader.name },
+          'Failed to get history from downloader'
+        )
       }
     }
   }
@@ -61,10 +64,17 @@ export async function runDownloadMonitor(): Promise<{
     if (match.status === 'Completed') {
       await downloadService.updateStatus(download.id, 'complete')
       await downloadService.syncRequestStatus(download.requestId)
-      logger.info({ title: download.requestTitle, release: download.releaseName }, 'Download completed')
+      logger.info(
+        { title: download.requestTitle, release: download.releaseName },
+        'Download completed'
+      )
       completed++
     } else if (match.status === 'Failed') {
-      await downloadService.updateStatus(download.id, 'failed', match.failMessage ?? 'Download failed')
+      await downloadService.updateStatus(
+        download.id,
+        'failed',
+        match.failMessage ?? 'Download failed'
+      )
       await downloadService.syncRequestStatus(download.requestId)
       logger.info({ title: download.requestTitle, reason: match.failMessage }, 'Download failed')
       failed++
@@ -77,7 +87,9 @@ export async function runDownloadMonitor(): Promise<{
 
     // Skip if already tracked by a download row
     const existingDownloads = await downloadService.getByRequestId(request.id)
-    const trackedByDownload = existingDownloads.some((d) => d.nzoId === request.nzoId && (d.status === 'downloading' || d.status === 'fetching'))
+    const trackedByDownload = existingDownloads.some(
+      (d) => d.nzoId === request.nzoId && (d.status === 'downloading' || d.status === 'fetching')
+    )
     if (trackedByDownload) continue
 
     const match = allHistory.find((slot) => slot.id === request.nzoId)

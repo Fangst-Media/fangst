@@ -1,10 +1,10 @@
-import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { getMedia, triggerScan, type MediaItem } from '../lib/api'
-import { apiFetch } from '../lib/api-client'
+import { useState } from 'react'
+import { CollectionCard } from '../components/CollectionCard'
 import { MediaCard } from '../components/MediaCard'
 import { TvShowCard } from '../components/TvShowCard'
-import { CollectionCard } from '../components/CollectionCard'
+import { type MediaItem, getMedia, triggerScan } from '../lib/api'
+import { apiFetch } from '../lib/api-client'
 import { useAuth } from '../lib/auth'
 
 type CollectionOverview = {
@@ -96,8 +96,19 @@ export default function Library() {
       <div className="flex min-h-screen items-center justify-center p-4">
         <div className="rounded-lg bg-card border border-border p-6 max-w-md text-center">
           <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4">
-            <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            <svg
+              aria-hidden="true"
+              className="w-6 h-6 text-red-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
             </svg>
           </div>
           <h2 className="text-lg font-semibold text-foreground mb-2">Failed to load library</h2>
@@ -134,8 +145,19 @@ export default function Library() {
               </>
             ) : (
               <>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                <svg
+                  aria-hidden="true"
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
                 </svg>
                 Scan Library
               </>
@@ -204,7 +226,11 @@ export default function Library() {
                   )
                 }
                 return (
-                  <MediaCard key={show.key} item={show.episodes[0]!} episodeCount={show.episodeCount} />
+                  <MediaCard
+                    key={show.key}
+                    item={show.episodes[0]!}
+                    episodeCount={show.episodeCount}
+                  />
                 )
               })}
             </div>
@@ -214,8 +240,19 @@ export default function Library() {
         {totalItems === 0 && (
           <div className="flex flex-col items-center justify-center py-24">
             <div className="w-16 h-16 rounded-full bg-card flex items-center justify-center mb-4">
-              <svg className="w-8 h-8 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
+              <svg
+                aria-hidden="true"
+                className="w-8 h-8 text-muted"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"
+                />
               </svg>
             </div>
             <h3 className="text-lg font-medium text-foreground mb-1">No media found</h3>

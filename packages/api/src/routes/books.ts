@@ -1,10 +1,10 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
+import { bookDetailsSchema } from '@jaeger/shared/schemas/metadata'
+import { createDetailRoute, createLaneRoute, createSearchRoute } from '../lib/openapi-helpers'
 import type { User } from '../services/auth'
 import { configService } from '../services/config'
 import { getMetadataService } from '../services/metadata'
 import { MetadataStore } from '../services/metadata-store'
-import { bookDetailsSchema } from '@jaeger/shared/schemas/metadata'
-import { createLaneRoute, createSearchRoute, createDetailRoute } from '../lib/openapi-helpers'
 
 type AuthEnv = {
   Variables: {
@@ -55,7 +55,9 @@ books.openapi(
   laneHandler((s) => s.getClassicBooks())
 )
 
-function searchHandler(searchFn: (store: MetadataStore, query: string) => Promise<unknown[] | null>) {
+function searchHandler(
+  searchFn: (store: MetadataStore, query: string) => Promise<unknown[] | null>
+) {
   return async (c: any) => {
     const user = c.get('user')
     if (!requireAuth(user)) return c.json({ error: 'Authentication required' }, 401)

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
+import { type ReactNode, createContext, useCallback, useContext, useEffect, useState } from 'react'
 
 const API_BASE_URL = 'http://localhost:5001'
 const HEALTH_CHECK_INTERVAL = 5000
@@ -104,7 +104,14 @@ export function ConnectionProvider({ children }: { children: ReactNode }) {
   return (
     <ConnectionContext.Provider value={{ status, lastError, retry }}>
       {children}
-      {status !== 'connected' && <ConnectionDialog status={status} lastError={lastError} retry={retry} retryCount={retryCount} />}
+      {status !== 'connected' && (
+        <ConnectionDialog
+          status={status}
+          lastError={lastError}
+          retry={retry}
+          retryCount={retryCount}
+        />
+      )}
     </ConnectionContext.Provider>
   )
 }
@@ -129,6 +136,7 @@ function ConnectionDialog({
           ) : (
             <div className="h-12 w-12 mx-auto mb-4 rounded-full bg-red-500/10 flex items-center justify-center">
               <svg
+                aria-hidden="true"
                 className="w-6 h-6 text-red-400"
                 fill="none"
                 stroke="currentColor"
@@ -155,15 +163,11 @@ function ConnectionDialog({
           </p>
 
           {lastError && (
-            <p className="text-xs text-red-400 mb-4 px-3 py-2 rounded bg-red-500/10">
-              {lastError}
-            </p>
+            <p className="text-xs text-red-400 mb-4 px-3 py-2 rounded bg-red-500/10">{lastError}</p>
           )}
 
           {retryCount > 0 && (
-            <p className="text-xs text-muted mb-4">
-              Retry attempts: {retryCount}
-            </p>
+            <p className="text-xs text-muted mb-4">Retry attempts: {retryCount}</p>
           )}
 
           <button

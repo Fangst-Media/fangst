@@ -113,7 +113,10 @@ export function getIndexerList(): Array<{ domain: string; name: string; protocol
  * Find an indexer entry by domain
  */
 export function findIndexerByDomain(domain: string): IndexerRegistryEntry | undefined {
-  const normalized = domain.toLowerCase().replace(/^(https?:\/\/)?(www\.)?/, '').replace(/\/$/, '')
+  const normalized = domain
+    .toLowerCase()
+    .replace(/^(https?:\/\/)?(www\.)?/, '')
+    .replace(/\/$/, '')
   return INDEXER_REGISTRY[normalized]
 }
 
@@ -125,6 +128,12 @@ export function extractDomain(url: string): string {
     const parsed = new URL(url)
     return parsed.hostname.replace(/^www\./, '')
   } catch {
-    return url.toLowerCase().replace(/^(https?:\/\/)?(www\.)?/, '').replace(/\/$/, '').split('/')[0] ?? url
+    return (
+      url
+        .toLowerCase()
+        .replace(/^(https?:\/\/)?(www\.)?/, '')
+        .replace(/\/$/, '')
+        .split('/')[0] ?? url
+    )
   }
 }

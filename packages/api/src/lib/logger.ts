@@ -1,6 +1,6 @@
+import { mkdir } from 'node:fs/promises'
 import pino from 'pino'
 import { createStream } from 'rotating-file-stream'
-import { mkdir } from 'node:fs/promises'
 
 // Ensure logs directory exists
 const logsDir = './logs'
@@ -53,10 +53,7 @@ export const logger = pino(
   },
   // In production with logging enabled, write to both stdout and file
   isProduction && loggingEnabled
-    ? pino.multistream([
-        { stream: process.stdout },
-        { stream: fileStream },
-      ])
+    ? pino.multistream([{ stream: process.stdout }, { stream: fileStream }])
     : undefined
 )
 

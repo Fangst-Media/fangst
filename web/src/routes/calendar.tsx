@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
+import { useMemo, useState } from 'react'
 import { apiFetch } from '../lib/api-client'
 
 type CalendarItem = {
@@ -29,7 +29,7 @@ function getPosterUrl(path: string | null, size = 'w92'): string {
 }
 
 function formatDate(dateStr: string): string {
-  const date = new Date(dateStr + 'T00:00:00')
+  const date = new Date(`${dateStr}T00:00:00`)
   return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 }
 
@@ -97,7 +97,7 @@ function CalendarItemCard({ item }: { item: CalendarItem }) {
 
   return (
     <Link
-      to={`/my-requests`}
+      to="/my-requests"
       className="flex items-center gap-2 p-2 rounded-lg bg-background hover:bg-card border border-border transition-colors group"
     >
       <img
@@ -112,12 +112,11 @@ function CalendarItemCard({ item }: { item: CalendarItem }) {
         </div>
         {episodeCode && (
           <p className="text-xs text-muted truncate">
-            {episodeCode}{item.episode?.title ? ` - ${item.episode.title}` : ''}
+            {episodeCode}
+            {item.episode?.title ? ` - ${item.episode.title}` : ''}
           </p>
         )}
-        {item.type === 'movie' && (
-          <p className="text-xs text-muted">Movie</p>
-        )}
+        {item.type === 'movie' && <p className="text-xs text-muted">Movie</p>}
       </div>
     </Link>
   )
@@ -155,7 +154,9 @@ function WeekView({ dates, items }: { dates: Date[]; items: CalendarItem[] }) {
                   : 'border-border bg-card'
             }`}
           >
-            <div className={`text-sm font-medium mb-2 ${isToday ? 'text-accent' : isPast ? 'text-muted' : 'text-foreground'}`}>
+            <div
+              className={`text-sm font-medium mb-2 ${isToday ? 'text-accent' : isPast ? 'text-muted' : 'text-foreground'}`}
+            >
               {date.toLocaleDateString('en-US', { weekday: 'short' })}
               <span className="ml-1 text-lg">{date.getDate()}</span>
             </div>
@@ -174,7 +175,11 @@ function WeekView({ dates, items }: { dates: Date[]; items: CalendarItem[] }) {
   )
 }
 
-function MonthView({ dates, items, baseDate }: { dates: Date[]; items: CalendarItem[]; baseDate: Date }) {
+function MonthView({
+  dates,
+  items,
+  baseDate,
+}: { dates: Date[]; items: CalendarItem[]; baseDate: Date }) {
   const today = new Date().toISOString().split('T')[0]!
   const currentMonth = baseDate.getMonth()
 
@@ -205,8 +210,8 @@ function MonthView({ dates, items, baseDate }: { dates: Date[]; items: CalendarI
       </div>
 
       {/* Weeks */}
-      {weeks.map((week, weekIdx) => (
-        <div key={weekIdx} className="grid grid-cols-7 gap-1">
+      {weeks.map((week) => (
+        <div key={week[0]?.toISOString()} className="grid grid-cols-7 gap-1">
           {week.map((date) => {
             const dateStr = date.toISOString().split('T')[0]!
             const dayItems = itemsByDate.get(dateStr) ?? []
@@ -227,9 +232,17 @@ function MonthView({ dates, items, baseDate }: { dates: Date[]; items: CalendarI
                         : 'border-border bg-card'
                 }`}
               >
-                <div className={`text-xs font-medium mb-1 ${
-                  isToday ? 'text-accent' : !isCurrentMonth ? 'text-muted/50' : isPast ? 'text-muted' : 'text-foreground'
-                }`}>
+                <div
+                  className={`text-xs font-medium mb-1 ${
+                    isToday
+                      ? 'text-accent'
+                      : !isCurrentMonth
+                        ? 'text-muted/50'
+                        : isPast
+                          ? 'text-muted'
+                          : 'text-foreground'
+                  }`}
+                >
                   {date.getDate()}
                 </div>
                 <div className="space-y-0.5">
@@ -244,7 +257,9 @@ function MonthView({ dates, items, baseDate }: { dates: Date[]; items: CalendarI
                     </div>
                   ))}
                   {dayItems.length > 3 && (
-                    <div className="text-xs text-muted text-center">+{dayItems.length - 3} more</div>
+                    <div className="text-xs text-muted text-center">
+                      +{dayItems.length - 3} more
+                    </div>
                   )}
                 </div>
               </div>
@@ -260,9 +275,8 @@ export default function Calendar() {
   const [viewMode, setViewMode] = useState<ViewMode>('week')
   const [baseDate, setBaseDate] = useState(new Date())
 
-  const { start, end, dates } = viewMode === 'week'
-    ? getWeekDates(baseDate)
-    : getMonthDates(baseDate)
+  const { start, end, dates } =
+    viewMode === 'week' ? getWeekDates(baseDate) : getMonthDates(baseDate)
 
   const { data, isLoading } = useQuery({
     queryKey: ['calendar', start, end],
@@ -285,9 +299,10 @@ export default function Calendar() {
     setBaseDate(new Date())
   }
 
-  const headerText = viewMode === 'week'
-    ? `${formatDate(start)} - ${formatDate(end)}`
-    : baseDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  const headerText =
+    viewMode === 'week'
+      ? `${formatDate(start)} - ${formatDate(end)}`
+      : baseDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 
   return (
     <div className="p-6">
@@ -332,8 +347,19 @@ export default function Calendar() {
             onClick={() => navigate('prev')}
             className="p-2 rounded-lg bg-card border border-border hover:bg-background transition-colors"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            <svg
+              aria-hidden="true"
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
             </svg>
           </button>
           <button
@@ -348,7 +374,13 @@ export default function Calendar() {
             onClick={() => navigate('next')}
             className="p-2 rounded-lg bg-card border border-border hover:bg-background transition-colors"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg
+              aria-hidden="true"
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>
@@ -387,8 +419,19 @@ export default function Calendar() {
       {/* Empty state */}
       {!isLoading && items.length === 0 && (
         <div className="text-center py-12">
-          <svg className="w-16 h-16 mx-auto text-muted/30 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          <svg
+            aria-hidden="true"
+            className="w-16 h-16 mx-auto text-muted/30 mb-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+            />
           </svg>
           <p className="text-muted">No upcoming episodes or movies in this period</p>
         </div>

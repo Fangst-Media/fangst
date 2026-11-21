@@ -36,7 +36,9 @@ export const parsedReleaseInfoSchema = z.object({
   resolution: z.enum(['2160p', '1080p', '720p', '480p']).optional(),
   source: z.enum(['bluray', 'webdl', 'webrip', 'hdtv', 'dvd']).optional(),
   videoCodec: z.enum(['x265', 'x264', 'av1', 'xvid']).optional(),
-  audioCodec: z.enum(['atmos', 'truehd', 'dtsx', 'dtshd', 'dts', 'ddp', 'dd', 'flac', 'aac', 'ac3', 'opus']).optional(),
+  audioCodec: z
+    .enum(['atmos', 'truehd', 'dtsx', 'dtshd', 'dts', 'ddp', 'dd', 'flac', 'aac', 'ac3', 'opus'])
+    .optional(),
   hdr: z.enum(['dv', 'hdr10+', 'hdr10', 'hlg']).optional(),
   releaseGroup: z.string().optional(),
   releaseGroupTier: z.union([z.literal(1), z.literal(2), z.literal(3), z.null()]).optional(),

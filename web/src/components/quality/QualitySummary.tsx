@@ -1,7 +1,7 @@
+import type { ParsedReleaseInfo } from '@jaeger/shared/types/indexer'
+import { QualityBadges } from './QualityBadges'
 import { QualityScore } from './QualityScore'
 import { TierBadge } from './TierBadge'
-import { QualityBadges } from './QualityBadges'
-import type { ParsedReleaseInfo } from '@jaeger/shared/types/indexer'
 
 type QualitySummaryProps = {
   parsed: ParsedReleaseInfo
@@ -45,6 +45,7 @@ export function QualitySummary({
           title={expanded ? 'Hide details' : 'Show details'}
         >
           <svg
+            aria-hidden="true"
             className={`w-4 h-4 transition-transform ${expanded ? 'rotate-180' : ''}`}
             fill="none"
             stroke="currentColor"

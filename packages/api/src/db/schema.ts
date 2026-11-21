@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text, real } from 'drizzle-orm/sqlite-core'
+import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 export const arrInstances = sqliteTable('arr_instances', {
   id: text('id').primaryKey(),
@@ -16,15 +16,21 @@ export const users = sqliteTable('users', {
   providerId: text('provider_id').notNull(),
   provider: text('provider', { enum: ['jellyfin', 'plex'] }).notNull(),
   name: text('name').notNull(),
-  role: text('role', { enum: ['member', 'admin'] }).notNull().default('member'),
-  preferredRequestMode: text('preferred_request_mode', { enum: ['simple', 'detailed'] }).default('simple'),
+  role: text('role', { enum: ['member', 'admin'] })
+    .notNull()
+    .default('member'),
+  preferredRequestMode: text('preferred_request_mode', { enum: ['simple', 'detailed'] }).default(
+    'simple'
+  ),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   lastSeenAt: integer('last_seen_at', { mode: 'timestamp' }),
 })
 
 export const sessions = sqliteTable('sessions', {
   id: text('id').primaryKey(),
-  userId: text('user_id').notNull().references(() => users.id),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id),
   ipAddress: text('ip_address').notNull(),
   userAgent: text('user_agent'),
   expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
@@ -123,7 +129,9 @@ export const requests = sqliteTable('requests', {
   overview: text('overview'),
 
   // Request tracking - kept for backwards compatibility, primary user
-  requestedBy: text('requested_by').notNull().references(() => users.id),
+  requestedBy: text('requested_by')
+    .notNull()
+    .references(() => users.id),
   status: text('status', {
     enum: [
       'pending_approval',
@@ -152,7 +160,9 @@ export const requests = sqliteTable('requests', {
   // Search preferences
   minQuality: text('min_quality'),
   qualityProfileId: text('quality_profile_id').references(() => qualityProfiles.id),
-  mode: text('mode', { enum: ['auto', 'manual'] }).notNull().default('auto'),
+  mode: text('mode', { enum: ['auto', 'manual'] })
+    .notNull()
+    .default('auto'),
 
   // Download tracking (deprecated — moving to downloads table)
   nzoId: text('nzo_id'),
@@ -162,8 +172,12 @@ export const requests = sqliteTable('requests', {
 // Join table for multiple users requesting the same media
 export const requestUsers = sqliteTable('request_users', {
   id: text('id').primaryKey(),
-  requestId: text('request_id').notNull().references(() => requests.id),
-  userId: text('user_id').notNull().references(() => users.id),
+  requestId: text('request_id')
+    .notNull()
+    .references(() => requests.id),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 })
 
@@ -235,7 +249,9 @@ export const qualityProfiles = sqliteTable('quality_profiles', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   // Video
-  minResolution: text('min_resolution', { enum: ['720p', '1080p', '2160p'] }).notNull().default('720p'),
+  minResolution: text('min_resolution', { enum: ['720p', '1080p', '2160p'] })
+    .notNull()
+    .default('720p'),
   preferredResolution: text('preferred_resolution', { enum: ['720p', '1080p', '2160p'] }),
   preferredSources: text('preferred_sources'), // JSON: ['remux','bluray','webdl']
   // HDR
@@ -259,14 +275,18 @@ export const qualityProfiles = sqliteTable('quality_profiles', {
 // Episode tracking for TV requests
 export const episodes = sqliteTable('episodes', {
   id: text('id').primaryKey(),
-  requestId: text('request_id').notNull().references(() => requests.id, { onDelete: 'cascade' }),
+  requestId: text('request_id')
+    .notNull()
+    .references(() => requests.id, { onDelete: 'cascade' }),
   seasonNumber: integer('season_number').notNull(),
   episodeNumber: integer('episode_number').notNull(),
   title: text('title'),
   airDate: text('air_date'),
   status: text('status', {
     enum: ['pending', 'searching', 'downloading', 'completed', 'failed'],
-  }).notNull().default('pending'),
+  })
+    .notNull()
+    .default('pending'),
   monitored: integer('monitored', { mode: 'boolean' }).notNull().default(true),
   // Deprecated — moving to downloads table
   nzoId: text('nzo_id'),
@@ -278,7 +298,9 @@ export const episodes = sqliteTable('episodes', {
 // Download attempts (fulfillment of requests)
 export const downloads = sqliteTable('downloads', {
   id: text('id').primaryKey(),
-  requestId: text('request_id').notNull().references(() => requests.id, { onDelete: 'cascade' }),
+  requestId: text('request_id')
+    .notNull()
+    .references(() => requests.id, { onDelete: 'cascade' }),
   episodeId: text('episode_id').references(() => episodes.id, { onDelete: 'cascade' }),
   // Release info
   releaseName: text('release_name').notNull(),

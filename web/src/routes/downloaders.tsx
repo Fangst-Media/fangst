@@ -1,6 +1,6 @@
+import type { CreateDownloader, Downloader } from '@jaeger/shared/types/settings'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { Downloader, CreateDownloader } from '@jaeger/shared/types/settings'
 import { apiFetch, apiPost } from '../lib/api-client'
 
 type DownloadersResponse = {
@@ -141,6 +141,7 @@ function DownloaderModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: the backdrop is not focusable; the Cancel button is the keyboard path */}
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative bg-card border border-border rounded-lg p-6 w-full max-w-md mx-4 shadow-xl">
         <h2 className="text-lg font-semibold text-foreground mb-4">
@@ -149,8 +150,14 @@ function DownloaderModal({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1">Name</label>
+            <label
+              htmlFor="downloaders-name"
+              className="block text-sm font-medium text-foreground mb-1"
+            >
+              Name
+            </label>
             <input
+              id="downloaders-name"
               type="text"
               required
               className="w-full rounded-md bg-background border border-border px-3 py-2 text-foreground text-sm"
@@ -161,8 +168,14 @@ function DownloaderModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1">Type</label>
+            <label
+              htmlFor="downloaders-type"
+              className="block text-sm font-medium text-foreground mb-1"
+            >
+              Type
+            </label>
             <select
+              id="downloaders-type"
               className="w-full rounded-md bg-background border border-border px-3 py-2 text-foreground text-sm"
               value={formData.type}
               onChange={(e) => setFormData({ ...formData, type: e.target.value as 'sabnzbd' })}
@@ -172,8 +185,14 @@ function DownloaderModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1">URL</label>
+            <label
+              htmlFor="downloaders-url"
+              className="block text-sm font-medium text-foreground mb-1"
+            >
+              URL
+            </label>
             <input
+              id="downloaders-url"
               type="url"
               required
               className="w-full rounded-md bg-background border border-border px-3 py-2 text-foreground text-sm"
@@ -184,9 +203,15 @@ function DownloaderModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1">API Key</label>
+            <label
+              htmlFor="downloaders-api-key"
+              className="block text-sm font-medium text-foreground mb-1"
+            >
+              API Key
+            </label>
             <div className="flex gap-2">
               <input
+                id="downloaders-api-key"
                 type={showApiKey ? 'text' : 'password'}
                 required={!initialData}
                 className="flex-1 rounded-md bg-background border border-border px-3 py-2 text-foreground text-sm"
@@ -205,13 +230,14 @@ function DownloaderModal({
           </div>
 
           <div className="border-t border-border pt-4">
-            <label className="block text-sm font-medium text-foreground mb-2">
-              Categories (optional)
-            </label>
+            <p className="block text-sm font-medium text-foreground mb-2">Categories (optional)</p>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs text-muted mb-1">Movies</label>
+                <label htmlFor="downloaders-movies" className="block text-xs text-muted mb-1">
+                  Movies
+                </label>
                 <input
+                  id="downloaders-movies"
                   type="text"
                   className="w-full rounded-md bg-background border border-border px-3 py-2 text-foreground text-sm"
                   value={formData.categories?.movies || ''}
@@ -225,8 +251,11 @@ function DownloaderModal({
                 />
               </div>
               <div>
-                <label className="block text-xs text-muted mb-1">TV Shows</label>
+                <label htmlFor="downloaders-tv-shows" className="block text-xs text-muted mb-1">
+                  TV Shows
+                </label>
                 <input
+                  id="downloaders-tv-shows"
                   type="text"
                   className="w-full rounded-md bg-background border border-border px-3 py-2 text-foreground text-sm"
                   value={formData.categories?.tv || ''}
@@ -349,7 +378,13 @@ function DownloaderCard({ downloader, onEdit, onDelete, onToggle }: DownloaderCa
             title={downloader.enabled ? 'Disable' : 'Enable'}
           >
             {downloader.enabled ? (
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg
+                aria-hidden="true"
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -358,7 +393,13 @@ function DownloaderCard({ downloader, onEdit, onDelete, onToggle }: DownloaderCa
                 />
               </svg>
             ) : (
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg
+                aria-hidden="true"
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -374,7 +415,13 @@ function DownloaderCard({ downloader, onEdit, onDelete, onToggle }: DownloaderCa
             className="p-2 text-muted hover:text-foreground transition-colors"
             title="Edit"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg
+              aria-hidden="true"
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -389,7 +436,13 @@ function DownloaderCard({ downloader, onEdit, onDelete, onToggle }: DownloaderCa
             className="p-2 text-muted hover:text-red-400 transition-colors"
             title="Delete"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg
+              aria-hidden="true"
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -453,7 +506,7 @@ export default function Downloaders() {
     if (editingDownloader) {
       const updates: Partial<Downloader> = { ...formData }
       if (!formData.apiKey) {
-        delete updates.apiKey
+        updates.apiKey = undefined
       }
       updateMutation.mutate({ id: editingDownloader.id, updates })
     } else {
@@ -503,7 +556,13 @@ export default function Downloaders() {
           onClick={handleAdd}
           className="px-4 py-2 text-sm rounded-md bg-accent text-white hover:bg-accent/90 transition-colors flex items-center gap-2"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg
+            aria-hidden="true"
+            className="w-4 h-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
           Add Downloader

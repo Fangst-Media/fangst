@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { db } from '../db'
-import { collections, metadata, mediaItems } from '../db/schema'
+import { collections, mediaItems, metadata } from '../db/schema'
 import { configService } from './config'
 import { getMetadataService } from './metadata'
 
@@ -209,7 +209,10 @@ export class CollectionService {
       .where(eq(metadata.tmdbCollectionId, tmdbCollectionId))
 
     // Create a map of tmdb ID to downloaded file
-    const downloadedMap = new Map<string, { id: string; filename: string; resolution?: string; size?: number }>()
+    const downloadedMap = new Map<
+      string,
+      { id: string; filename: string; resolution?: string; size?: number }
+    >()
     for (const item of moviesInLibrary) {
       if (item.mediaItemId) {
         // Extract TMDB ID from metadata ID (format: "tmdb:12345")

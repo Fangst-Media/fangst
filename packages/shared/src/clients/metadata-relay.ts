@@ -205,7 +205,9 @@ export class MetadataRelayClient {
     return result.results
       .filter((movie) => {
         if (!year) return true
-        const releaseYear = movie.release_date ? new Date(movie.release_date).getFullYear() : undefined
+        const releaseYear = movie.release_date
+          ? new Date(movie.release_date).getFullYear()
+          : undefined
         return releaseYear === year
       })
       .map((movie) => ({
@@ -230,7 +232,9 @@ export class MetadataRelayClient {
     return result.results
       .filter((show) => {
         if (!year) return true
-        const firstAirYear = show.first_air_date ? new Date(show.first_air_date).getFullYear() : undefined
+        const firstAirYear = show.first_air_date
+          ? new Date(show.first_air_date).getFullYear()
+          : undefined
         return firstAirYear === year
       })
       .map((show) => ({
@@ -288,7 +292,10 @@ export class MetadataRelayClient {
   }
 
   async getSeasonDetails(tmdbId: string | number, seasonNumber: number): Promise<SeasonDetails> {
-    const result = await this.fetch(`/tmdb/tv/shows/${tmdbId}/${seasonNumber}`, tmdbSeasonDetailsSchema)
+    const result = await this.fetch(
+      `/tmdb/tv/shows/${tmdbId}/${seasonNumber}`,
+      tmdbSeasonDetailsSchema
+    )
 
     return {
       seasonNumber: result.season_number,

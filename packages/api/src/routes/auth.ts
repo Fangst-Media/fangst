@@ -1,7 +1,7 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
-import { setCookie, getCookie, deleteCookie } from 'hono/cookie'
-import { z } from 'zod'
 import { zValidator } from '@hono/zod-validator'
+import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
+import { z } from 'zod'
 import { authService } from '../services/auth'
 import { configService } from '../services/config'
 
@@ -84,9 +84,7 @@ auth.get('/me', async (c) => {
   // Compute effective request mode based on role and settings
   const settings = configService.get()
   const rolePermission =
-    user.role === 'admin'
-      ? settings.requests.adminRequestMode
-      : settings.requests.memberRequestMode
+    user.role === 'admin' ? settings.requests.adminRequestMode : settings.requests.memberRequestMode
 
   let effectiveRequestMode: 'simple' | 'detailed'
   if (rolePermission === 'user_choice') {

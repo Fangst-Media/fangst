@@ -67,7 +67,10 @@ export function QualityDetails({ parsed }: QualityDetailsProps) {
       <div className="grid grid-cols-2 gap-x-6 gap-y-2">
         <DetailRow label="Resolution" value={parsed.resolution?.toUpperCase()} />
         <DetailRow label="Source" value={parsed.source && sourceLabels[parsed.source]} />
-        <DetailRow label="Video Codec" value={parsed.videoCodec && codecLabels[parsed.videoCodec]} />
+        <DetailRow
+          label="Video Codec"
+          value={parsed.videoCodec && codecLabels[parsed.videoCodec]}
+        />
         <DetailRow label="Audio" value={parsed.audioCodec && audioLabels[parsed.audioCodec]} />
         <DetailRow label="HDR" value={parsed.hdr && hdrLabels[parsed.hdr]} />
         <DetailRow label="Streaming" value={parsed.streamingService} />

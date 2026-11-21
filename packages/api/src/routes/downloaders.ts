@@ -1,8 +1,8 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
-import { configService } from '../services/config'
-import { createDownloaderSchema, updateDownloaderSchema } from '@jaeger/shared/types/settings'
 import { SABnzbdClient } from '@jaeger/shared/clients/sabnzbd'
+import { createDownloaderSchema, updateDownloaderSchema } from '@jaeger/shared/types/settings'
 import type { User } from '../services/auth'
+import { configService } from '../services/config'
 
 type AuthEnv = {
   Variables: {

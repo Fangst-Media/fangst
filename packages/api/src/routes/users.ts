@@ -1,11 +1,11 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
-import { z } from 'zod'
 import { zValidator } from '@hono/zod-validator'
 import { eq } from 'drizzle-orm'
+import { z } from 'zod'
 import { db } from '../db'
 import { users } from '../db/schema'
-import { configService } from '../services/config'
 import type { User } from '../services/auth'
+import { configService } from '../services/config'
 
 type Variables = {
   user: User | null
@@ -28,9 +28,7 @@ usersRouter.patch('/me/preferences', zValidator('json', updatePreferencesSchema)
   // Check if user is allowed to change their request mode
   const settings = configService.get()
   const rolePermission =
-    user.role === 'admin'
-      ? settings.requests.adminRequestMode
-      : settings.requests.memberRequestMode
+    user.role === 'admin' ? settings.requests.adminRequestMode : settings.requests.memberRequestMode
 
   if (rolePermission !== 'user_choice') {
     return c.json({ error: 'Cannot change request mode with current permissions' }, 403)

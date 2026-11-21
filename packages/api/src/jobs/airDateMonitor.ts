@@ -21,7 +21,9 @@ export async function runAirDateMonitor(): Promise<AirDateMonitorResult> {
 
   // Get TV requests for ongoing series
   const returningRequests = await requestService.getReturningSeriesRequests()
-  console.log(`[AirDateMonitor] Found ${returningRequests.length} returning/upcoming series to monitor`)
+  console.log(
+    `[AirDateMonitor] Found ${returningRequests.length} returning/upcoming series to monitor`
+  )
 
   const relayUrl = configService.getMetadataRelayUrl()
   const client = new MetadataRelayClient(relayUrl)
@@ -69,7 +71,9 @@ async function processRequest(
 
   // Check if series status changed
   if (seriesDetails.status !== request.seriesStatus) {
-    console.log(`[AirDateMonitor] Status changed for ${request.title}: ${request.seriesStatus} -> ${seriesDetails.status}`)
+    console.log(
+      `[AirDateMonitor] Status changed for ${request.title}: ${request.seriesStatus} -> ${seriesDetails.status}`
+    )
     await requestService.updateRequestSeriesStatus(request.id, seriesDetails.status)
     stats.statusUpdates++
   }
@@ -86,7 +90,9 @@ async function processRequest(
   const newEpisodes = tmdbEpisodes.filter((ep) => !existingEpNumbers.has(ep.episodeNumber))
 
   if (newEpisodes.length > 0) {
-    console.log(`[AirDateMonitor] Adding ${newEpisodes.length} new episodes for ${request.title} S${request.season}`)
+    console.log(
+      `[AirDateMonitor] Adding ${newEpisodes.length} new episodes for ${request.title} S${request.season}`
+    )
 
     for (const ep of newEpisodes) {
       await requestService.addEpisode(request.id, {
@@ -114,7 +120,8 @@ async function processRequest(
 
   // Check if all episodes are now completed - if so, update series status
   const allEpisodes = await requestService.getEpisodes(request.id)
-  const allCompleted = allEpisodes.length > 0 && allEpisodes.every((ep) => ep.status === 'completed')
+  const allCompleted =
+    allEpisodes.length > 0 && allEpisodes.every((ep) => ep.status === 'completed')
 
   if (allCompleted && seriesDetails.status === 'ended') {
     // Mark the request as completed

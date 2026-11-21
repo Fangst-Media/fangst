@@ -1,11 +1,11 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
 import {
-  MonitoringPresetSelector,
   type MonitoringPreset,
+  MonitoringPresetSelector,
 } from '../components/MonitoringPresetSelector'
-import { tvLanes, apiFetch, apiPost } from '../lib/api-client'
+import { apiFetch, apiPost, tvLanes } from '../lib/api-client'
 
 type EpisodeFile = {
   id: string
@@ -61,7 +61,10 @@ type SeasonRequestResponse = {
   episodes: RequestedEpisode[]
 }
 
-async function getSeasonEpisodes(tmdbId: string, seasonNumber: number): Promise<SeasonWithEpisodes> {
+async function getSeasonEpisodes(
+  tmdbId: string,
+  seasonNumber: number
+): Promise<SeasonWithEpisodes> {
   return apiFetch(`/api/library/tv/${tmdbId}/season/${seasonNumber}`)
 }
 
@@ -144,7 +147,11 @@ export default function SeasonPage({
   const [monitoringPreset, setMonitoringPreset] = useState<MonitoringPreset>('all')
   const [requestingEpisode, setRequestingEpisode] = useState<number | null>(null)
 
-  const { data: season, isLoading, error } = useQuery({
+  const {
+    data: season,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ['library-season', tmdbId, seasonNumber],
     queryFn: () => getSeasonEpisodes(tmdbId, seasonNumber),
   })
@@ -180,22 +187,6 @@ export default function SeasonPage({
       await fetchEpisodesForRequest(data.request.id)
       queryClient.invalidateQueries({ queryKey: ['season-request', tmdbId, seasonNumber] })
       setShowRequestModal(false)
-    },
-  })
-
-  const toggleMonitoringMutation = useMutation({
-    mutationFn: async ({
-      episodeId,
-      monitored,
-    }: {
-      episodeId: string
-      monitored: boolean
-    }) => {
-      if (!existingRequest) return
-      await toggleEpisodeMonitoring(existingRequest.id, episodeId, monitored)
-    },
-    onSuccess: () => {
-      refetchRequest()
     },
   })
 
@@ -258,7 +249,13 @@ export default function SeasonPage({
       <div className="flex min-h-screen items-center justify-center p-4">
         <div className="rounded-lg bg-card border border-border p-6 max-w-md text-center">
           <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4">
-            <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg
+              aria-hidden="true"
+              className="w-6 h-6 text-red-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -292,6 +289,7 @@ export default function SeasonPage({
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
           onClick={() => setShowRequestModal(false)}
           onKeyDown={(e) => e.key === 'Escape' && setShowRequestModal(false)}
+          // biome-ignore lint/a11y/useSemanticElements: a native <dialog> only blocks the page through showModal(); this overlay is rendered conditionally instead
           role="dialog"
           aria-modal="true"
         >
@@ -383,7 +381,13 @@ export default function SeasonPage({
               onClick={() => setShowRequestModal(true)}
               className="shrink-0 flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 transition-colors"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg
+                aria-hidden="true"
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -459,7 +463,12 @@ export default function SeasonPage({
                   <td className="px-4 py-3">
                     {episode.downloaded ? (
                       <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 text-xs font-medium">
-                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <svg
+                          aria-hidden="true"
+                          className="w-3 h-3"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
                           <path
                             fillRule="evenodd"
                             d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
@@ -470,7 +479,13 @@ export default function SeasonPage({
                       </span>
                     ) : !aired ? (
                       <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 text-xs font-medium">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg
+                          aria-hidden="true"
+                          className="w-3 h-3"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
                           <path
                             strokeLinecap="round"
                             strokeLinejoin="round"
@@ -482,7 +497,12 @@ export default function SeasonPage({
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 text-xs font-medium">
-                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <svg
+                          aria-hidden="true"
+                          className="w-3 h-3"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
                           <path
                             fillRule="evenodd"
                             d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
@@ -525,38 +545,47 @@ export default function SeasonPage({
                     <span className="text-sm text-muted">{formatBytes(episode.file?.size)}</span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    {!episode.downloaded && aired && (() => {
-                      const requestedEp = requestedEpisodes.find(
-                        (e) => e.episodeNumber === episode.episodeNumber
-                      )
-                      const isMonitored = requestedEp?.monitored
-
-                      if (isMonitored) {
-                        return (
-                          <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-green-500/10 text-green-400">
-                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                              <path
-                                fillRule="evenodd"
-                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                clipRule="evenodd"
-                              />
-                            </svg>
-                            Monitored
-                          </span>
+                    {!episode.downloaded &&
+                      aired &&
+                      (() => {
+                        const requestedEp = requestedEpisodes.find(
+                          (e) => e.episodeNumber === episode.episodeNumber
                         )
-                      }
+                        const isMonitored = requestedEp?.monitored
 
-                      return (
-                        <button
-                          type="button"
-                          onClick={() => requestSingleEpisodeMutation.mutate(episode.episodeNumber)}
-                          disabled={requestingEpisode === episode.episodeNumber}
-                          className="text-xs px-2 py-1 rounded bg-accent text-white hover:bg-accent/90 transition-colors disabled:opacity-50"
-                        >
-                          {requestingEpisode === episode.episodeNumber ? '...' : 'Request'}
-                        </button>
-                      )
-                    })()}
+                        if (isMonitored) {
+                          return (
+                            <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-green-500/10 text-green-400">
+                              <svg
+                                aria-hidden="true"
+                                className="w-3 h-3"
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                              Monitored
+                            </span>
+                          )
+                        }
+
+                        return (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              requestSingleEpisodeMutation.mutate(episode.episodeNumber)
+                            }
+                            disabled={requestingEpisode === episode.episodeNumber}
+                            className="text-xs px-2 py-1 rounded bg-accent text-white hover:bg-accent/90 transition-colors disabled:opacity-50"
+                          >
+                            {requestingEpisode === episode.episodeNumber ? '...' : 'Request'}
+                          </button>
+                        )
+                      })()}
                   </td>
                 </tr>
               )

@@ -1,10 +1,10 @@
+import type { MetadataRelayResult, TvSeriesDetails } from '@jaeger/shared/clients/metadata-relay'
 import { eq } from 'drizzle-orm'
 import { db } from '../db'
-import { movieMetadata, tvMetadata, bookMetadata, metadataLists } from '../db/schema'
-import { type MetadataService, type MovieDetails, type BookDetails } from './metadata'
-import type { MetadataRelayResult, TvSeriesDetails } from '@jaeger/shared/clients/metadata-relay'
-import { configService } from './config'
+import { bookMetadata, metadataLists, movieMetadata, tvMetadata } from '../db/schema'
 import { logger } from '../lib/logger'
+import { configService } from './config'
+import type { BookDetails, MetadataService, MovieDetails } from './metadata'
 
 type StoreConfig = {
   enabled: boolean
@@ -46,7 +46,11 @@ export class MetadataStore {
     const config = getConfig()
     if (!config.enabled) return this.upstream.getMovieDetails(tmdbId)
 
-    const cached = await db.select().from(movieMetadata).where(eq(movieMetadata.id, tmdbId)).limit(1)
+    const cached = await db
+      .select()
+      .from(movieMetadata)
+      .where(eq(movieMetadata.id, tmdbId))
+      .limit(1)
     if (cached.length > 0) {
       const row = cached[0]!
       if (!isStale(row.lastRefreshedAt, config.itemTtlMs)) {
@@ -119,7 +123,11 @@ export class MetadataStore {
     const config = getConfig()
     if (!config.enabled) return fetchFn()
 
-    const cached = await db.select().from(metadataLists).where(eq(metadataLists.id, listId)).limit(1)
+    const cached = await db
+      .select()
+      .from(metadataLists)
+      .where(eq(metadataLists.id, listId))
+      .limit(1)
     if (cached.length > 0) {
       const row = cached[0]!
       const results = JSON.parse(row.resultsJson) as MetadataRelayResult[]
@@ -217,25 +225,11 @@ export class MetadataStore {
 
   private async storeMovie(details: MovieDetails): Promise<void> {
     const now = new Date()
-    await db.insert(movieMetadata).values({
-      id: details.id,
-      provider: 'tmdb',
-      title: details.title,
-      year: details.year ?? null,
-      overview: details.overview ?? null,
-      posterPath: details.poster ?? null,
-      backdropPath: details.backdrop ?? null,
-      rating: details.rating ?? null,
-      runtime: details.runtime ?? null,
-      imdbId: details.imdbId ?? null,
-      genres: null,
-      collectionJson: details.collection ? JSON.stringify(details.collection) : null,
-      releaseDate: null,
-      lastRefreshedAt: now,
-      createdAt: now,
-    }).onConflictDoUpdate({
-      target: movieMetadata.id,
-      set: {
+    await db
+      .insert(movieMetadata)
+      .values({
+        id: details.id,
+        provider: 'tmdb',
         title: details.title,
         year: details.year ?? null,
         overview: details.overview ?? null,
@@ -244,32 +238,36 @@ export class MetadataStore {
         rating: details.rating ?? null,
         runtime: details.runtime ?? null,
         imdbId: details.imdbId ?? null,
+        genres: null,
         collectionJson: details.collection ? JSON.stringify(details.collection) : null,
+        releaseDate: null,
         lastRefreshedAt: now,
-      },
-    })
+        createdAt: now,
+      })
+      .onConflictDoUpdate({
+        target: movieMetadata.id,
+        set: {
+          title: details.title,
+          year: details.year ?? null,
+          overview: details.overview ?? null,
+          posterPath: details.poster ?? null,
+          backdropPath: details.backdrop ?? null,
+          rating: details.rating ?? null,
+          runtime: details.runtime ?? null,
+          imdbId: details.imdbId ?? null,
+          collectionJson: details.collection ? JSON.stringify(details.collection) : null,
+          lastRefreshedAt: now,
+        },
+      })
   }
 
   private async storeTv(details: TvSeriesDetails): Promise<void> {
     const now = new Date()
-    await db.insert(tvMetadata).values({
-      id: details.id,
-      provider: 'tmdb',
-      title: details.title,
-      year: details.year ?? null,
-      overview: details.overview ?? null,
-      posterPath: details.poster ?? null,
-      backdropPath: details.backdrop ?? null,
-      rating: details.rating ?? null,
-      status: details.status ?? null,
-      genres: null,
-      numberOfSeasons: details.numberOfSeasons ?? null,
-      seasonsJson: details.seasons ? JSON.stringify(details.seasons) : null,
-      lastRefreshedAt: now,
-      createdAt: now,
-    }).onConflictDoUpdate({
-      target: tvMetadata.id,
-      set: {
+    await db
+      .insert(tvMetadata)
+      .values({
+        id: details.id,
+        provider: 'tmdb',
         title: details.title,
         year: details.year ?? null,
         overview: details.overview ?? null,
@@ -277,32 +275,36 @@ export class MetadataStore {
         backdropPath: details.backdrop ?? null,
         rating: details.rating ?? null,
         status: details.status ?? null,
+        genres: null,
         numberOfSeasons: details.numberOfSeasons ?? null,
         seasonsJson: details.seasons ? JSON.stringify(details.seasons) : null,
         lastRefreshedAt: now,
-      },
-    })
+        createdAt: now,
+      })
+      .onConflictDoUpdate({
+        target: tvMetadata.id,
+        set: {
+          title: details.title,
+          year: details.year ?? null,
+          overview: details.overview ?? null,
+          posterPath: details.poster ?? null,
+          backdropPath: details.backdrop ?? null,
+          rating: details.rating ?? null,
+          status: details.status ?? null,
+          numberOfSeasons: details.numberOfSeasons ?? null,
+          seasonsJson: details.seasons ? JSON.stringify(details.seasons) : null,
+          lastRefreshedAt: now,
+        },
+      })
   }
 
   private async storeBook(details: BookDetails): Promise<void> {
     const now = new Date()
-    await db.insert(bookMetadata).values({
-      id: details.id,
-      provider: 'openlibrary',
-      title: details.title,
-      author: details.author ?? null,
-      authorId: details.authorId ?? null,
-      year: details.year ?? null,
-      overview: details.overview ?? null,
-      coverUrl: details.cover ?? null,
-      subjects: details.subjects ? JSON.stringify(details.subjects) : null,
-      isbn: details.isbn ? JSON.stringify(details.isbn) : null,
-      pageCount: details.numberOfPages ?? null,
-      lastRefreshedAt: now,
-      createdAt: now,
-    }).onConflictDoUpdate({
-      target: bookMetadata.id,
-      set: {
+    await db
+      .insert(bookMetadata)
+      .values({
+        id: details.id,
+        provider: 'openlibrary',
         title: details.title,
         author: details.author ?? null,
         authorId: details.authorId ?? null,
@@ -313,28 +315,46 @@ export class MetadataStore {
         isbn: details.isbn ? JSON.stringify(details.isbn) : null,
         pageCount: details.numberOfPages ?? null,
         lastRefreshedAt: now,
-      },
-    })
+        createdAt: now,
+      })
+      .onConflictDoUpdate({
+        target: bookMetadata.id,
+        set: {
+          title: details.title,
+          author: details.author ?? null,
+          authorId: details.authorId ?? null,
+          year: details.year ?? null,
+          overview: details.overview ?? null,
+          coverUrl: details.cover ?? null,
+          subjects: details.subjects ? JSON.stringify(details.subjects) : null,
+          isbn: details.isbn ? JSON.stringify(details.isbn) : null,
+          pageCount: details.numberOfPages ?? null,
+          lastRefreshedAt: now,
+        },
+      })
   }
 
   private async storeList(listId: string, results: MetadataRelayResult[]): Promise<void> {
     const now = new Date()
     const [mediaType, ...rest] = listId.split('-')
-    await db.insert(metadataLists).values({
-      id: listId,
-      listType: rest.join('-') || listId,
-      mediaType: mediaType ?? 'unknown',
-      provider: null,
-      resultsJson: JSON.stringify(results),
-      lastRefreshedAt: now,
-      createdAt: now,
-    }).onConflictDoUpdate({
-      target: metadataLists.id,
-      set: {
+    await db
+      .insert(metadataLists)
+      .values({
+        id: listId,
+        listType: rest.join('-') || listId,
+        mediaType: mediaType ?? 'unknown',
+        provider: null,
         resultsJson: JSON.stringify(results),
         lastRefreshedAt: now,
-      },
-    })
+        createdAt: now,
+      })
+      .onConflictDoUpdate({
+        target: metadataLists.id,
+        set: {
+          resultsJson: JSON.stringify(results),
+          lastRefreshedAt: now,
+        },
+      })
   }
 
   // Store individual items from list results to build up local metadata
@@ -342,56 +362,65 @@ export class MetadataStore {
     const now = new Date()
     for (const item of results) {
       if (item.type === 'movie') {
-        db.insert(movieMetadata).values({
-          id: item.id,
-          provider: 'tmdb',
-          title: item.title,
-          year: item.year ?? null,
-          overview: item.overview ?? null,
-          posterPath: item.poster ?? null,
-          backdropPath: item.backdrop ?? null,
-          rating: item.rating ?? null,
-          runtime: null,
-          imdbId: null,
-          genres: null,
-          collectionJson: null,
-          releaseDate: item.releaseDate ?? null,
-          lastRefreshedAt: now,
-          createdAt: now,
-        }).onConflictDoNothing().catch(() => {})
+        db.insert(movieMetadata)
+          .values({
+            id: item.id,
+            provider: 'tmdb',
+            title: item.title,
+            year: item.year ?? null,
+            overview: item.overview ?? null,
+            posterPath: item.poster ?? null,
+            backdropPath: item.backdrop ?? null,
+            rating: item.rating ?? null,
+            runtime: null,
+            imdbId: null,
+            genres: null,
+            collectionJson: null,
+            releaseDate: item.releaseDate ?? null,
+            lastRefreshedAt: now,
+            createdAt: now,
+          })
+          .onConflictDoNothing()
+          .catch(() => {})
       } else if (item.type === 'tv') {
-        db.insert(tvMetadata).values({
-          id: item.id,
-          provider: 'tmdb',
-          title: item.title,
-          year: item.year ?? null,
-          overview: item.overview ?? null,
-          posterPath: item.poster ?? null,
-          backdropPath: item.backdrop ?? null,
-          rating: item.rating ?? null,
-          status: null,
-          genres: null,
-          numberOfSeasons: null,
-          seasonsJson: null,
-          lastRefreshedAt: now,
-          createdAt: now,
-        }).onConflictDoNothing().catch(() => {})
+        db.insert(tvMetadata)
+          .values({
+            id: item.id,
+            provider: 'tmdb',
+            title: item.title,
+            year: item.year ?? null,
+            overview: item.overview ?? null,
+            posterPath: item.poster ?? null,
+            backdropPath: item.backdrop ?? null,
+            rating: item.rating ?? null,
+            status: null,
+            genres: null,
+            numberOfSeasons: null,
+            seasonsJson: null,
+            lastRefreshedAt: now,
+            createdAt: now,
+          })
+          .onConflictDoNothing()
+          .catch(() => {})
       } else if (item.type === 'book') {
-        db.insert(bookMetadata).values({
-          id: item.id,
-          provider: 'openlibrary',
-          title: item.title,
-          author: item.author ?? null,
-          authorId: null,
-          year: item.year ?? null,
-          overview: item.overview ?? null,
-          coverUrl: item.poster ?? null,
-          subjects: null,
-          isbn: null,
-          pageCount: null,
-          lastRefreshedAt: now,
-          createdAt: now,
-        }).onConflictDoNothing().catch(() => {})
+        db.insert(bookMetadata)
+          .values({
+            id: item.id,
+            provider: 'openlibrary',
+            title: item.title,
+            author: item.author ?? null,
+            authorId: null,
+            year: item.year ?? null,
+            overview: item.overview ?? null,
+            coverUrl: item.poster ?? null,
+            subjects: null,
+            isbn: null,
+            pageCount: null,
+            lastRefreshedAt: now,
+            createdAt: now,
+          })
+          .onConflictDoNothing()
+          .catch(() => {})
       }
     }
   }
@@ -447,20 +476,29 @@ export class MetadataStore {
   // --- Background refresh ---
 
   private refreshMovieInBackground(tmdbId: string): void {
-    this.upstream.getMovieDetails(tmdbId)
-      .then((details) => { if (details) this.storeMovie(details) })
+    this.upstream
+      .getMovieDetails(tmdbId)
+      .then((details) => {
+        if (details) this.storeMovie(details)
+      })
       .catch((err) => logger.warn({ tmdbId, error: err }, 'Background movie refresh failed'))
   }
 
   private refreshTvInBackground(tmdbId: string): void {
-    this.upstream.getTvDetails(tmdbId)
-      .then((details) => { if (details) this.storeTv(details) })
+    this.upstream
+      .getTvDetails(tmdbId)
+      .then((details) => {
+        if (details) this.storeTv(details)
+      })
       .catch((err) => logger.warn({ tmdbId, error: err }, 'Background TV refresh failed'))
   }
 
   private refreshBookInBackground(workId: string): void {
-    this.upstream.getBookDetails(workId)
-      .then((details) => { if (details) this.storeBook(details) })
+    this.upstream
+      .getBookDetails(workId)
+      .then((details) => {
+        if (details) this.storeBook(details)
+      })
       .catch((err) => logger.warn({ workId, error: err }, 'Background book refresh failed'))
   }
 

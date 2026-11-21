@@ -40,7 +40,7 @@ libraryRouter.get('/collections/:tmdbCollectionId', async (c) => {
     return c.json({ error: 'Authentication required' }, 401)
   }
 
-  const tmdbCollectionId = parseInt(c.req.param('tmdbCollectionId'), 10)
+  const tmdbCollectionId = Number.parseInt(c.req.param('tmdbCollectionId'), 10)
   if (isNaN(tmdbCollectionId)) {
     return c.json({ error: 'Invalid collection ID' }, 400)
   }
@@ -112,7 +112,7 @@ libraryRouter.get('/tv/:tmdbId/season/:seasonNumber', async (c) => {
   }
 
   const tmdbId = c.req.param('tmdbId')
-  const seasonNumber = parseInt(c.req.param('seasonNumber'), 10)
+  const seasonNumber = Number.parseInt(c.req.param('seasonNumber'), 10)
 
   if (isNaN(seasonNumber)) {
     return c.json({ error: 'Invalid season number' }, 400)

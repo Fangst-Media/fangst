@@ -1,6 +1,6 @@
+import type { MetadataRelayClient } from './metadata-relay'
 import type { TmdbClient } from './tmdb'
 import type { TvdbClient } from './tvdb'
-import type { MetadataRelayClient } from './metadata-relay'
 
 export type MetadataResult = {
   id: string
@@ -41,7 +41,11 @@ export class MetadataProvider {
     this.clients = clients || {}
   }
 
-  async search(query: string, year?: number, type?: 'movie' | 'tv'): Promise<MetadataResult | null> {
+  async search(
+    query: string,
+    year?: number,
+    type?: 'movie' | 'tv'
+  ): Promise<MetadataResult | null> {
     for (const provider of this.providerOrder) {
       try {
         const result = await this.searchWithProvider(provider, query, year, type)
@@ -92,7 +96,8 @@ export class MetadataProvider {
 
     if (provider === 'tmdb') {
       const tmdbClient = client as TmdbClient
-      const searchMethod = type === 'movie' ? 'searchMovie' : type === 'tv' ? 'searchTv' : 'searchMulti'
+      const searchMethod =
+        type === 'movie' ? 'searchMovie' : type === 'tv' ? 'searchTv' : 'searchMulti'
       const result = await tmdbClient[searchMethod](query, year)
 
       if (result.results.length === 0) return null

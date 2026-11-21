@@ -1,8 +1,8 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
-import { configService } from '../services/config'
-import type { SettingsUpdate, SettingsResponse } from '@jaeger/shared/types/settings'
-import type { User } from '../services/auth'
+import type { SettingsResponse, SettingsUpdate } from '@jaeger/shared/types/settings'
 import { logger } from '../lib/logger'
+import type { User } from '../services/auth'
+import { configService } from '../services/config'
 
 type AuthEnv = {
   Variables: {
@@ -19,10 +19,9 @@ function maskApiKey(key: string): string {
 
 async function validateTmdbApiKey(apiKey: string): Promise<boolean> {
   try {
-    const response = await fetch(
-      `https://api.themoviedb.org/3/configuration?api_key=${apiKey}`,
-      { signal: AbortSignal.timeout(5000) }
-    )
+    const response = await fetch(`https://api.themoviedb.org/3/configuration?api_key=${apiKey}`, {
+      signal: AbortSignal.timeout(5000),
+    })
     return response.ok
   } catch (error) {
     logger.error({ error }, 'Failed to validate TMDB API key')

@@ -50,7 +50,10 @@ type RequestsResponse = {
   requests: MediaRequest[]
 }
 
-async function fetchRequestByTmdbId(tmdbId: string, type: 'movie' | 'tv'): Promise<MediaRequest | null> {
+async function fetchRequestByTmdbId(
+  tmdbId: string,
+  type: 'movie' | 'tv'
+): Promise<MediaRequest | null> {
   try {
     const data = await apiFetch<RequestsResponse>(`/api/requests?tmdbId=${tmdbId}&type=${type}`)
     return data.requests[0] ?? null
@@ -59,9 +62,14 @@ async function fetchRequestByTmdbId(tmdbId: string, type: 'movie' | 'tv'): Promi
   }
 }
 
-async function fetchBookRequest(openLibraryId: string, format: 'ebook' | 'audiobook'): Promise<MediaRequest | null> {
+async function fetchBookRequest(
+  openLibraryId: string,
+  format: 'ebook' | 'audiobook'
+): Promise<MediaRequest | null> {
   try {
-    const data = await apiFetch<RequestsResponse>(`/api/requests?openLibraryId=${openLibraryId}&type=book`)
+    const data = await apiFetch<RequestsResponse>(
+      `/api/requests?openLibraryId=${openLibraryId}&type=book`
+    )
     return data.requests.find((r) => r.format === format) ?? null
   } catch {
     return null

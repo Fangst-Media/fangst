@@ -1,8 +1,14 @@
-import { configService } from './config'
-import { NewznabClient, type NewznabSearchParams } from '@jaeger/shared/clients/newznab'
-import type { SearchResult, SearchRequest, SearchResponse, Indexer, ParsedReleaseInfo } from '@jaeger/shared/types/indexer'
 import { parseReleaseName } from '@jaeger/parser'
+import { NewznabClient, type NewznabSearchParams } from '@jaeger/shared/clients/newznab'
 import { isReleaseTooSmall } from '@jaeger/shared/lib/size-filter'
+import type {
+  Indexer,
+  ParsedReleaseInfo,
+  SearchRequest,
+  SearchResponse,
+  SearchResult,
+} from '@jaeger/shared/types/indexer'
+import { configService } from './config'
 
 interface SearchError {
   indexer: string
@@ -71,7 +77,13 @@ export class SearchService {
     const sizeFilterConfig = configService.get().sizeFilter
     const filteredResults = request.runtime
       ? parsedResults.filter(
-          (result) => !isReleaseTooSmall(result.size, request.runtime!, result.parsed?.resolution, sizeFilterConfig)
+          (result) =>
+            !isReleaseTooSmall(
+              result.size,
+              request.runtime!,
+              result.parsed?.resolution,
+              sizeFilterConfig
+            )
         )
       : parsedResults
 

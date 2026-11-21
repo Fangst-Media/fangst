@@ -1,6 +1,6 @@
-import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
+import { useState } from 'react'
 import { apiFetch } from '../lib/api-client'
 
 type SeasonProgress = {
@@ -66,7 +66,13 @@ export default function TvSeriesPage({ tmdbId }: { tmdbId: string }) {
       <div className="flex min-h-screen items-center justify-center p-4">
         <div className="rounded-lg bg-card border border-border p-6 max-w-md text-center">
           <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4">
-            <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg
+              aria-hidden="true"
+              className="w-6 h-6 text-red-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -196,9 +202,7 @@ export default function TvSeriesPage({ tmdbId }: { tmdbId: string }) {
             .filter((s) => s.seasonNumber > 0)
             .map((season) => {
               const seasonProgress =
-                season.episodeCount > 0
-                  ? (season.downloadedCount / season.episodeCount) * 100
-                  : 0
+                season.episodeCount > 0 ? (season.downloadedCount / season.episodeCount) * 100 : 0
 
               return (
                 <Link
@@ -213,6 +217,7 @@ export default function TvSeriesPage({ tmdbId }: { tmdbId: string }) {
                         {season.name}
                       </h3>
                       <svg
+                        aria-hidden="true"
                         className="w-4 h-4 text-muted group-hover:text-accent transition-colors"
                         fill="none"
                         stroke="currentColor"
@@ -268,9 +273,7 @@ export default function TvSeriesPage({ tmdbId }: { tmdbId: string }) {
               .filter((s) => s.seasonNumber === 0)
               .map((season) => {
                 const seasonProgress =
-                  season.episodeCount > 0
-                    ? (season.downloadedCount / season.episodeCount) * 100
-                    : 0
+                  season.episodeCount > 0 ? (season.downloadedCount / season.episodeCount) * 100 : 0
 
                 return (
                   <Link
@@ -285,6 +288,7 @@ export default function TvSeriesPage({ tmdbId }: { tmdbId: string }) {
                           {season.name}
                         </h3>
                         <svg
+                          aria-hidden="true"
                           className="w-4 h-4 text-muted group-hover:text-accent transition-colors"
                           fill="none"
                           stroke="currentColor"

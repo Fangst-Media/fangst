@@ -1,4 +1,4 @@
-import { eq, and, sql } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { db } from '../db'
 import { episodes, requests } from '../db/schema'
 
@@ -291,7 +291,10 @@ export class EpisodeService {
     const totalEpisodes = allEps.length
     const downloadedEpisodes = allEps.filter((ep) => ep.status === 'completed').length
 
-    await db.update(requests).set({ totalEpisodes, downloadedEpisodes }).where(eq(requests.id, requestId))
+    await db
+      .update(requests)
+      .set({ totalEpisodes, downloadedEpisodes })
+      .where(eq(requests.id, requestId))
   }
 
   async updateRequestSeriesStatus(

@@ -27,7 +27,14 @@ const serviceColors: Record<string, string> = {
   PMTP: 'bg-blue-700',
 }
 
-export function QualityBadges({ hdr, audioCodec, streamingService, isRemux, proper, repack }: QualityBadgesProps) {
+export function QualityBadges({
+  hdr,
+  audioCodec,
+  streamingService,
+  isRemux,
+  proper,
+  repack,
+}: QualityBadgesProps) {
   const badges: { label: string; bg: string }[] = []
 
   if (hdr && hdrConfig[hdr]) {

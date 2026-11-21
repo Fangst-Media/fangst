@@ -1,13 +1,13 @@
-import type { ParsedReleaseInfo } from '@jaeger/shared/types/indexer'
 import type { TvSeriesDetails } from '@jaeger/shared/schemas/metadata'
+import type { ParsedReleaseInfo } from '@jaeger/shared/types/indexer'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import {
-  MonitoringPresetSelector,
   type MonitoringPreset,
+  MonitoringPresetSelector,
 } from '../../components/MonitoringPresetSelector'
 import { QualityDetails, QualitySummary } from '../../components/quality'
-import { movieLanes, tvLanes, collections, apiFetch, apiPost } from '../../lib/api-client'
+import { apiFetch, apiPost, collections, movieLanes, tvLanes } from '../../lib/api-client'
 
 export type SearchResult = {
   id: string
@@ -110,7 +110,10 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
 }
 
-function matchesQualityFilter(parsed: ParsedReleaseInfo | undefined, filter: QualityFilter): boolean {
+function matchesQualityFilter(
+  parsed: ParsedReleaseInfo | undefined,
+  filter: QualityFilter
+): boolean {
   if (filter === 'all') return true
   if (!parsed?.resolution) return false
   return parsed.resolution === filter
@@ -208,7 +211,11 @@ export function ReleaseModal({
       if (media.type === 'movie') {
         if (movieDetails?.imdbId) {
           setImdbId(movieDetails.imdbId)
-          return searchIndexers({ imdbId: movieDetails.imdbId, type: 'movie', runtime: movieDetails.runtime })
+          return searchIndexers({
+            imdbId: movieDetails.imdbId,
+            type: 'movie',
+            runtime: movieDetails.runtime,
+          })
         }
         const query = media.year ? `${media.title} ${media.year}` : media.title
         return searchIndexers({ query, type: 'movie', runtime: movieDetails?.runtime })
@@ -285,7 +292,9 @@ export function ReleaseModal({
     }
 
     queryClient.invalidateQueries({ queryKey: ['requests'] })
-    setSuccessMessage(`Added ${collectionDetails.movies.length} movies from "${collectionDetails.name}" to requests!`)
+    setSuccessMessage(
+      `Added ${collectionDetails.movies.length} movies from "${collectionDetails.name}" to requests!`
+    )
     setTimeout(() => {
       setSuccessMessage(null)
       onClose()
@@ -380,6 +389,7 @@ export function ReleaseModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={onClose}
       onKeyDown={(e) => e.key === 'Escape' && onClose()}
+      // biome-ignore lint/a11y/useSemanticElements: a native <dialog> only blocks the page through showModal(); this overlay is rendered conditionally instead
       role="dialog"
       aria-modal="true"
       aria-labelledby="release-modal-title"
@@ -392,7 +402,11 @@ export function ReleaseModal({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div>
-            <h2 id="release-modal-title" className="text-lg font-semibold text-foreground truncate" title={`${media.title}${media.year ? ` (${media.year})` : ''}`}>
+            <h2
+              id="release-modal-title"
+              className="text-lg font-semibold text-foreground truncate"
+              title={`${media.title}${media.year ? ` (${media.year})` : ''}`}
+            >
               {media.title}
               {media.year && <span className="text-muted ml-2">({media.year})</span>}
             </h2>
@@ -410,8 +424,19 @@ export function ReleaseModal({
                 className="p-2 rounded-md text-muted hover:text-foreground hover:bg-background transition-colors"
                 title="Switch to simple mode"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h8m-8 6h16" />
+                <svg
+                  aria-hidden="true"
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 6h16M4 12h8m-8 6h16"
+                  />
                 </svg>
               </button>
             )}
@@ -799,7 +824,10 @@ export function ReleaseModal({
                             </div>
                             <div className="text-sm text-muted">{result.grabs ?? '-'}</div>
                             <div className="flex items-center justify-between gap-2">
-                              <span className="text-sm text-muted" title={formatFullAge(result.pubDate)}>
+                              <span
+                                className="text-sm text-muted"
+                                title={formatFullAge(result.pubDate)}
+                              >
                                 {formatCompactAge(result.pubDate)}
                               </span>
                               <button

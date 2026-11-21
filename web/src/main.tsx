@@ -1,32 +1,39 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
-import { RouterProvider, createRouter, createRootRoute, createRoute, Outlet, Navigate } from '@tanstack/react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import {
+  Navigate,
+  Outlet,
+  RouterProvider,
+  createRootRoute,
+  createRoute,
+  createRouter,
+} from '@tanstack/react-router'
+import { AdminLayout } from './components/AdminLayout'
+import { Layout } from './components/Layout'
 import { AuthProvider, useAuth } from './lib/auth'
 import { ConnectionProvider } from './lib/connection'
-import { Layout } from './components/Layout'
-import { AdminLayout } from './components/AdminLayout'
-import Login from './routes/login'
-import Home from './routes/home'
-import Movies from './routes/movies'
-import TvShows from './routes/tv-shows'
-import Books from './routes/books'
-import BookDetail from './routes/book-detail'
-import Search from './routes/search'
-import Library from './routes/library'
-import MediaDetails from './routes/media-details'
-import TvSeriesPage from './routes/tv-series'
-import SeasonPage from './routes/season'
-import CollectionPage from './routes/collection'
-import RequestsList from './routes/requests-list'
-import Calendar from './routes/calendar'
-import Dashboard from './routes/dashboard'
 import Activity from './routes/activity'
-import Indexers from './routes/indexers'
+import BookDetail from './routes/book-detail'
+import Books from './routes/books'
+import Calendar from './routes/calendar'
+import CollectionPage from './routes/collection'
+import Dashboard from './routes/dashboard'
 import Downloaders from './routes/downloaders'
-import Settings from './routes/settings'
+import Home from './routes/home'
+import Indexers from './routes/indexers'
+import Library from './routes/library'
+import Login from './routes/login'
+import MediaDetails from './routes/media-details'
 import MovieDetail from './routes/movie-detail'
+import Movies from './routes/movies'
+import RequestsList from './routes/requests-list'
+import Search from './routes/search'
+import SeasonPage from './routes/season'
+import Settings from './routes/settings'
+import TvSeriesPage from './routes/tv-series'
+import TvShows from './routes/tv-shows'
 
 const queryClient = new QueryClient()
 
@@ -56,7 +63,10 @@ function IndexRedirect() {
   )
 }
 
-function ProtectedRoute({ children, adminOnly = false }: { children: React.ReactNode; adminOnly?: boolean }) {
+function ProtectedRoute({
+  children,
+  adminOnly = false,
+}: { children: React.ReactNode; adminOnly?: boolean }) {
   const { user, isLoading, isAdmin } = useAuth()
 
   if (isLoading) {
@@ -257,7 +267,7 @@ const seasonRoute = createRoute({
     const { tmdbId, seasonNumber } = seasonRoute.useParams()
     return (
       <ProtectedRoute>
-        <SeasonPage tmdbId={tmdbId} seasonNumber={parseInt(seasonNumber, 10)} />
+        <SeasonPage tmdbId={tmdbId} seasonNumber={Number.parseInt(seasonNumber, 10)} />
       </ProtectedRoute>
     )
   },

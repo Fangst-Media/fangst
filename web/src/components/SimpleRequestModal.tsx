@@ -1,8 +1,8 @@
 import type { TvSeriesDetails } from '@jaeger/shared/schemas/metadata'
-import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { movieLanes, tvLanes, collections, apiPost } from '../lib/api-client'
-import { MonitoringPresetSelector, type MonitoringPreset } from './MonitoringPresetSelector'
+import { useState } from 'react'
+import { apiPost, collections, movieLanes, tvLanes } from '../lib/api-client'
+import { type MonitoringPreset, MonitoringPresetSelector } from './MonitoringPresetSelector'
 
 type SearchResult = {
   id: string
@@ -143,7 +143,9 @@ export function SimpleRequestModal({
     }
 
     queryClient.invalidateQueries({ queryKey: ['requests'] })
-    setSuccessMessage(`Added ${collectionDetails.movies.length} movies from "${collectionDetails.name}"!`)
+    setSuccessMessage(
+      `Added ${collectionDetails.movies.length} movies from "${collectionDetails.name}"!`
+    )
     setTimeout(() => {
       setSuccessMessage(null)
       onClose()
@@ -155,6 +157,7 @@ export function SimpleRequestModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={onClose}
       onKeyDown={(e) => e.key === 'Escape' && onClose()}
+      // biome-ignore lint/a11y/useSemanticElements: a native <dialog> only blocks the page through showModal(); this overlay is rendered conditionally instead
       role="dialog"
       aria-modal="true"
       aria-labelledby="simple-request-title"
@@ -172,7 +175,11 @@ export function SimpleRequestModal({
             className="w-16 h-24 rounded object-cover bg-background"
           />
           <div className="flex-1 min-w-0">
-            <h2 id="simple-request-title" className="font-semibold text-foreground truncate" title={`${media.title}${media.year ? ` (${media.year})` : ''}`}>
+            <h2
+              id="simple-request-title"
+              className="font-semibold text-foreground truncate"
+              title={`${media.title}${media.year ? ` (${media.year})` : ''}`}
+            >
               {media.title}
             </h2>
             {media.year && <p className="text-sm text-muted mt-0.5">({media.year})</p>}
@@ -187,8 +194,19 @@ export function SimpleRequestModal({
               className="self-start p-1.5 rounded-md text-muted hover:text-foreground hover:bg-background transition-colors"
               title="Switch to detailed mode"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+              <svg
+                aria-hidden="true"
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 6h16M4 12h16M4 18h7"
+                />
               </svg>
             </button>
           )}
@@ -209,7 +227,10 @@ export function SimpleRequestModal({
         {/* Season selector for TV shows */}
         {media.type === 'tv' && (
           <div className="p-4 pb-0">
-            <label htmlFor="season-select" className="block text-sm font-medium text-foreground mb-2">
+            <label
+              htmlFor="season-select"
+              className="block text-sm font-medium text-foreground mb-2"
+            >
               Season
             </label>
             {isLoadingTvDetails ? (
@@ -221,7 +242,9 @@ export function SimpleRequestModal({
               <select
                 id="season-select"
                 value={selectedSeason ?? 'all'}
-                onChange={(e) => setSelectedSeason(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+                onChange={(e) =>
+                  setSelectedSeason(e.target.value === 'all' ? 'all' : Number(e.target.value))
+                }
                 className="w-full rounded-md bg-background border border-border px-3 py-2.5 text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
               >
                 <option value="all">All Seasons</option>
@@ -251,7 +274,10 @@ export function SimpleRequestModal({
 
         {/* Quality selector */}
         <div className="p-4">
-          <label htmlFor="quality-select" className="block text-sm font-medium text-foreground mb-2">
+          <label
+            htmlFor="quality-select"
+            className="block text-sm font-medium text-foreground mb-2"
+          >
             Preferred Quality
           </label>
           <select

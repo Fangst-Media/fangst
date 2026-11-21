@@ -1,7 +1,7 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
-import { configService } from '../services/config'
 import { SABnzbdClient } from '@jaeger/shared/clients/sabnzbd'
 import type { User } from '../services/auth'
+import { configService } from '../services/config'
 
 type AuthEnv = {
   Variables: {
@@ -37,10 +37,7 @@ activity.get('/', async (c) => {
       if (downloader.type === 'sabnzbd') {
         const client = new SABnzbdClient(downloader.url, downloader.apiKey)
         try {
-          const [queue, history] = await Promise.all([
-            client.getQueue(),
-            client.getHistory(10),
-          ])
+          const [queue, history] = await Promise.all([client.getQueue(), client.getHistory(10)])
           return {
             downloader: downloader.name,
             downloaderId: downloader.id,
@@ -92,10 +89,12 @@ activity.get('/', async (c) => {
     queue: results.flatMap((r) => r.queue),
     history: results.flatMap((r) => r.history),
     stats: results.find((r) => r.stats)?.stats ?? null,
-    errors: results.filter((r) => r.error).map((r) => ({
-      downloader: r.downloader,
-      error: r.error,
-    })),
+    errors: results
+      .filter((r) => r.error)
+      .map((r) => ({
+        downloader: r.downloader,
+        error: r.error,
+      })),
   }
 
   return c.json(combined)

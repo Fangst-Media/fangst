@@ -1,15 +1,15 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
+import {
+  collectionDetailsSchema,
+  movieDetailsSchema,
+  tvSeriesDetailsSchema,
+} from '@jaeger/shared/schemas/metadata'
+import { createDetailRoute, createLaneRoute, createSearchRoute } from '../lib/openapi-helpers'
 import type { User } from '../services/auth'
 import { configService } from '../services/config'
 import { indexerTrendingService } from '../services/indexer-trending'
 import { getMetadataService } from '../services/metadata'
 import { MetadataStore } from '../services/metadata-store'
-import {
-  movieDetailsSchema,
-  tvSeriesDetailsSchema,
-  collectionDetailsSchema,
-} from '@jaeger/shared/schemas/metadata'
-import { createLaneRoute, createSearchRoute, createDetailRoute } from '../lib/openapi-helpers'
 
 type AuthEnv = {
   Variables: {
@@ -97,7 +97,9 @@ metadata.openapi(
 
 // --- Search (must be before :id routes) ---
 
-function searchHandler(searchFn: (store: MetadataStore, query: string) => Promise<unknown[] | null>) {
+function searchHandler(
+  searchFn: (store: MetadataStore, query: string) => Promise<unknown[] | null>
+) {
   return async (c: any) => {
     const user = c.get('user')
     if (!requireAuth(user)) return c.json({ error: 'Authentication required' }, 401)
@@ -142,8 +144,13 @@ function detailHandler(fetchFn: (store: MetadataStore, id: string) => Promise<un
 }
 
 metadata.openapi(
-  createDetailRoute('/tmdb/collections/{id}', collectionDetailsSchema, 'Get collection details', 'Collections'),
-  detailHandler((s, id) => s.getCollectionDetails(parseInt(id, 10)))
+  createDetailRoute(
+    '/tmdb/collections/{id}',
+    collectionDetailsSchema,
+    'Get collection details',
+    'Collections'
+  ),
+  detailHandler((s, id) => s.getCollectionDetails(Number.parseInt(id, 10)))
 )
 
 metadata.openapi(
@@ -173,7 +180,11 @@ function indexerTrendingHandler(mediaType: 'movie' | 'tv') {
 }
 
 metadata.openapi(
-  createLaneRoute('/indexer/trending/movies', 'Get trending movies from indexers', 'Indexer Trending'),
+  createLaneRoute(
+    '/indexer/trending/movies',
+    'Get trending movies from indexers',
+    'Indexer Trending'
+  ),
   indexerTrendingHandler('movie')
 )
 

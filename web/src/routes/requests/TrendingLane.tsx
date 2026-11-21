@@ -1,6 +1,6 @@
 import type { MetadataResult } from '@jaeger/shared/schemas/metadata'
-import { useRef } from 'react'
 import { useNavigate } from '@tanstack/react-router'
+import { useRef } from 'react'
 
 export type TrendingItem = MetadataResult
 
@@ -11,7 +11,7 @@ function isNotReleased(releaseDate?: string): boolean {
 }
 
 function formatReleaseDate(releaseDate: string): string {
-  const date = new Date(releaseDate + 'T00:00:00')
+  const date = new Date(`${releaseDate}T00:00:00`)
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
@@ -42,7 +42,12 @@ export function TrendingLane({
       onSelect(item)
       return
     }
-    const path = item.type === 'book' ? `/book/${item.id}` : item.type === 'movie' ? `/movie/${item.id}` : `/tv/${item.id}`
+    const path =
+      item.type === 'book'
+        ? `/book/${item.id}`
+        : item.type === 'movie'
+          ? `/movie/${item.id}`
+          : `/tv/${item.id}`
     navigate({ to: path })
   }
 
@@ -57,7 +62,13 @@ export function TrendingLane({
           onClick={() => scroll('left')}
           className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-background/80 border border-border flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-card"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg
+            aria-hidden="true"
+            className="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -81,7 +92,11 @@ export function TrendingLane({
               <div className="relative aspect-[2/3] rounded-lg overflow-hidden bg-card border border-border group-hover/card:border-accent/50 transition-colors">
                 {item.poster ? (
                   <img
-                    src={item.poster.startsWith('http') ? item.poster : `https://image.tmdb.org/t/p/w342${item.poster}`}
+                    src={
+                      item.poster.startsWith('http')
+                        ? item.poster
+                        : `https://image.tmdb.org/t/p/w342${item.poster}`
+                    }
                     alt={item.title}
                     className="w-full h-full object-cover"
                     loading="lazy"
@@ -89,6 +104,7 @@ export function TrendingLane({
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-card">
                     <svg
+                      aria-hidden="true"
                       className="w-8 h-8 text-muted"
                       fill="none"
                       stroke="currentColor"
@@ -123,7 +139,13 @@ export function TrendingLane({
           onClick={() => scroll('right')}
           className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-background/80 border border-border flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-card"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg
+            aria-hidden="true"
+            className="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
         </button>
