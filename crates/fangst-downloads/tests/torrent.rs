@@ -158,15 +158,17 @@ impl Swarm {
 fn service(store: Store, root: &Path, engine: Engine) -> Service {
     let runner = Runner {
         store,
-        pool: Arc::new(fangst_nntp::Pool::new(fangst_nntp::ServerConfig {
-            host: "127.0.0.1".to_owned(),
-            port: 0,
-            tls: None,
-            credentials: None,
-            max_connections: 1,
-            connect_timeout: Duration::from_secs(1),
-            command_timeout: Duration::from_secs(1),
-        })),
+        servers: vec![fangst_usenet::Server::primary(Arc::new(
+            fangst_nntp::Pool::new(fangst_nntp::ServerConfig {
+                host: "127.0.0.1".to_owned(),
+                port: 0,
+                tls: None,
+                credentials: None,
+                max_connections: 1,
+                connect_timeout: Duration::from_secs(1),
+                command_timeout: Duration::from_secs(1),
+            }),
+        ))],
         root: root.to_owned(),
         options: fangst_usenet::Options {
             connections: 1,

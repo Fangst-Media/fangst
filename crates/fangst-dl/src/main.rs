@@ -200,7 +200,9 @@ async fn serve(args: ServeArgs) -> anyhow::Result<ExitCode> {
     let runner = fangst_downloads::Runner {
         store,
         // Without a server the queue still accepts jobs; they wait until one is configured.
-        pool: Arc::new(pool.unwrap_or_else(|| Pool::new(placeholder_server()))),
+        servers: vec![fangst_usenet::Server::primary(Arc::new(
+            pool.unwrap_or_else(|| Pool::new(placeholder_server())),
+        ))],
         root: args.data_dir.join("downloads"),
         options: args.usenet.options(),
     };

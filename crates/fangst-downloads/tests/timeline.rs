@@ -9,15 +9,17 @@ use fangst_nntp::{Pool, ServerConfig};
 fn runner(store: Store, server: &MockServer, root: &std::path::Path) -> Runner {
     Runner {
         store,
-        pool: Arc::new(Pool::new(ServerConfig {
-            host: "127.0.0.1".to_owned(),
-            port: server.addr.port(),
-            tls: None,
-            credentials: None,
-            max_connections: 2,
-            connect_timeout: Duration::from_secs(5),
-            command_timeout: Duration::from_secs(5),
-        })),
+        servers: vec![fangst_usenet::Server::primary(Arc::new(Pool::new(
+            ServerConfig {
+                host: "127.0.0.1".to_owned(),
+                port: server.addr.port(),
+                tls: None,
+                credentials: None,
+                max_connections: 2,
+                connect_timeout: Duration::from_secs(5),
+                command_timeout: Duration::from_secs(5),
+            },
+        )))],
         root: root.to_owned(),
         options: fangst_usenet::Options {
             connections: 2,
@@ -49,11 +51,18 @@ async fn completed_job_has_a_full_timeline() {
         .unwrap();
 
     let events = store.timeline(id).await.unwrap();
-    assert_eq!(kinds(&events), ["added", "status", "file", "status"]);
+    assert_eq!(
+        kinds(&events),
+        ["added", "status", "file", "server", "status"]
+    );
     assert_eq!(events[0].message, "added with 1 files, 20000 bytes");
     assert_eq!(events[1].message, "downloading");
     assert_eq!(events[2].message, "a.bin: 4 of 4 segments stored");
-    assert_eq!(events[3].message, "completed");
+    assert_eq!(
+        events[3].message,
+        "server 127.0.0.1: served 4 segments, missing 0"
+    );
+    assert_eq!(events[4].message, "completed");
 }
 
 #[tokio::test]
@@ -119,4 +128,55 @@ async fn interrupted_job_records_requeue_and_resume() {
             .any(|e| e.message == "queued: the previous run stopped before this job finished")
     );
     assert_eq!(store.get(id).await.unwrap().status, Status::Completed);
+}
+
+#[tokio::test]
+async fn timeline_names_which_server_served_and_missed() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut library = Library::new();
+    let ids = library.add_file("d.bin", &vec![5u8; 20_000], 5000, "g");
+    let store = Store::open(&dir.path().join("downloads.db")).await.unwrap();
+    let id = store
+        .add_nzb("backfilled", None, 0, library.nzb().as_bytes())
+        .await
+        .unwrap();
+    let primary = MockServer::start(
+        library.clone(),
+        Config {
+            missing: HashSet::from([ids[2].clone()]),
+            ..Config::default()
+        },
+    )
+    .await
+    .unwrap();
+    let backfill = MockServer::start(library, Config::default()).await.unwrap();
+    let mut job_runner = runner(store.clone(), &primary, dir.path());
+    let backfill_server = runner(store.clone(), &backfill, dir.path())
+        .servers
+        .remove(0);
+    job_runner.servers.push(fangst_usenet::Server {
+        name: "block".to_owned(),
+        backfill: true,
+        ..backfill_server
+    });
+    job_runner.servers[0].name = "main".to_owned();
+
+    job_runner.run_until_idle().await.unwrap();
+
+    assert_eq!(store.get(id).await.unwrap().status, Status::Completed);
+    let servers: Vec<String> = store
+        .timeline(id)
+        .await
+        .unwrap()
+        .into_iter()
+        .filter(|e| e.kind == "server")
+        .map(|e| e.message)
+        .collect();
+    assert_eq!(
+        servers,
+        [
+            "server main: served 3 segments, missing 1",
+            "backfill server block: served 1 segments, missing 0"
+        ]
+    );
 }

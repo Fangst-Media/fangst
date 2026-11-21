@@ -37,15 +37,17 @@ async fn harness() -> Harness {
     auth.bootstrap(KEY).await.unwrap();
     let runner = Runner {
         store,
-        pool: Arc::new(fangst_nntp::Pool::new(fangst_nntp::ServerConfig {
-            host: "127.0.0.1".to_owned(),
-            port: server.addr.port(),
-            tls: None,
-            credentials: None,
-            max_connections: 2,
-            connect_timeout: Duration::from_secs(5),
-            command_timeout: Duration::from_secs(5),
-        })),
+        servers: vec![fangst_usenet::Server::primary(Arc::new(
+            fangst_nntp::Pool::new(fangst_nntp::ServerConfig {
+                host: "127.0.0.1".to_owned(),
+                port: server.addr.port(),
+                tls: None,
+                credentials: None,
+                max_connections: 2,
+                connect_timeout: Duration::from_secs(5),
+                command_timeout: Duration::from_secs(5),
+            }),
+        ))],
         root: dir.path().join("downloads"),
         options: fangst_usenet::Options {
             connections: 2,

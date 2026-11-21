@@ -202,9 +202,9 @@ fn refuses_a_short_api_key() {
 
 #[test]
 fn committed_openapi_document_is_current() {
-    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../openapi/dl.json");
+    let path = manifest_dir().join("../../openapi/dl.json");
     let output = Command::new(env!("CARGO_BIN_EXE_fangst-dl"))
-        .args(["openapi", "--check", path])
+        .args(["openapi".as_ref(), "--check".as_ref(), path.as_os_str()])
         .output()
         .unwrap();
     assert!(
@@ -232,4 +232,13 @@ fn unknown_provider_stops_startup_with_the_reason() {
         .unwrap();
     assert!(!output.status.success());
     assert!(String::from_utf8_lossy(&output.stderr).contains("unknown provider `notify-nope`"));
+}
+
+/// The crate folder at run time. `env!("CARGO_MANIFEST_DIR")` is baked in at compile time, and a
+/// build folder shared between git worktrees can hand back a test binary built in another (perhaps
+/// deleted) worktree; cargo and nextest set the variable correctly for every run.
+fn manifest_dir() -> std::path::PathBuf {
+    std::path::PathBuf::from(
+        std::env::var("CARGO_MANIFEST_DIR").expect("run through cargo or nextest"),
+    )
 }

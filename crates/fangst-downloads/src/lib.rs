@@ -534,7 +534,8 @@ async fn backup(pool: &SqlitePool, path: &Path, pending: i64) -> Result<(), Erro
 #[derive(Clone)]
 pub struct Runner {
     pub store: Store,
-    pub pool: Arc<fangst_nntp::Pool>,
+    /// Usenet servers in priority order; backfill servers only get what every primary lacks.
+    pub servers: Vec<fangst_usenet::Server>,
     /// Folder each job gets a subfolder in.
     pub root: PathBuf,
     pub options: fangst_usenet::Options,
@@ -599,10 +600,10 @@ impl Runner {
             }),
         };
         let progress: fangst_usenet::ProgressFn = Arc::new(|_| {});
-        let result = fangst_usenet::download_resumable(
+        let result = fangst_usenet::download_from(
             &nzb,
             &out,
-            Arc::clone(&self.pool),
+            self.servers.clone(),
             self.options,
             progress,
             resume,
@@ -616,6 +617,11 @@ impl Runner {
             for file in &report.files {
                 self.store
                     .add_event(job.id, "file", &describe_file(file))
+                    .await?;
+            }
+            for server in report.servers.iter().filter(|s| s.served + s.missed > 0) {
+                self.store
+                    .add_event(job.id, "server", &describe_server(server))
                     .await?;
             }
         }
@@ -640,6 +646,14 @@ impl Runner {
             }
         }
     }
+}
+
+fn describe_server(server: &fangst_usenet::ServerReport) -> String {
+    let role = if server.backfill { "backfill " } else { "" };
+    format!(
+        "{role}server {}: served {} segments, missing {}",
+        server.name, server.served, server.missed
+    )
 }
 
 fn describe_file(file: &fangst_usenet::FileReport) -> String {
