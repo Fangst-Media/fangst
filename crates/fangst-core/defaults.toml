@@ -25,3 +25,11 @@ persist_interval_secs = 10
 max_active = 5
 # TCP port peers connect to. Forward it on the router for incoming peers.
 listen_port = 6881
+
+[extract]
+# Delete the archive files of a job once every archive in it extracted.
+delete_archives = true
+
+[safety]
+# File types that fail a job, inside an archive or lying in the job folder. No dot, any case.
+blocked_extensions = ["exe", "lnk", "scr", "bat", "cmd", "com", "pif", "vbs", "js", "msi", "ps1"]

@@ -15,7 +15,8 @@ ignore = [
 [licenses]
 confidence-threshold = 0.9
 # Every licence here is compatible with shipping the app under AGPL-3.0-or-later.
-# GPL-3.0 joins this list together with the first crate that needs it (rarpar, #19).
+# RAR extraction (#19) uses rar-rs (BSD-2-Clause) instead of rarpar, so no GPL-3.0 entry is
+# needed yet; docs/decisions/0006-archive-extraction.md says why.
 allow = [
     "AGPL-3.0-or-later",
     "Apache-2.0",

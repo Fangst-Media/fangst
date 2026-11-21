@@ -52,3 +52,27 @@ Format for each entry:
 **Symptom:** a repair could create or overwrite a file outside the job folder.
 **Cause:** file names in PAR2 FileDesc packets are untrusted, and `rust-par2` joins them onto the folder as given, including `../` and absolute paths.
 **Handled in:** `crates/fangst-postproc-par2/src/lib.rs` (`load` refuses any name that isn't a plain safe file name before verify or repair touch the disk). Covered by `names_that_leave_the_folder_are_refused`.
+
+## Archive entry names point outside the job folder
+
+**Symptom:** extracting a RAR or 7z writes a file next to or above the job folder, or replaces one there.
+**Cause:** entry names are untrusted. Posters (and attackers) use `../`, a leading `/` or `\`, a drive (`C:\`), names Windows treats as devices (`CON.mkv`), and symlink entries whose target leads out. Archive libraries clean some of these and pass others through as given.
+**Handled in:** `crates/fangst-postproc-extract/src/names.rs` (`entry_path` refuses instead of rewriting; `check_link`). The extractor applies it to every entry even with `postproc-safety` off and never creates links. Covered by `extract_refuses_unsafe_entries_on_its_own` and `safety_refuses_paths_and_links_leaving_the_job_folder` in `crates/fangst-postproc-extract/tests/archives.rs`.
+
+## A link's target is only known after decoding
+
+**Symptom:** a symlink entry passes a listing-only check and then points anywhere.
+**Cause:** RAR5 keeps a link's target in the header, but RAR4 (Unix symlinks) and 7z keep it in the entry's data, so it can't be checked without decoding the archive.
+**Handled in:** `crates/fangst-postproc-extract/src/{rar,sevenz}.rs` mark such entries `LinkTarget::Unknown`, which both providers refuse. Covered by the `malicious/symlink.7z` cases.
+
+## RAR volumes come in two naming schemes
+
+**Symptom:** only the first part of a multi-volume RAR is found, or volumes sort as `part1, part10, part2`.
+**Cause:** current posts use `name.part01.rar`, `name.part02.rar`; older ones `name.rar`, `name.r00`, `name.r01` and so on, sometimes past `.r99`. 7-Zip splits into `name.7z.001`, `name.7z.002` at arbitrary byte offsets.
+**Handled in:** `crates/fangst-postproc-extract/src/sets.rs` (`find`, ordered by the number, not the text). Covered by its unit tests and the `rar4-old-naming` and `7z-volumes` fixtures.
+
+## The RAR reader needs a bigger stack than a Windows thread has
+
+**Symptom:** `thread has overflowed its stack` while handling an encrypted RAR in a debug build on Windows.
+**Cause:** rar-rs keeps large decoder and key state on the stack; Windows gives a main thread 1 MiB.
+**Handled in:** `crates/fangst-postproc-extract/src/lib.rs` (`on_worker` runs every archive step on its own thread with an 8 MiB stack). The fixture generator in `fixtures/archives/generate` does the same.

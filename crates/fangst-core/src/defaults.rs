@@ -12,6 +12,8 @@ pub struct Defaults {
     pub disk: Disk,
     pub progress: Progress,
     pub torrent: Torrent,
+    pub extract: Extract,
+    pub safety: Safety,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -75,6 +77,19 @@ pub struct Torrent {
     pub listen_port: u16,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Extract {
+    pub delete_archives: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Safety {
+    /// Without the dot; compared ignoring case.
+    pub blocked_extensions: Vec<String>,
+}
+
 #[derive(Debug)]
 pub struct Error(toml::de::Error);
 
@@ -108,9 +123,11 @@ impl Defaults {
 mod tests {
     use super::Defaults;
 
-    const PROGRESS: &str =
-        "[progress]\npublish_interval_ms = 1\nrate_window_secs = 1\npersist_interval_secs = 1\n";
-    const TORRENT: &str = "[torrent]\nmax_active = 1\nlisten_port = 1\n";
+    /// Every section after `[disk]`, which the tests below don't vary.
+    const REST: &str = "[progress]\npublish_interval_ms = 1\nrate_window_secs = 1\npersist_interval_secs = 1\n\
+        [torrent]\nmax_active = 1\nlisten_port = 1\n\
+        [extract]\ndelete_archives = true\n\
+        [safety]\nblocked_extensions = [\"exe\"]\n";
 
     #[test]
     fn builtin_defaults_parse() {
@@ -123,28 +140,34 @@ mod tests {
         assert_eq!(defaults.progress.persist_interval_secs, 10);
         assert_eq!(defaults.torrent.max_active, 5);
         assert_eq!(defaults.torrent.listen_port, 6881);
+        assert!(defaults.extract.delete_archives);
+        assert_eq!(
+            defaults.safety.blocked_extensions,
+            [
+                "exe", "lnk", "scr", "bat", "cmd", "com", "pif", "vbs", "js", "msi", "ps1"
+            ]
+        );
     }
 
     #[test]
     fn missing_value_is_an_error() {
-        let err = Defaults::parse(&format!(
-            "[notify]\ntimeout_secs = 1\n[disk]\nmin_free_bytes = 1\n{PROGRESS}{TORRENT}"
-        ))
-        .unwrap_err();
+        let text = format!("[notify]\ntimeout_secs = 1\n[disk]\nmin_free_bytes = 1\n{REST}");
+        let err = Defaults::parse(&text).unwrap_err();
         assert!(err.to_string().contains("check_interval_secs"), "{err}");
     }
 
     #[test]
     fn misspelled_key_is_an_error() {
-        let text =
-            "[notify]\ntimeout_sec = 1\n[disk]\nmin_free_bytes = 1\ncheck_interval_secs = 1\n";
-        assert!(Defaults::parse(text).is_err());
+        let text = format!(
+            "[notify]\ntimeout_sec = 1\n[disk]\nmin_free_bytes = 1\ncheck_interval_secs = 1\n{REST}"
+        );
+        assert!(Defaults::parse(&text).is_err());
     }
 
     #[test]
     fn unknown_section_is_ignored() {
         let text = format!(
-            "[later]\nx = 1\n[notify]\ntimeout_secs = 1\n[disk]\nmin_free_bytes = 1\ncheck_interval_secs = 1\n{PROGRESS}{TORRENT}"
+            "[later]\nx = 1\n[notify]\ntimeout_secs = 1\n[disk]\nmin_free_bytes = 1\ncheck_interval_secs = 1\n{REST}"
         );
         assert_eq!(Defaults::parse(&text).unwrap().notify.timeout_secs, 1);
     }

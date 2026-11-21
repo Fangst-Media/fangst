@@ -75,3 +75,23 @@ The TCP port other peers connect to. `fangst-dl serve --torrent-port` overrides 
 - Default: `6881`
 - Range: 0 to 65535
 - Change it when the port is taken by another program, or to match a port forwarded on your router.
+
+## `[extract]`
+
+### `delete_archives`
+
+Whether the `postproc-extract` post-processor deletes a job's archive files (every volume of every RAR and 7z archive) once all of them extracted. When any archive fails, nothing is deleted and the files extracted so far are removed again, so the job can be retried.
+
+- Default: `true`
+- Range: `true` or `false`
+- Turn it off when you seed or re-share the original archives, or want to keep them until you have checked the result.
+
+## `[safety]`
+
+### `blocked_extensions`
+
+File types the `postproc-safety` post-processor refuses. A job fails, naming the file, when one of these appears inside an archive or lies in the job folder itself. Extensions are written without the dot and compared ignoring case.
+
+- Default: `["exe", "lnk", "scr", "bat", "cmd", "com", "pif", "vbs", "js", "msi", "ps1"]`
+- Range: any list, including an empty one
+- Add types you never expect in media downloads, such as `jar` or `hta`. Removing one lets that type through the check.

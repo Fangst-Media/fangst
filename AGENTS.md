@@ -87,4 +87,4 @@ CI (`.github/workflows/check.yml`) runs `just check-full` on Linux, macOS and Wi
 
 ## Legal
 
-The project is AGPL-3.0-or-later (`LICENSE`). Layer 0 crates are MIT OR Apache-2.0 so other projects can use them. Contributions come in under `CLA.md`; the name is covered by `TRADEMARKS.md`. Layer 0 crates take only permissive dependencies (MIT, Apache-2.0, BSD, ISC, Zlib, MPL-2.0). Layers 1 to 4 may also use GPL-3.0 and LGPL code, since it is compatible with AGPL-3.0 (`rarpar` is one). Ask before any other licence.
+The project is AGPL-3.0-or-later (`LICENSE`). Layer 0 crates are MIT OR Apache-2.0 so other projects can use them. Contributions come in under `CLA.md`; the name is covered by `TRADEMARKS.md`. Layer 0 crates take only permissive dependencies (MIT, Apache-2.0, BSD, ISC, Zlib, MPL-2.0). Layers 1 to 4 may also use GPL-3.0 and LGPL code, since it is compatible with AGPL-3.0. Ask before any other licence.

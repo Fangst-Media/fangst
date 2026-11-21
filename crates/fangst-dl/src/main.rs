@@ -263,13 +263,11 @@ async fn serve(args: ServeArgs) -> anyhow::Result<ExitCode> {
         );
     }
     let defaults = fangst_core::defaults::Defaults::builtin()?;
-    let available = builtin_providers(
-        &args.notify,
-        &args.enabled_providers,
-        defaults.notify.timeout(),
-        |name| std::env::var(name).ok(),
-    )?;
-    let registry = fangst_providers::Registry::build(available, &args.enabled_providers)?;
+    let enabled = with_required_providers(&args.enabled_providers);
+    let available = builtin_providers(&args.notify, &enabled, &defaults, |name| {
+        std::env::var(name).ok()
+    })?;
+    let registry = fangst_providers::Registry::build(available, &enabled)?;
     std::fs::create_dir_all(&args.data_dir)
         .with_context(|| format!("creating {}", args.data_dir.display()))?;
     let store = fangst_downloads::Store::open(&args.data_dir.join("downloads.db")).await?;
@@ -350,20 +348,52 @@ async fn serve(args: ServeArgs) -> anyhow::Result<ExitCode> {
     Ok(ExitCode::SUCCESS)
 }
 
+/// The safety check runs for every job, whatever `--enable` says: without it, extraction or a
+/// plain download could hand an executable to the media library.
+const REQUIRED_PROVIDERS: [&str; 1] = ["postproc-safety"];
+
+fn with_required_providers(enabled: &[String]) -> Vec<String> {
+    let mut all: Vec<String> = REQUIRED_PROVIDERS
+        .iter()
+        .map(|id| (*id).to_owned())
+        .collect();
+    all.extend(
+        enabled
+            .iter()
+            .filter(|id| !REQUIRED_PROVIDERS.contains(&id.as_str()))
+            .cloned(),
+    );
+    all
+}
+
 /// Every provider compiled into this binary; `--enable` picks from these. Notifiers are only built
 /// when enabled, since they need their settings.
 fn builtin_providers(
     notify: &NotifyArgs,
     enabled: &[String],
-    timeout: Duration,
+    defaults: &fangst_core::defaults::Defaults,
     env: impl Fn(&str) -> Option<String>,
 ) -> anyhow::Result<Vec<fangst_providers::Provider>> {
     let mut providers = vec![
         fangst_providers::Provider::ApiAdapter(Arc::new(fangst_adapter_sabnzbd::Sabnzbd)),
         fangst_providers::Provider::ApiAdapter(Arc::new(fangst_adapter_qbittorrent::Qbittorrent)),
     ];
-    providers.extend(notify.providers(enabled, timeout, env)?);
+    providers.extend(post_processors(defaults));
+    providers.extend(notify.providers(enabled, defaults.notify.timeout(), env)?);
     Ok(providers)
+}
+
+/// Post-processors run in this order once enabled: nothing is extracted before the safety check.
+fn post_processors(defaults: &fangst_core::defaults::Defaults) -> [fangst_providers::Provider; 2] {
+    use fangst_postproc_extract::{ExtractSettings, Extractor, SafetyCheck, SafetySettings};
+    [
+        fangst_providers::Provider::PostProcessor(Arc::new(SafetyCheck::new(SafetySettings {
+            blocked_extensions: defaults.safety.blocked_extensions.clone(),
+        }))),
+        fangst_providers::Provider::PostProcessor(Arc::new(Extractor::new(ExtractSettings {
+            delete_archives: defaults.extract.delete_archives,
+        }))),
+    ]
 }
 
 /// Notifier settings until the config file arrives (#31). Secrets are read from environment
@@ -599,7 +629,6 @@ async fn get(args: GetArgs) -> anyhow::Result<ExitCode> {
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
-    use std::time::Duration;
 
     use clap::Parser;
 
@@ -622,7 +651,7 @@ mod tests {
         let providers = builtin_providers(
             &args.notify,
             &args.enabled_providers,
-            Duration::from_secs(1),
+            &fangst_core::defaults::Defaults::builtin().unwrap(),
             |name| env.get(name).cloned(),
         )?;
         Ok(providers.iter().map(|p| p.info().id).collect())
@@ -648,10 +677,16 @@ mod tests {
 
     #[test]
     fn notifier_settings_alone_build_no_notifier() {
-        // Adapters need no settings, so they're always built; notifiers only when enabled.
+        // Adapters and post-processors need no settings, so they're always compiled in; notifiers
+        // only when enabled.
         assert_eq!(
             provider_ids(ALL_SETTINGS, ALL_ENV).unwrap(),
-            ["adapter-sabnzbd", "adapter-qbittorrent"]
+            [
+                "adapter-sabnzbd",
+                "adapter-qbittorrent",
+                "postproc-safety",
+                "postproc-extract"
+            ]
         );
     }
 
@@ -671,6 +706,8 @@ mod tests {
             [
                 "adapter-sabnzbd",
                 "adapter-qbittorrent",
+                "postproc-safety",
+                "postproc-extract",
                 "notify-webhook",
                 "notify-ntfy",
                 "notify-discord"
@@ -680,8 +717,39 @@ mod tests {
         let ntfy_only = provider_ids(&["--ntfy-topic", "fangst", "--enable", "notify-ntfy"], &[]);
         assert_eq!(
             ntfy_only.unwrap(),
-            ["adapter-sabnzbd", "adapter-qbittorrent", "notify-ntfy"]
+            [
+                "adapter-sabnzbd",
+                "adapter-qbittorrent",
+                "postproc-safety",
+                "postproc-extract",
+                "notify-ntfy"
+            ]
         );
+    }
+
+    #[test]
+    fn safety_check_runs_before_extraction_whatever_the_enable_order() {
+        let args = serve_args(&[
+            "--enable",
+            "postproc-extract",
+            "--enable",
+            "postproc-safety",
+        ]);
+        let available = builtin_providers(
+            &args.notify,
+            &args.enabled_providers,
+            &fangst_core::defaults::Defaults::builtin().unwrap(),
+            |_| None,
+        )
+        .unwrap();
+        let registry =
+            fangst_providers::Registry::build(available, &args.enabled_providers).unwrap();
+        let order: Vec<String> = registry
+            .post_processors
+            .iter()
+            .map(|p| p.info().id)
+            .collect();
+        assert_eq!(order, ["postproc-safety", "postproc-extract"]);
     }
 
     #[test]
@@ -725,5 +793,19 @@ mod tests {
     fn token_flags_need_their_setting() {
         let args = ["fangst-dl", "serve", "--ntfy-token-env", "NTFY_TOKEN"];
         assert!(Cli::try_parse_from(args).is_err());
+    }
+}
+
+#[cfg(test)]
+mod required_provider_tests {
+    use super::with_required_providers;
+
+    #[test]
+    fn safety_is_always_enabled_once() {
+        assert_eq!(with_required_providers(&[]), ["postproc-safety"]);
+        assert_eq!(
+            with_required_providers(&["postproc-extract".to_owned(), "postproc-safety".to_owned()]),
+            ["postproc-safety", "postproc-extract"]
+        );
     }
 }

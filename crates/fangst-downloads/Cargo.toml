@@ -25,6 +25,7 @@ tokio = { version = "1.54.1", features = ["sync", "fs", "rt", "time", "macros"] 
 
 [dev-dependencies]
 fangst-bench = { path = "../../tools/fangst-bench" }
+fangst-postproc-extract = { path = "../fangst-postproc-extract" }
 sqlx = { version = "0.9.1", default-features = false, features = ["runtime-tokio", "sqlite"] }
 tempfile = "3.27.0"
 tokio = { version = "1.54.1", features = ["rt-multi-thread"] }
