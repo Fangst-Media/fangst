@@ -52,3 +52,29 @@ test('a job added through the API shows up live, then pauses and deletes from th
   expect(remaining.status()).toBe(200)
   expect(await remaining.json()).toEqual([])
 })
+
+test('a magnet link added in the UI becomes a queued torrent job', async ({ page }) => {
+  const apiKey = requireEnv(ENV.apiKey)
+  const webUrl = requireEnv(ENV.webUrl)
+  const jobName = `Fangst.Magnet.${Date.now()}`
+  const hash = Date.now().toString(16).padStart(40, '0')
+
+  await page.goto(`${webUrl}/downloads`)
+  await page.getByLabel('API key').fill(apiKey)
+  await page.getByRole('button', { name: 'Save key' }).click()
+  await expect(page.getByTestId('events')).toHaveText('Live')
+
+  await page.getByLabel('Magnet link').fill(`magnet:?xt=urn:btih:${hash}&dn=${jobName}`)
+  await page.getByRole('button', { name: 'Add' }).click()
+
+  // The smoke daemon runs without the torrent engine, so the job stays queued.
+  const row = page.getByTestId('job-row').filter({ hasText: jobName })
+  await expect(row).toBeVisible()
+  await expect(row.getByText('torrent', { exact: true })).toBeVisible()
+  await expect(row.getByText('Queued', { exact: true })).toBeVisible()
+  await expect(page.getByLabel('Magnet link')).toHaveValue('')
+
+  await row.getByRole('button', { name: 'Delete' }).click()
+  await row.getByRole('button', { name: 'Confirm delete' }).click()
+  await expect(row).toHaveCount(0)
+})

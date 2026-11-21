@@ -21,7 +21,7 @@ Fangst is Danish for "the catch". It's a self-hosted media platform written in R
 |---|---|
 | Usenet downloads (NNTP, yEnc, NZB, resume after restart, job timeline) | working |
 | Native HTTP API with OpenAPI, live event stream, web queue page | working |
-| Torrents | in progress |
+| Torrents (magnet links and `.torrent` files, on by default) | working |
 | PAR2 repair, unpacking, qBittorrent and SABnzbd compatibility | planned |
 | Media manager | planned |
 

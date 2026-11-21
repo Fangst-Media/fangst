@@ -37,6 +37,8 @@ fn start(enable: &[&str]) -> Daemon {
         dir.path().to_str().unwrap().to_owned(),
         "--listen".to_owned(),
         "127.0.0.1:0".to_owned(),
+        // The torrent engine isn't under test; keep it off the network.
+        "--no-torrent".to_owned(),
     ];
     for id in enable {
         args.push("--enable".to_owned());

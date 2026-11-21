@@ -422,3 +422,61 @@ async fn restart_keeps_the_pieces_already_downloaded() {
         )]
     );
 }
+
+/// A magnet link only a local tracker without peers knows never gets its metadata, so its job holds
+/// a slot until it is paused.
+fn unseeded_magnet(n: u8, tracker: &Tracker) -> String {
+    format!(
+        "magnet:?xt=urn:btih:{}&dn=Nobody.Seeds.{n}&tr={}",
+        format!("{n:02x}").repeat(20),
+        tracker.announce_url()
+    )
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn no_more_torrents_run_than_the_limit() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = Store::open(&dir.path().join("downloads.db")).await.unwrap();
+    let engine = Engine::start(config()).await.unwrap();
+    let tracker = Tracker::start().await.unwrap();
+    let service =
+        service(store.clone(), &dir.path().join("downloads"), engine).with_torrent_limit(2);
+    let mut ids = Vec::new();
+    for n in 1..=3 {
+        let link = unseeded_magnet(n, &tracker);
+        // Falling priority, so the first two are the ones that start.
+        let priority = 10 - i64::from(n);
+        ids.push(
+            service
+                .add_torrent("waits", None, priority, TorrentSource::Magnet(&link))
+                .await
+                .unwrap(),
+        );
+    }
+    let mut changes = service.subscribe();
+    let worker = tokio::spawn({
+        let service = service.clone();
+        async move { service.run().await }
+    });
+    wait_for(&store, ids[0], Status::Downloading).await;
+    wait_for(&store, ids[1], Status::Downloading).await;
+    // The lane would start the third right after the second; give it every chance to.
+    let quiet = tokio::time::timeout(Duration::from_millis(500), async {
+        while let Ok(change) = changes.recv().await {
+            if change == fangst_downloads::Change::Updated(ids[2]) {
+                return;
+            }
+        }
+    })
+    .await;
+    assert!(
+        quiet.is_err(),
+        "the third torrent changed while two were running"
+    );
+    assert_eq!(store.get(ids[2]).await.unwrap().status, Status::Queued);
+
+    service.pause(ids[0]).await.unwrap();
+    wait_for(&store, ids[2], Status::Downloading).await;
+    assert_eq!(store.get(ids[1]).await.unwrap().status, Status::Downloading);
+    worker.abort();
+}

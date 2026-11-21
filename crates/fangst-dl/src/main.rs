@@ -1,3 +1,4 @@
+use std::num::NonZeroU32;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
@@ -18,7 +19,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     /// Run the daemon: the job queue and the HTTP API.
-    Serve(ServeArgs),
+    Serve(Box<ServeArgs>),
     /// Download the files of one NZB from one usenet server, then exit.
     Get(GetArgs),
     /// Write or check the committed OpenAPI document.
@@ -129,7 +130,79 @@ struct ServeArgs {
     #[command(flatten)]
     usenet: UsenetArgs,
     #[command(flatten)]
+    torrent: TorrentArgs,
+    #[command(flatten)]
     notify: NotifyArgs,
+}
+
+/// The torrent engine. On unless `--no-torrent`; its state lives in `<data-dir>/torrent`.
+#[derive(clap::Args)]
+#[allow(clippy::struct_excessive_bools)] // Each is an independent command-line switch.
+struct TorrentArgs {
+    /// Run without the torrent engine; torrent jobs can still be added and wait in the queue.
+    #[arg(long)]
+    no_torrent: bool,
+    /// TCP port peers connect to; 0 picks a free one at every start. Defaults to
+    /// `torrent.listen_port` in the defaults file.
+    #[arg(long, value_name = "PORT")]
+    torrent_port: Option<u16>,
+    /// Port told to trackers and the DHT when peers reach this machine on another one, such as a
+    /// port forwarded by a VPN.
+    #[arg(long, value_name = "PORT")]
+    torrent_announce_port: Option<u16>,
+    /// Don't look for peers in the DHT, the tracker-less peer network.
+    #[arg(long)]
+    no_dht: bool,
+    /// Don't look for peers on the local network by multicast.
+    #[arg(long)]
+    no_local_discovery: bool,
+    /// Don't ask the router to forward the torrent port.
+    #[arg(long)]
+    no_upnp: bool,
+    /// Download limit across all torrents, in bytes per second. Unlimited when left out.
+    #[arg(long, value_name = "BYTES_PER_SEC")]
+    torrent_download_limit: Option<NonZeroU32>,
+    /// Upload limit across all torrents, in bytes per second. Unlimited when left out.
+    #[arg(long, value_name = "BYTES_PER_SEC")]
+    torrent_upload_limit: Option<NonZeroU32>,
+    /// Torrent jobs downloading at once. Defaults to `torrent.max_active` in the defaults file.
+    #[arg(long, value_name = "N", value_parser = clap::value_parser!(u32).range(1..))]
+    max_active_torrents: Option<u32>,
+}
+
+impl TorrentArgs {
+    async fn engine(
+        &self,
+        data_dir: &std::path::Path,
+        defaults: &fangst_core::defaults::Torrent,
+    ) -> anyhow::Result<Option<fangst_torrent::Engine>> {
+        if self.no_torrent {
+            return Ok(None);
+        }
+        let state_dir = data_dir.join("torrent");
+        std::fs::create_dir_all(&state_dir)
+            .with_context(|| format!("creating {}", state_dir.display()))?;
+        let port = self.torrent_port.unwrap_or(defaults.listen_port);
+        let engine = fangst_torrent::Engine::start(fangst_torrent::Config {
+            listen: (std::net::Ipv4Addr::UNSPECIFIED, port).into(),
+            announce_port: self.torrent_announce_port,
+            dht: !self.no_dht,
+            local_discovery: !self.no_local_discovery,
+            upnp: !self.no_upnp,
+            state_dir: Some(state_dir),
+            download_limit: self.torrent_download_limit,
+            upload_limit: self.torrent_upload_limit,
+        })
+        .await
+        .with_context(|| format!("starting the torrent engine on port {port}"))?;
+        Ok(Some(engine))
+    }
+
+    fn max_active(&self, defaults: &fangst_core::defaults::Torrent) -> usize {
+        self.max_active_torrents
+            .and_then(|n| usize::try_from(n).ok())
+            .unwrap_or(defaults.max_active)
+    }
 }
 
 #[derive(clap::Args)]
@@ -162,7 +235,7 @@ fn main() -> ExitCode {
         }
     };
     let result = match cli.command {
-        Command::Serve(args) => runtime.block_on(serve(args)),
+        Command::Serve(args) => runtime.block_on(serve(*args)),
         Command::Get(args) => runtime.block_on(get(args)),
         Command::Openapi(args) => openapi(&args),
         Command::ResetPassword(args) => runtime.block_on(reset_password(args)),
@@ -216,22 +289,34 @@ async fn serve(args: ServeArgs) -> anyhow::Result<ExitCode> {
         options: args.usenet.options(),
         post_processors: registry.post_processors.clone(),
     };
-    let service = fangst_downloads::Service::new(runner)
+    let mut service = fangst_downloads::Service::new(runner)
         .with_notifications(fangst_downloads::Notifications {
             notifiers: registry.notifiers.clone(),
             timeout: defaults.notify.timeout(),
             min_free_bytes: defaults.disk.min_free_bytes,
             disk_check_interval: defaults.disk.check_interval(),
         })
-        .with_progress(defaults.progress.clone());
+        .with_progress(defaults.progress.clone())
+        .with_torrent_limit(args.torrent.max_active(&defaults.torrent));
+    if !has_server {
+        service = service.without_usenet();
+    }
+    let engine = args
+        .torrent
+        .engine(&args.data_dir, &defaults.torrent)
+        .await?;
+    if let Some(engine) = &engine {
+        service = service.with_torrents(engine.clone());
+    }
 
     let listener = tokio::net::TcpListener::bind(&args.listen)
         .await
         .with_context(|| format!("listening on {}", args.listen))?;
     println!("listening on {}", listener.local_addr()?);
     if !has_server {
-        println!("no usenet server configured; jobs will wait in the queue");
+        println!("no usenet server configured; usenet jobs will wait in the queue");
     }
+    println!("{}", describe_torrents(engine.as_ref()));
     println!("{}", describe_providers(&registry));
 
     let settings = fangst_dl_api::AuthSettings {
@@ -245,9 +330,9 @@ async fn serve(args: ServeArgs) -> anyhow::Result<ExitCode> {
         fangst_dl_api::FetchLimits::default(),
         &registry.adapters,
     );
-    let worker = has_server.then(|| {
+    let worker = tokio::spawn({
         let service = service.clone();
-        tokio::spawn(async move { service.run().await })
+        async move { service.run().await }
     });
     // The client address feeds the login rate limit.
     axum::serve(
@@ -258,8 +343,9 @@ async fn serve(args: ServeArgs) -> anyhow::Result<ExitCode> {
         let _ = tokio::signal::ctrl_c().await;
     })
     .await?;
-    if let Some(worker) = worker {
-        worker.abort();
+    worker.abort();
+    if let Some(engine) = engine {
+        engine.shutdown().await;
     }
     Ok(ExitCode::SUCCESS)
 }
@@ -361,6 +447,14 @@ impl NotifyArgs {
             .into_iter()
             .map(fangst_providers::Provider::Notifier)
             .collect())
+    }
+}
+
+fn describe_torrents(engine: Option<&fangst_torrent::Engine>) -> String {
+    match engine.map(fangst_torrent::Engine::listen_addr) {
+        Some(Some(addr)) => format!("torrents: listening on {addr}"),
+        Some(None) => "torrents: on, not listening for peers".to_owned(),
+        None => "torrents: off; torrent jobs will wait in the queue".to_owned(),
     }
 }
 
@@ -513,7 +607,7 @@ mod tests {
     fn serve_args(flags: &[&str]) -> ServeArgs {
         let args = ["fangst-dl", "serve"].iter().chain(flags);
         match Cli::try_parse_from(args).unwrap().command {
-            Command::Serve(args) => args,
+            Command::Serve(args) => *args,
             _ => unreachable!(),
         }
     }

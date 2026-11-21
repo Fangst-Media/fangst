@@ -25,7 +25,7 @@ Commands marked "planned" arrive with the issue named; until then they do not ex
 | Fast gate (while coding) | `just check`: fmt, clippy, tests, TypeScript typecheck and Biome lint |
 | Full gate (before every commit and merge) | `just check-full`: adds the web build, `layercheck`, `cargo deny`, regenerate-and-diff, `just web-test`, changeset check |
 | Layer rules only | `just layercheck` (layer map in `layers.toml`) |
-| Run the download daemon | `FANGST_API_KEY=<16+ chars> cargo run -p fangst-dl -- serve --data-dir data --host news.example.com` (API on 127.0.0.1:7740; without `--host` jobs wait in the queue) |
+| Run the download daemon | `FANGST_API_KEY=<16+ chars> cargo run -p fangst-dl -- serve --data-dir data --host news.example.com` (API on 127.0.0.1:7740; without `--host` usenet jobs wait in the queue; the torrent engine is on unless `--no-torrent`) |
 | Usenet benchmark | `just bench-usenet` compares throughput, CPU per Gbit and yEnc decode speed with this machine's baseline in `bench/` (git-ignored) and fails on a regression over 15%; `just bench-baseline` records it. Not part of the gate; a nightly CI job keeps results as artifacts |
 | Update the OpenAPI document | `just openapi` after changing an API route or type; `openapi/dl.json` is committed and the gate fails when it drifts |
 | Tests | `just test` (`cargo nextest run --workspace`) |

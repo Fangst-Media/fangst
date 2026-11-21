@@ -131,6 +131,12 @@ impl Jobs for ServiceJobs {
                 .fetch(&request.url)
                 .await
                 .map_err(|e| fetch_error(&e))?;
+            if fetched.magnet.is_some() {
+                return Err(ProviderError::new(
+                    "the URL leads to a magnet link, not an NZB",
+                    false,
+                ));
+            }
             this.queue(
                 request.name,
                 fetched.file_name,

@@ -265,7 +265,7 @@
           {
             "name": "name",
             "in": "query",
-            "description": "Shown in the queue; defaults to the NZB's title.",
+            "description": "Shown in the queue; defaults to the NZB's title or the torrent's name.",
             "required": false,
             "schema": {
               "type": "string"
@@ -288,14 +288,33 @@
               "type": "integer",
               "format": "int64"
             }
+          },
+          {
+            "name": "magnet",
+            "in": "query",
+            "description": "A magnet link to add instead of a request body.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
-          "description": "The NZB file, or JSON naming a URL to fetch it from. Without `name` the job is named after the NZB's title, then the file name in the URL.",
+          "description": "An NZB file, a `.torrent` file, or JSON naming a URL to fetch either from or a magnet link. With `?magnet=` the body is ignored. Without `name` the job is named after the NZB's title or the torrent's name, then the file name in the URL.",
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AddJobUrl"
+                "$ref": "#/components/schemas/AddJobLink"
+              }
+            },
+            "application/x-bittorrent": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int32",
+                  "minimum": 0
+                }
               }
             },
             "application/x-nzb": {
@@ -322,7 +341,7 @@
             }
           },
           "400": {
-            "description": "The URL is invalid or not http(s)",
+            "description": "The JSON is invalid, or the URL is invalid or not http(s)",
             "content": {
               "application/json": {
                 "schema": {
@@ -340,8 +359,18 @@
               }
             }
           },
+          "409": {
+            "description": "The same torrent is already a job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "422": {
-            "description": "Not a valid NZB, or the fetched NZB is too large",
+            "description": "Not a valid NZB, torrent or magnet link, or the fetched file is too large",
             "content": {
               "application/json": {
                 "schema": {
@@ -617,18 +646,43 @@
   },
   "components": {
     "schemas": {
+      "AddJobLink": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/AddJobUrl"
+          },
+          {
+            "$ref": "#/components/schemas/AddJobMagnet"
+          }
+        ],
+        "description": "The JSON forms of `POST /api/v1/jobs`: exactly one of `url` or `magnet`."
+      },
+      "AddJobMagnet": {
+        "type": "object",
+        "description": "A torrent by magnet link. Only links with a v1 (`btih`) info hash are accepted.",
+        "required": [
+          "magnet"
+        ],
+        "properties": {
+          "magnet": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "AddJobUrl": {
         "type": "object",
-        "description": "An NZB for the daemon to download itself.",
+        "description": "An NZB or `.torrent` for the daemon to download itself.",
         "required": [
           "url"
         ],
         "properties": {
           "url": {
             "type": "string",
-            "description": "`http` or `https`; redirects are followed only to `http` and `https`."
+            "description": "`http` or `https`; redirects are followed only to `http` and `https`, except that a\nredirect to a magnet link adds that link. A `magnet:` link here is added as one."
           }
-        }
+        },
+        "additionalProperties": false
       },
       "ApiError": {
         "type": "object",

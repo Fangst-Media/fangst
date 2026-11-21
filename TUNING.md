@@ -57,3 +57,21 @@ How often a running job's downloaded bytes are written to the database, so the q
 - Default: `10`
 - Range: 1 or more
 - Lower it if a crash should lose less of the shown progress; the downloaded data itself is never lost by this.
+
+## `[torrent]`
+
+### `max_active`
+
+How many torrent jobs download at the same time. Further torrent jobs stay queued and start, highest priority first, when a running one finishes, fails, is paused or is deleted. A magnet link counts as running while the daemon asks peers for its file list, so a few links nobody seeds can hold every slot until you pause or delete them. Usenet jobs are not counted; they run one at a time in their own lane.
+
+- Default: `5`
+- Range: 1 or more
+- Raise it when you add many torrents with few seeders each, so slow swarms don't keep the rest waiting. Lower it on a slow line, where every extra torrent splits the same bandwidth further.
+
+### `listen_port`
+
+The TCP port other peers connect to. `fangst-dl serve --torrent-port` overrides it; `0` picks a free port at every start, which works for downloading but leaves peers behind a firewall unable to reach you.
+
+- Default: `6881`
+- Range: 0 to 65535
+- Change it when the port is taken by another program, or to match a port forwarded on your router.

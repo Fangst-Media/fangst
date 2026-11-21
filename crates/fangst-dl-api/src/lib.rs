@@ -24,7 +24,7 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::middleware;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post, put};
-use fangst_downloads::{Auth, Change, Error as QueueError, Event, Job, Service};
+use fangst_downloads::{Auth, Change, Error as QueueError, Event, Job, Service, TorrentSource};
 use serde::{Deserialize, Serialize};
 use utoipa::{OpenApi, ToSchema};
 
@@ -44,7 +44,7 @@ struct ApiState {
 #[openapi(
     info(title = "Fangst download daemon", description = "Native API of fangst-dl."),
     paths(health, auth::login, auth::logout, auth::me, auth::change_password, list_jobs, add_job, get_job, pause_job, resume_job, delete_job, job_timeline, events, test_server),
-    components(schemas(Health, JobDto, EventDto, ApiError, ChangeDto, JobStatus, JobKind, AddJobUrl, ServerTestRequest, ServerTestResult, UserDto, LoginRequest, PasswordChange)),
+    components(schemas(Health, JobDto, EventDto, ApiError, ChangeDto, JobStatus, JobKind, AddJobLink, AddJobUrl, AddJobMagnet, ServerTestRequest, ServerTestResult, UserDto, LoginRequest, PasswordChange)),
     modifiers(&ApiKeyScheme),
     security(("api_key" = []), ("session" = []))
 )]
@@ -343,36 +343,72 @@ async fn list_jobs(State(state): State<ApiState>) -> Response {
 #[derive(Deserialize, utoipa::IntoParams)]
 #[into_params(parameter_in = Query)]
 struct AddJobQuery {
-    /// Shown in the queue; defaults to the NZB's title.
+    /// Shown in the queue; defaults to the NZB's title or the torrent's name.
     name: Option<String>,
     category: Option<String>,
     /// Higher runs first.
     priority: Option<i64>,
+    /// A magnet link to add instead of a request body.
+    magnet: Option<String>,
 }
 
-/// An NZB for the daemon to download itself.
+/// An NZB or `.torrent` for the daemon to download itself.
 #[derive(Deserialize, Serialize, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub struct AddJobUrl {
-    /// `http` or `https`; redirects are followed only to `http` and `https`.
+    /// `http` or `https`; redirects are followed only to `http` and `https`, except that a
+    /// redirect to a magnet link adds that link. A `magnet:` link here is added as one.
     pub url: String,
 }
+
+/// A torrent by magnet link. Only links with a v1 (`btih`) info hash are accepted.
+#[derive(Deserialize, Serialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AddJobMagnet {
+    pub magnet: String,
+}
+
+/// The JSON forms of `POST /api/v1/jobs`: exactly one of `url` or `magnet`.
+#[derive(Deserialize, Serialize, ToSchema)]
+#[serde(untagged)]
+pub enum AddJobLink {
+    Url(AddJobUrl),
+    Magnet(AddJobMagnet),
+}
+
+/// What a request to add a job carries, once URLs are fetched.
+enum Input {
+    Nzb {
+        bytes: Vec<u8>,
+        file_name: Option<String>,
+    },
+    Torrent {
+        bytes: Vec<u8>,
+        file_name: Option<String>,
+    },
+    Magnet(String),
+}
+
+const TORRENT_TYPE: &str = "application/x-bittorrent";
 
 #[utoipa::path(
     post,
     path = "/api/v1/jobs",
     params(AddJobQuery),
     request_body(
-        description = "The NZB file, or JSON naming a URL to fetch it from. Without `name` the job is named after the NZB's title, then the file name in the URL.",
+        description = "An NZB file, a `.torrent` file, or JSON naming a URL to fetch either from or a magnet link. With `?magnet=` the body is ignored. Without `name` the job is named after the NZB's title or the torrent's name, then the file name in the URL.",
         content(
-            (AddJobUrl = "application/json"),
-            (Vec<u8> = "application/x-nzb")
+            (AddJobLink = "application/json"),
+            (Vec<u8> = "application/x-nzb"),
+            (Vec<u8> = "application/x-bittorrent")
         )
     ),
     responses(
         (status = 201, body = JobDto),
-        (status = 400, body = ApiError, description = "The URL is invalid or not http(s)"),
+        (status = 400, body = ApiError, description = "The JSON is invalid, or the URL is invalid or not http(s)"),
         (status = 401, body = ApiError),
-        (status = 422, body = ApiError, description = "Not a valid NZB, or the fetched NZB is too large"),
+        (status = 409, body = ApiError, description = "The same torrent is already a job"),
+        (status = 422, body = ApiError, description = "Not a valid NZB, torrent or magnet link, or the fetched file is too large"),
         (status = 502, body = ApiError, description = "The URL could not be fetched")
     )
 )]
@@ -382,32 +418,65 @@ async fn add_job(
     headers: HeaderMap,
     body: axum::body::Bytes,
 ) -> Response {
-    let is_json = headers
+    let content_type = headers
         .get(axum::http::header::CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
-        .is_some_and(|v| v.trim_start().starts_with("application/json"));
-    let (nzb, file_name) = if is_json {
-        match fetch_for_job(&state, &body).await {
-            Ok(fetched) => (fetched.bytes, fetched.file_name),
+        .unwrap_or_default()
+        .trim_start();
+    let input = if let Some(link) = query.magnet {
+        Input::Magnet(link)
+    } else if content_type.starts_with("application/json") {
+        match link_input(&state, &body).await {
+            Ok(input) => input,
             Err(response) => return *response,
         }
+    } else if content_type.starts_with(TORRENT_TYPE) {
+        Input::Torrent {
+            bytes: body.to_vec(),
+            file_name: None,
+        }
     } else {
-        (body.to_vec(), None)
+        Input::Nzb {
+            bytes: body.to_vec(),
+            file_name: None,
+        }
     };
-    let name = query
-        .name
-        .or_else(|| fangst_nzb_title(&nzb))
-        .or(file_name)
-        .unwrap_or_else(|| "Untitled".to_owned());
-    let added = state
-        .service
-        .add_nzb(
-            &name,
-            query.category.as_deref(),
-            query.priority.unwrap_or(0),
-            &nzb,
-        )
-        .await;
+    let category = query.category.as_deref();
+    let priority = query.priority.unwrap_or(0);
+    let added = match input {
+        Input::Nzb { bytes, file_name } => {
+            let name = query
+                .name
+                .or_else(|| fangst_nzb_title(&bytes))
+                .or(file_name)
+                .unwrap_or_else(|| UNTITLED.to_owned());
+            state
+                .service
+                .add_nzb(&name, category, priority, &bytes)
+                .await
+        }
+        Input::Torrent { bytes, file_name } => {
+            let name = query
+                .name
+                .or_else(|| fangst_torrent::inspect(&bytes).ok()?.name)
+                .or(file_name)
+                .unwrap_or_else(|| UNTITLED.to_owned());
+            state
+                .service
+                .add_torrent(&name, category, priority, TorrentSource::File(&bytes))
+                .await
+        }
+        Input::Magnet(link) => {
+            let name = query
+                .name
+                .or_else(|| fangst_torrent::parse_magnet(&link).ok()?.name)
+                .unwrap_or_else(|| UNTITLED.to_owned());
+            state
+                .service
+                .add_torrent(&name, category, priority, TorrentSource::Magnet(&link))
+                .await
+        }
+    };
     match added {
         Ok(id) => match state.service.store().get(id).await {
             Ok(job) => (StatusCode::CREATED, Json(JobDto::from(job))).into_response(),
@@ -417,20 +486,42 @@ async fn add_job(
     }
 }
 
-async fn fetch_for_job(state: &ApiState, body: &[u8]) -> Result<fetch::Fetched, Box<Response>> {
-    let request: AddJobUrl = serde_json::from_slice(body).map_err(|e| {
+const UNTITLED: &str = "Untitled";
+
+async fn link_input(state: &ApiState, body: &[u8]) -> Result<Input, Box<Response>> {
+    let request: AddJobLink = serde_json::from_slice(body).map_err(|_| {
         Box::new(error(
             StatusCode::BAD_REQUEST,
-            format!("invalid JSON body: {e}"),
+            "the JSON body must be {\"url\": \"...\"} or {\"magnet\": \"...\"}",
         ))
     })?;
-    state.jobs.fetcher.fetch(&request.url).await.map_err(|e| {
+    let url = match request {
+        AddJobLink::Magnet(AddJobMagnet { magnet }) => return Ok(Input::Magnet(magnet)),
+        AddJobLink::Url(AddJobUrl { url }) if url.starts_with("magnet:") => {
+            return Ok(Input::Magnet(url));
+        }
+        AddJobLink::Url(AddJobUrl { url }) => url,
+    };
+    let fetched = state.jobs.fetcher.fetch(&url).await.map_err(|e| {
         let status = match e {
             fetch::FetchError::InvalidUrl(_) => StatusCode::BAD_REQUEST,
             fetch::FetchError::TooLarge(_) => StatusCode::UNPROCESSABLE_ENTITY,
             fetch::FetchError::Status(_) | fetch::FetchError::Network(_) => StatusCode::BAD_GATEWAY,
         };
         Box::new(error(status, e.to_string()))
+    })?;
+    Ok(if let Some(link) = fetched.magnet {
+        Input::Magnet(link)
+    } else if fetched.is_torrent() {
+        Input::Torrent {
+            bytes: fetched.bytes,
+            file_name: fetched.file_name,
+        }
+    } else {
+        Input::Nzb {
+            bytes: fetched.bytes,
+            file_name: fetched.file_name,
+        }
     })
 }
 

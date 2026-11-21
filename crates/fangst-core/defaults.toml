@@ -19,3 +19,9 @@ publish_interval_ms = 1000
 rate_window_secs = 5
 # Seconds between writes of a running job's downloaded bytes to the database.
 persist_interval_secs = 10
+
+[torrent]
+# Torrent jobs downloading at once; the rest wait in the queue until one finishes or is paused.
+max_active = 5
+# TCP port peers connect to. Forward it on the router for incoming peers.
+listen_port = 6881

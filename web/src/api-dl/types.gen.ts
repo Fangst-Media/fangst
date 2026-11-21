@@ -5,11 +5,24 @@ export type ClientOptions = {
 };
 
 /**
- * An NZB for the daemon to download itself.
+ * The JSON forms of `POST /api/v1/jobs`: exactly one of `url` or `magnet`.
+ */
+export type AddJobLink = AddJobUrl | AddJobMagnet;
+
+/**
+ * A torrent by magnet link. Only links with a v1 (`btih`) info hash are accepted.
+ */
+export type AddJobMagnet = {
+    magnet: string;
+};
+
+/**
+ * An NZB or `.torrent` for the daemon to download itself.
  */
 export type AddJobUrl = {
     /**
-     * `http` or `https`; redirects are followed only to `http` and `https`.
+     * `http` or `https`; redirects are followed only to `http` and `https`, except that a
+     * redirect to a magnet link adds that link. A `magnet:` link here is added as one.
      */
     url: string;
 };
@@ -270,13 +283,13 @@ export type ListJobsResponse = ListJobsResponses[keyof ListJobsResponses];
 
 export type AddJobData = {
     /**
-     * The NZB file, or JSON naming a URL to fetch it from. Without `name` the job is named after the NZB's title, then the file name in the URL.
+     * An NZB file, a `.torrent` file, or JSON naming a URL to fetch either from or a magnet link. With `?magnet=` the body is ignored. Without `name` the job is named after the NZB's title or the torrent's name, then the file name in the URL.
      */
-    body: AddJobUrl;
+    body: AddJobLink;
     path?: never;
     query?: {
         /**
-         * Shown in the queue; defaults to the NZB's title.
+         * Shown in the queue; defaults to the NZB's title or the torrent's name.
          */
         name?: string;
         category?: string;
@@ -284,18 +297,26 @@ export type AddJobData = {
          * Higher runs first.
          */
         priority?: number;
+        /**
+         * A magnet link to add instead of a request body.
+         */
+        magnet?: string;
     };
     url: '/api/v1/jobs';
 };
 
 export type AddJobErrors = {
     /**
-     * The URL is invalid or not http(s)
+     * The JSON is invalid, or the URL is invalid or not http(s)
      */
     400: ApiError;
     401: ApiError;
     /**
-     * Not a valid NZB, or the fetched NZB is too large
+     * The same torrent is already a job
+     */
+    409: ApiError;
+    /**
+     * Not a valid NZB, torrent or magnet link, or the fetched file is too large
      */
     422: ApiError;
     /**
