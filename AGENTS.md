@@ -11,7 +11,7 @@ This file is for every coding agent (Claude Code, Codex, Cursor, Copilot, Gemini
 
 - Rust 1.95.0, pinned in `rust-toolchain.toml`.
 - Dev tools: `just`, `cargo-nextest`, `cargo-deny`, `changesetter`, Bun.
-- Bun for the JS side; the web app is React 19, TanStack Router and Query, Tailwind, TypeScript strict.
+- Bun for the JS side. The web app in `web/` is React 19, TanStack Router and Query, Tailwind 3, Vite, TypeScript strict.
 
 When an API detail of a crate or upstream protocol is uncertain, check its docs or source instead of guessing, and say so.
 
@@ -27,6 +27,7 @@ Commands marked "planned" arrive with the issue named; until then they do not ex
 | Layer rules only | `just layercheck` (layer map in `layers.toml`) |
 | Tests | `just test` (`cargo nextest run --workspace`) |
 | Add a changeset | `changesetter add --package fangst-core --bump patch --type fix -m "What changed, for users"` (`--no-bump` for tooling, docs and tests; `--bump minor` for new features). Packages share one version, so any package in the group works |
+| Web app | `just web-dev` (Vite with hot refresh on :5173, proxies `/api` to :5001), `just web-build` (production build into `web/dist`, part of the full gate) |
 | Old TS stack | `bun run dev`; `just ts-check` for typecheck and lint, which fails on main until #66 (until milestone 2) |
 
 CI (`.github/workflows/check.yml`) runs `just check-full` on Linux, macOS and Windows for every push and for pull requests from forks. Run `just check-full` before committing. If you touched TypeScript, also run `just ts-check` and make sure you added no new errors (main fails it until #66).

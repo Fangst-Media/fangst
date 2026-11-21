@@ -36,6 +36,8 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      - uses: oven-sh/setup-bun@v2
+
       - uses: taiki-e/install-action@v2
         with:
           tool: just,cargo-nextest,cargo-deny,changesetter@0.7.0
