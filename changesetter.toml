@@ -1,0 +1,25 @@
+# Fangst ships as one app, so every shipped package shares one version.
+# New crates join the fixed group when they are created; layercheck keeps the layer map, this keeps the version.
+
+# "" is the root Cargo.toml: a virtual workspace with no package, which changesetter 0.7.0 still
+# lists. "jaeger" is the private Bun workspace root. layercheck is a dev tool. The old TypeScript
+# packages are replaced in milestone 2 and are never released.
+# Entries are package names; paths are silently ignored.
+ignore = ["", "jaeger", "layercheck", "@jaeger/api", "@jaeger/shared", "@jaeger/parser"]
+
+[groups.fangst]
+fixed = ["fangst-core", "@jaeger/web"]
+
+[changelog]
+file = "CHANGELOG.md"
+per_package = false
+group = true
+none_bump = "section"
+none_bump_heading = "Internal"
+
+[tag]
+format = "v{version}"
+
+[release]
+commit_message = "chore: release {versions}"
+tag_annotated = true

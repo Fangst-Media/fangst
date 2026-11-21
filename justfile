@@ -15,7 +15,7 @@ setup:
 check: fmt-check clippy test
 
 # Full gate: run before every commit and merge
-check-full: check layercheck deny generated
+check-full: check layercheck deny generated changeset
 
 # Layer and layer-0 licence rules from AGENTS.md
 layercheck:
@@ -28,6 +28,10 @@ deny:
 # Regenerate generated files and fail if any changed; OpenAPI specs and clients join here as they appear
 generated:
     @echo "generated: nothing to regenerate yet"
+
+# Fail when the branch adds no changeset; passes on main and when nothing changed
+changeset:
+    changesetter check --base origin/main
 
 # Format all Rust code
 fmt:
