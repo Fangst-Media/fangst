@@ -14,6 +14,21 @@ setup:
 # Fast gate: run while coding. ts-check joins once #66 is fixed.
 check: fmt-check clippy test
 
+# Full gate: run before every commit and merge
+check-full: check layercheck deny generated
+
+# Layer and layer-0 licence rules from AGENTS.md
+layercheck:
+    cargo run --quiet -p layercheck
+
+# Advisories, licences, bans and sources for every dependency
+deny:
+    cargo deny check
+
+# Regenerate generated files and fail if any changed; OpenAPI specs and clients join here as they appear
+generated:
+    @echo "generated: nothing to regenerate yet"
+
 # Format all Rust code
 fmt:
     cargo fmt --all
