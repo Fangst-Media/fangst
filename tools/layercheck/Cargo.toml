@@ -1,0 +1,17 @@
+[package]
+name = "layercheck"
+description = "Fails the build when a crate breaks Fangst's layer rules or a layer 0 crate pulls in copyleft code."
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.9"
+
+[lints]
+workspace = true

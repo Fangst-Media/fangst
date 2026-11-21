@@ -10,7 +10,7 @@ This file is for every coding agent (Claude Code, Codex, Cursor, Copilot, Gemini
 ## Pinned versions
 
 - Rust 1.95.0, pinned in `rust-toolchain.toml`.
-- Dev tools: `just`, `cargo-nextest`, Bun; later `cargo-deny` (#3) and `changesetter` (#5).
+- Dev tools: `just`, `cargo-nextest`, `cargo-deny`, Bun; later `changesetter` (#5).
 - Bun for the JS side; the web app is React 19, TanStack Router and Query, Tailwind, TypeScript strict.
 
 When an API detail of a crate or upstream protocol is uncertain, check its docs or source instead of guessing, and say so.
@@ -23,16 +23,17 @@ Commands marked "planned" arrive with the issue named; until then they do not ex
 | --- | --- |
 | First setup | `just setup` |
 | Fast gate (while coding) | `just check`: fmt, clippy, tests |
-| Full gate (before every commit and merge) | `just check:full` (planned, #3): adds layer check, license check, regenerate-and-diff, changeset check |
+| Full gate (before every commit and merge) | `just check-full`: adds `layercheck`, `cargo deny`, regenerate-and-diff (empty so far); the changeset check joins with #5 |
+| Layer rules only | `just layercheck` (layer map in `layers.toml`) |
 | Tests | `just test` (`cargo nextest run --workspace`) |
 | Add a changeset | `changesetter add` (planned, #5) |
 | Old TS stack | `bun run dev`; `just ts-check` for typecheck and lint, which fails on main until #66 (until milestone 2) |
 
-Until `just check:full` exists (#3), run `just check` before committing. If you touched TypeScript, also run `just ts-check` and make sure you added no new errors.
+Run `just check-full` before committing. If you touched TypeScript, also run `just ts-check` and make sure you added no new errors (main fails it until #66).
 
 ## Architecture rules
 
-1. **Parts, not a monolith.** Every crate sits on one layer and depends only on lower layers. Crates on the same layer never depend on each other, except layer 0 crates, which may depend on other layer 0 crates as long as there are no cycles. `tools/layercheck` enforces this (planned, #3).
+1. **Parts, not a monolith.** Every crate sits on one layer and depends only on lower layers. Crates on the same layer never depend on each other, except layer 0 crates, which may depend on other layer 0 crates as long as there are no cycles. `tools/layercheck` enforces this from `layers.toml`; a new crate must be added there or the gate fails.
 
    | Layer | Crates | Rule |
    | --- | --- | --- |
@@ -46,7 +47,7 @@ Until `just check:full` exists (#3), run `just check` before committing. If you 
 2. **Native API first, adapters at the edge.** Fangst's own API is designed for Fangst. qBittorrent, SABnzbd and Sonarr/Radarr compatibility live in `fangst-adapter-*` crates that only translate onto the public operations of one service. An adapter holds no business logic and no state beyond ID mapping. If an adapter needs something the native API can't express, fix the service so the native API gains it too.
 3. **Providers for every extension point.** Traits live in `fangst-providers`; each built-in implementation is its own crate. Provider traits take and return plain serde data, never Rust handles or callbacks, so a WebAssembly component can implement them later.
 4. **Separate storage.** Each service owns its own database file. No service reads another service's tables.
-5. **Removable parts.** Every optional provider and adapter can be switched off in config. `just check:full` starts each binary with all of them off and fails if it doesn't come up healthy.
+5. **Removable parts.** Every optional provider and adapter can be switched off in config. `just check-full` starts each binary with all of them off and fails if it doesn't come up healthy (added with the first binary, #11).
 6. **No magic numbers.** Tunables (connections, timeouts, backoff, seeding defaults) live in one defaults file, `crates/fangst-core/defaults.toml`, documented in `TUNING.md` at the repo root.
 7. **Untrusted input at the edge.** NZB files, torrent metadata, adapter request parameters and file paths are validated where they enter. Paths stay inside configured roots; `..` and links that point outside are refused. Extraction never writes outside the job folder and blocks executables.
 

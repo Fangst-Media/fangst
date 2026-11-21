@@ -1,0 +1,14 @@
+# Which layer each workspace crate belongs to. `tools/layercheck` enforces the rules in AGENTS.md:
+# a crate depends only on lower layers, layer 0 crates may use each other, nothing depends on tools
+# except through dev-dependencies. A name ending in `*` matches every crate with that prefix.
+# A crate missing from this file fails the check.
+
+core = ["fangst-core"]
+tools = ["layercheck", "fangst-bench"]
+
+[layers]
+0 = ["fangst-nntp", "fangst-yenc", "fangst-nzb", "fangst-release", "fangst-providers"]
+1 = ["fangst-usenet", "fangst-torrent", "fangst-notify-*", "fangst-indexer-*", "fangst-meta-*", "fangst-sidecar-*", "fangst-mediaserver-*", "fangst-dlclient-*", "fangst-postproc-*", "fangst-wasm"]
+2 = ["fangst-downloads", "fangst-manager"]
+3 = ["fangst-dl-api", "fangst-manager-api", "fangst-adapter-*", "fangst-mcp"]
+4 = ["fangst-dl", "fangst-manager-bin", "fangst"]
