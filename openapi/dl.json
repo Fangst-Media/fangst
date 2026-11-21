@@ -92,37 +92,28 @@
         "parameters": [
           {
             "name": "name",
-            "in": "path",
+            "in": "query",
             "description": "Shown in the queue; defaults to the NZB's title.",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "string",
-                "null"
-              ]
+              "type": "string"
             }
           },
           {
             "name": "category",
-            "in": "path",
-            "required": true,
+            "in": "query",
+            "required": false,
             "schema": {
-              "type": [
-                "string",
-                "null"
-              ]
+              "type": "string"
             }
           },
           {
             "name": "priority",
-            "in": "path",
+            "in": "query",
             "description": "Higher runs first.",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int64"
             }
           }
@@ -225,14 +216,11 @@
           },
           {
             "name": "delete_files",
-            "in": "path",
+            "in": "query",
             "description": "Also remove the job's folder and everything downloaded into it.",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "boolean",
-                "null"
-              ]
+              "type": "boolean"
             }
           }
         ],

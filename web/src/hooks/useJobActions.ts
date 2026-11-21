@@ -25,10 +25,9 @@ export function useJobActions() {
   })
 
   const remove = useMutation({
-    // delete_files is a query parameter on the daemon, but the spec lists it as a path
-    // parameter, so the generated client drops it; null keeps the files either way.
+    // Downloaded files stay on disk; removing them is a separate, explicit choice.
     mutationFn: async (id: number) => {
-      ensureOk(await deleteJob({ path: { id, delete_files: null } }), 'Job')
+      ensureOk(await deleteJob({ path: { id }, query: { delete_files: false } }), 'Job')
       return id
     },
     onSuccess: (id) => {

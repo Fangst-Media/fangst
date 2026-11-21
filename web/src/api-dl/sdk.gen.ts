@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddJobData, AddJobErrors, AddJobResponses, DeleteJobData, DeleteJobErrors, DeleteJobResponses, EventsData, EventsErrors, GetJobData, GetJobErrors, GetJobResponses, HealthData, HealthResponses, JobTimelineData, JobTimelineErrors, JobTimelineResponses, ListJobsData, ListJobsErrors, ListJobsResponses, PauseJobData, PauseJobErrors, PauseJobResponses, ResumeJobData, ResumeJobErrors, ResumeJobResponses } from './types.gen';
+import type { AddJobData, AddJobErrors, AddJobResponses, DeleteJobData, DeleteJobErrors, DeleteJobResponses, EventsData, EventsErrors, GetJobData, GetJobErrors, GetJobResponses, HealthData, HealthResponses, JobTimelineData, JobTimelineErrors, JobTimelineResponses, ListJobsData, ListJobsErrors, ListJobsResponses, PauseJobData, PauseJobErrors, PauseJobResponses, ResumeJobData, ResumeJobErrors, ResumeJobResponses, TestServerData, TestServerErrors, TestServerResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -73,4 +73,17 @@ export const jobTimeline = <ThrowOnError extends boolean = false>(options: Optio
     security: [{ name: 'X-Api-Key', type: 'apiKey' }],
     url: '/api/v1/jobs/{id}/timeline',
     ...options
+});
+
+/**
+ * Connects with every requested connection at once and logs in. A failed test is still a 200; read `ok` and `cause`.
+ */
+export const testServer = <ThrowOnError extends boolean = false>(options: Options<TestServerData, ThrowOnError>) => (options.client ?? client).post<TestServerResponses, TestServerErrors, ThrowOnError>({
+    security: [{ name: 'X-Api-Key', type: 'apiKey' }],
+    url: '/api/v1/servers/test',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
