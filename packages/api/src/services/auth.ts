@@ -1,7 +1,7 @@
-import { eq, and } from 'drizzle-orm'
-import { db } from '../db'
-import { users, sessions } from '../db/schema'
 import { JellyfinClient, type JellyfinUser } from '@jaeger/shared/clients/jellyfin'
+import { and, eq } from 'drizzle-orm'
+import { db } from '../db'
+import { sessions, users } from '../db/schema'
 import { configService } from './config'
 
 export type UserRole = 'member' | 'admin'
@@ -88,7 +88,10 @@ export class AuthService {
     return { user, session }
   }
 
-  private async upsertUser(jellyfinUser: JellyfinUser, provider: 'jellyfin' | 'plex'): Promise<User> {
+  private async upsertUser(
+    jellyfinUser: JellyfinUser,
+    provider: 'jellyfin' | 'plex'
+  ): Promise<User> {
     const now = new Date()
     const syncAdminFromProvider = configService.getSyncAdminFromProvider()
 
@@ -162,7 +165,11 @@ export class AuthService {
     return count.length === 0
   }
 
-  private async createSession(userId: string, ipAddress: string, userAgent?: string): Promise<Session> {
+  private async createSession(
+    userId: string,
+    ipAddress: string,
+    userAgent?: string
+  ): Promise<Session> {
     const id = generateId()
     const now = new Date()
     const sessionExpiryDays = configService.getSessionExpiryDays()

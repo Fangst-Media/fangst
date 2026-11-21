@@ -1,8 +1,8 @@
 import type { MetadataResult } from '@jaeger/shared/schemas/metadata'
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { movieLanes, tvLanes, bookLanes } from '../lib/api-client'
+import { useEffect, useState } from 'react'
+import { bookLanes, movieLanes, tvLanes } from '../lib/api-client'
 
 async function searchContent(query: string): Promise<MetadataResult[]> {
   if (!query.trim()) return []
@@ -13,11 +13,7 @@ async function searchContent(query: string): Promise<MetadataResult[]> {
     bookLanes.search(query).catch(() => ({ results: [] })),
   ])
 
-  return [
-    ...movies.results.slice(0, 10),
-    ...tv.results.slice(0, 10),
-    ...books.results.slice(0, 10),
-  ]
+  return [...movies.results.slice(0, 10), ...tv.results.slice(0, 10), ...books.results.slice(0, 10)]
 }
 
 function getPosterUrl(result: MetadataResult): string {
@@ -43,11 +39,12 @@ export default function Search() {
   })
 
   function handleSelect(result: MetadataResult) {
-    const path = result.type === 'book'
-      ? `/book/${result.id}`
-      : result.type === 'movie'
-        ? `/movie/${result.id}`
-        : `/tv/${result.id}`
+    const path =
+      result.type === 'book'
+        ? `/book/${result.id}`
+        : result.type === 'movie'
+          ? `/movie/${result.id}`
+          : `/tv/${result.id}`
     navigate({ to: path })
   }
 
@@ -61,6 +58,7 @@ export default function Search() {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search for movies, TV shows, or books..."
             className="w-full rounded-lg bg-card border border-border px-4 py-3 pl-12 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
+            // biome-ignore lint/a11y/noAutofocus: the page exists to type a query, so focus goes straight to it
             autoFocus
           />
           <svg
@@ -70,7 +68,12 @@ export default function Search() {
             viewBox="0 0 24 24"
             aria-hidden="true"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
           </svg>
         </div>
 
@@ -99,9 +102,7 @@ export default function Search() {
                     {result.title}
                     {result.year && <span className="text-muted ml-2">({result.year})</span>}
                   </h3>
-                  {result.author && (
-                    <p className="text-sm text-muted">{result.author}</p>
-                  )}
+                  {result.author && <p className="text-sm text-muted">{result.author}</p>}
                   <span className="inline-block mt-1 px-2 py-0.5 text-xs rounded bg-accent/10 text-accent uppercase">
                     {result.type}
                   </span>
@@ -122,8 +123,19 @@ export default function Search() {
 
         {!debouncedQuery && (
           <div className="text-center py-24">
-            <svg className="w-16 h-16 text-muted/30 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            <svg
+              aria-hidden="true"
+              className="w-16 h-16 text-muted/30 mx-auto mb-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
             </svg>
             <p className="text-muted">Start typing to search</p>
           </div>

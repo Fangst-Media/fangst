@@ -66,7 +66,10 @@ export class TmdbClient {
 
   async searchMulti(query: string, year?: number): Promise<TmdbSearchResult> {
     const yearParam = year ? `&year=${year}` : ''
-    return this.fetch(`/search/multi?query=${encodeURIComponent(query)}${yearParam}`, tmdbSearchResultSchema)
+    return this.fetch(
+      `/search/multi?query=${encodeURIComponent(query)}${yearParam}`,
+      tmdbSearchResultSchema
+    )
   }
 
   async getMovie(id: number): Promise<TmdbMovie> {

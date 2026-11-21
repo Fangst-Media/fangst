@@ -1,9 +1,9 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
-import { configService } from '../services/config'
-import { createIndexerSchema, updateIndexerSchema } from '@jaeger/shared/types/indexer'
 import { NewznabClient } from '@jaeger/shared/clients/newznab'
 import { getIndexerList } from '@jaeger/shared/data/indexer-registry'
+import { createIndexerSchema, updateIndexerSchema } from '@jaeger/shared/types/indexer'
 import type { User } from '../services/auth'
+import { configService } from '../services/config'
 
 type AuthEnv = {
   Variables: {
@@ -65,10 +65,7 @@ indexers.post('/', async (c) => {
       },
     })
   } catch (error) {
-    return c.json(
-      { error: error instanceof Error ? error.message : 'Failed to add indexer' },
-      400
-    )
+    return c.json({ error: error instanceof Error ? error.message : 'Failed to add indexer' }, 400)
   }
 })
 

@@ -11,8 +11,8 @@ setup:
     bun install
     cargo fetch
 
-# Fast gate: run while coding. ts-check joins once #66 is fixed.
-check: fmt-check clippy test
+# Fast gate: run while coding
+check: fmt-check clippy test ts-check
 
 # Full gate: run before every commit and merge
 check-full: check web-build layercheck deny generated changeset
@@ -47,16 +47,16 @@ clippy:
 test:
     cargo nextest run --workspace --no-tests=pass
 
-# Production build of the web app; catches broken imports and config even while #66 keeps typecheck out of the gate
+# Production build of the web app; catches config and bundling errors the typecheck can't
 web-build:
-    bun install --frozen-lockfile
     bun run --cwd web build
 
 # Run the web app with hot refresh against the old TypeScript API on :5001
 web-dev:
     bun run --cwd web dev
 
-# Typecheck and lint the TypeScript packages (fails on main until #66)
+# Typecheck and lint the TypeScript side
 ts-check:
+    bun install --frozen-lockfile
     bun run typecheck
     bun run lint

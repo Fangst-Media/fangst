@@ -16,7 +16,11 @@ function resolutionIndex(res: string): number {
   return idx === -1 ? RESOLUTION_ORDER.length : idx
 }
 
-function preferenceBonus(value: string | undefined, preferences: string[] | undefined, maxPoints: number): number {
+function preferenceBonus(
+  value: string | undefined,
+  preferences: string[] | undefined,
+  maxPoints: number
+): number {
   if (!value || !preferences || preferences.length === 0) return 0
   const idx = preferences.indexOf(value)
   if (idx === -1) return 0
@@ -36,18 +40,36 @@ export function scoreReleaseWithProfile(
     const releaseIdx = resolutionIndex(parsed.resolution)
     const minIdx = resolutionIndex(profile.minResolution)
     if (releaseIdx > minIdx) {
-      return { baseScore, profileBonus: 0, totalScore: 0, rejected: true, rejectReason: `Below minimum resolution (${profile.minResolution})` }
+      return {
+        baseScore,
+        profileBonus: 0,
+        totalScore: 0,
+        rejected: true,
+        rejectReason: `Below minimum resolution (${profile.minResolution})`,
+      }
     }
   } else {
     // No resolution detected — reject if profile requires a minimum above 480p
     if (profile.minResolution !== '720p') {
-      return { baseScore, profileBonus: 0, totalScore: 0, rejected: true, rejectReason: 'Resolution not detected' }
+      return {
+        baseScore,
+        profileBonus: 0,
+        totalScore: 0,
+        rejected: true,
+        rejectReason: 'Resolution not detected',
+      }
     }
   }
 
   // Hard reject: HDR required but not present
   if (profile.requireHdr && !parsed.hdr) {
-    return { baseScore, profileBonus: 0, totalScore: 0, rejected: true, rejectReason: 'HDR required but not detected' }
+    return {
+      baseScore,
+      profileBonus: 0,
+      totalScore: 0,
+      rejected: true,
+      rejectReason: 'HDR required but not detected',
+    }
   }
 
   // Preference bonuses

@@ -1,12 +1,12 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
-import { MediaScanner } from '../services/scanner'
-import { mediaService } from '../services/media'
+import { MetadataProvider } from '@jaeger/shared/clients/metadata-provider'
+import { MetadataRelayClient } from '@jaeger/shared/clients/metadata-relay'
 import { TmdbClient } from '@jaeger/shared/clients/tmdb'
 import { TvdbClient } from '@jaeger/shared/clients/tvdb'
-import { MetadataRelayClient } from '@jaeger/shared/clients/metadata-relay'
-import { MetadataProvider } from '@jaeger/shared/clients/metadata-provider'
-import { RealFilesystem, MockFilesystem } from '../services/filesystem'
 import { configService } from '../services/config'
+import { MockFilesystem, RealFilesystem } from '../services/filesystem'
+import { mediaService } from '../services/media'
+import { MediaScanner } from '../services/scanner'
 
 const media = new OpenAPIHono()
 

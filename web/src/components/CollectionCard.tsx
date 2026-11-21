@@ -1,5 +1,5 @@
-import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
+import { useState } from 'react'
 
 type CollectionCardProps = {
   tmdbCollectionId: number
@@ -42,6 +42,7 @@ export function CollectionCard({
           <div className="h-full w-full flex items-center justify-center bg-card">
             <div className="text-center p-4">
               <svg
+                aria-hidden="true"
                 className="w-12 h-12 text-muted mx-auto mb-2"
                 fill="none"
                 stroke="currentColor"
@@ -62,7 +63,13 @@ export function CollectionCard({
         {/* Hover overlay */}
         <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100 flex items-center justify-center">
           <div className="rounded-full bg-white/20 p-3">
-            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg
+              aria-hidden="true"
+              className="w-6 h-6 text-white"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"

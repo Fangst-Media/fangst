@@ -250,7 +250,7 @@ export class SABnzbdClient {
       throw new Error(`SABnzbd request failed: ${response.statusText}`)
     }
 
-    const data = await response.json() as { nzo_ids?: string[]; error?: string }
+    const data = (await response.json()) as { nzo_ids?: string[]; error?: string }
     if (data.error) {
       throw new Error(`SABnzbd error: ${data.error}`)
     }

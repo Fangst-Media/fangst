@@ -1,7 +1,7 @@
 import { Link, useRouterState } from '@tanstack/react-router'
+import { useState } from 'react'
 import { useScrolled } from '../hooks/useScrolled'
 import { UserDropdown } from './UserDropdown'
-import { useState } from 'react'
 
 const navLinks = [
   { label: 'Home', href: '/' },
@@ -36,16 +36,15 @@ export function TopNav() {
           {/* Desktop nav links */}
           <div className="hidden md:flex items-center gap-1">
             {navLinks.map((link) => {
-              const isActive = currentPath === link.href ||
+              const isActive =
+                currentPath === link.href ||
                 (link.href !== '/' && currentPath.startsWith(link.href))
               return (
                 <Link
                   key={link.href}
                   to={link.href}
                   className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'text-foreground'
-                      : 'text-foreground/60 hover:text-foreground'
+                    isActive ? 'text-foreground' : 'text-foreground/60 hover:text-foreground'
                   }`}
                 >
                   {link.label}
@@ -61,8 +60,19 @@ export function TopNav() {
             to="/search"
             className="p-2 text-foreground/60 hover:text-foreground transition-colors"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            <svg
+              aria-hidden="true"
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
             </svg>
           </Link>
 
@@ -74,11 +84,27 @@ export function TopNav() {
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="md:hidden p-2 text-foreground/60 hover:text-foreground transition-colors"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg
+              aria-hidden="true"
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
               {mobileMenuOpen ? (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
               )}
             </svg>
           </button>
@@ -90,7 +116,8 @@ export function TopNav() {
         <div className="md:hidden border-t border-border bg-background/95 backdrop-blur-md">
           <div className="px-4 py-3 space-y-1">
             {navLinks.map((link) => {
-              const isActive = currentPath === link.href ||
+              const isActive =
+                currentPath === link.href ||
                 (link.href !== '/' && currentPath.startsWith(link.href))
               return (
                 <Link

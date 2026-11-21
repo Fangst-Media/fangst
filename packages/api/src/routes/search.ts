@@ -1,11 +1,11 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
-import { searchService } from '../services/search'
-import { configService } from '../services/config'
-import { searchRequestSchema } from '@jaeger/shared/types/indexer'
 import { SABnzbdClient } from '@jaeger/shared/clients/sabnzbd'
-import { requestService } from '../services/requests'
-import { downloadService } from '../services/downloads'
+import { searchRequestSchema } from '@jaeger/shared/types/indexer'
 import type { User } from '../services/auth'
+import { configService } from '../services/config'
+import { downloadService } from '../services/downloads'
+import { requestService } from '../services/requests'
+import { searchService } from '../services/search'
 
 type AuthEnv = {
   Variables: {
@@ -33,10 +33,7 @@ search.post('/', async (c) => {
 
     return c.json(response)
   } catch (error) {
-    return c.json(
-      { error: error instanceof Error ? error.message : 'Search failed' },
-      400
-    )
+    return c.json({ error: error instanceof Error ? error.message : 'Search failed' }, 400)
   }
 })
 
@@ -57,7 +54,10 @@ search.post('/download', async (c) => {
     }
 
     if (!downloadUrl || !downloaderId || !releaseName) {
-      return c.json({ error: 'Missing required fields: downloadUrl, downloaderId, releaseName' }, 400)
+      return c.json(
+        { error: 'Missing required fields: downloadUrl, downloaderId, releaseName' },
+        400
+      )
     }
 
     const downloader = configService.getDownloader(downloaderId)
@@ -98,13 +98,7 @@ search.post('/download-release', async (c) => {
 
   try {
     const body = await c.req.json()
-    const {
-      downloadUrl,
-      downloaderId,
-      releaseName,
-      category,
-      media,
-    } = body as {
+    const { downloadUrl, downloaderId, releaseName, category, media } = body as {
       downloadUrl: string
       downloaderId: string
       releaseName: string

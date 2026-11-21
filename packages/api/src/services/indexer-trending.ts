@@ -1,8 +1,8 @@
-import { configService } from './config'
-import { NewznabClient } from '@jaeger/shared/clients/newznab'
-import type { SearchResult, Indexer } from '@jaeger/shared/types/indexer'
 import { parseReleaseName } from '@jaeger/parser'
+import { NewznabClient } from '@jaeger/shared/clients/newznab'
+import type { Indexer, SearchResult } from '@jaeger/shared/types/indexer'
 import { logger } from '../lib/logger'
+import { configService } from './config'
 
 export type IndexerTrendingItem = {
   title: string
@@ -77,13 +77,14 @@ export class IndexerTrendingService {
       return { results: [], indexerCount: 0 }
     }
 
-    const targetIndexers = indexerId
-      ? indexers.filter((i) => i.id === indexerId)
-      : indexers
+    const targetIndexers = indexerId ? indexers.filter((i) => i.id === indexerId) : indexers
 
     const promises = targetIndexers.map((indexer) =>
       fetchFromIndexer(indexer, mediaType).catch((err) => {
-        logger.warn({ indexer: indexer.name, error: err instanceof Error ? err.message : err }, 'Failed to fetch indexer trending')
+        logger.warn(
+          { indexer: indexer.name, error: err instanceof Error ? err.message : err },
+          'Failed to fetch indexer trending'
+        )
         return [] as IndexerTrendingItem[]
       })
     )
@@ -100,7 +101,9 @@ export class IndexerTrendingService {
     }
   }
 
-  async getPerIndexerTrending(mediaType: 'movie' | 'tv'): Promise<Record<string, IndexerTrendingItem[]>> {
+  async getPerIndexerTrending(
+    mediaType: 'movie' | 'tv'
+  ): Promise<Record<string, IndexerTrendingItem[]>> {
     const indexers = configService.getEnabledIndexers()
     const result: Record<string, IndexerTrendingItem[]> = {}
 

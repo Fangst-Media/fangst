@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { db } from '../db'
-import { metadata, mediaItems } from '../db/schema'
+import { mediaItems, metadata } from '../db/schema'
 import type { ScannedFile } from './scanner'
 
 export type MediaItemWithMetadata = {
@@ -89,7 +89,9 @@ export class MediaService {
     return all.filter((item) => item.parsed.season !== undefined)
   }
 
-  async syncFromScan(scannedFiles: ScannedFile[]): Promise<{ added: number; updated: number; removed: number }> {
+  async syncFromScan(
+    scannedFiles: ScannedFile[]
+  ): Promise<{ added: number; updated: number; removed: number }> {
     const now = new Date()
     const scannedPaths = new Set(scannedFiles.map((f) => f.path))
 
@@ -106,7 +108,12 @@ export class MediaService {
       let metadataId: string | null = null
       if (file.metadata) {
         metadataId = `${file.metadata.provider}:${file.metadata.id}`
-        await this.upsertMetadata(metadataId, file.metadata, file.parsed.season !== undefined ? 'tv' : 'movie', now)
+        await this.upsertMetadata(
+          metadataId,
+          file.metadata,
+          file.parsed.season !== undefined ? 'tv' : 'movie',
+          now
+        )
       }
 
       if (existing) {

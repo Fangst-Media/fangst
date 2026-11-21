@@ -1,6 +1,6 @@
 import { configService } from './config'
+import { type MediaItemWithMetadata, mediaService } from './media'
 import { getMetadataService } from './metadata'
-import { mediaService, type MediaItemWithMetadata } from './media'
 
 export type TvSeriesOverview = {
   tmdbId: string
@@ -83,7 +83,9 @@ export class LibraryService {
 
     for (const [key, items] of seriesMap) {
       const firstItem = items[0]!
-      const seasonNumbers = [...new Set(items.map((i) => i.parsed.season).filter((s): s is number => s !== undefined))]
+      const seasonNumbers = [
+        ...new Set(items.map((i) => i.parsed.season).filter((s): s is number => s !== undefined)),
+      ]
 
       const tmdbId = key.startsWith('parsed:') ? undefined : key.replace(/^[^:]+:/, '')
 
@@ -171,7 +173,10 @@ export class LibraryService {
     }
   }
 
-  async getSeasonEpisodes(tmdbId: string, seasonNumber: number): Promise<SeasonWithEpisodes | null> {
+  async getSeasonEpisodes(
+    tmdbId: string,
+    seasonNumber: number
+  ): Promise<SeasonWithEpisodes | null> {
     const tvItems = await mediaService.getTvShows()
 
     // Filter items for this series and season

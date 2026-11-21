@@ -1,22 +1,22 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
-import YAML from 'yaml'
 import {
-  settingsSchema,
-  downloaderSchema,
-  type Settings,
-  type LockedSettings,
-  type SettingsUpdate,
-  type Downloader,
-  type CreateDownloader,
-  type UpdateDownloader,
-} from '@jaeger/shared/types/settings'
-import {
-  indexerSchema,
-  type Indexer,
   type CreateIndexer,
+  type Indexer,
   type UpdateIndexer,
+  indexerSchema,
 } from '@jaeger/shared/types/indexer'
+import {
+  type CreateDownloader,
+  type Downloader,
+  type LockedSettings,
+  type Settings,
+  type SettingsUpdate,
+  type UpdateDownloader,
+  downloaderSchema,
+  settingsSchema,
+} from '@jaeger/shared/types/settings'
+import YAML from 'yaml'
 
 // ENV variable to settings path mapping
 const ENV_MAPPING: Record<string, string> = {
@@ -75,7 +75,11 @@ class ConfigService {
       const yamlWithKey = this.deepMerge(yamlSettings, {
         security: { apiKey: (merged.security as Record<string, unknown>).apiKey },
       })
-      this.saveToYaml({ ...yamlWithKey, downloaders: yamlDownloaders, indexers: yamlIndexers } as YamlConfig)
+      this.saveToYaml({
+        ...yamlWithKey,
+        downloaders: yamlDownloaders,
+        indexers: yamlIndexers,
+      } as YamlConfig)
     }
 
     // Validate and apply defaults
@@ -90,7 +94,9 @@ class ConfigService {
     this.initialized = true
 
     console.log(`[Config] Loaded settings from ${this.yamlPath}`)
-    console.log(`[Config] Locked settings: ${Object.keys(this.locked).length > 0 ? JSON.stringify(this.locked) : 'none'}`)
+    console.log(
+      `[Config] Locked settings: ${Object.keys(this.locked).length > 0 ? JSON.stringify(this.locked) : 'none'}`
+    )
     console.log(`[Config] Loaded ${this.downloaders.length} downloader(s)`)
     console.log(`[Config] Loaded ${this.indexers.length} indexer(s)`)
     console.log(

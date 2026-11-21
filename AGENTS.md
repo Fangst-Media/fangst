@@ -22,15 +22,15 @@ Commands marked "planned" arrive with the issue named; until then they do not ex
 | What | Command |
 | --- | --- |
 | First setup | `just setup` |
-| Fast gate (while coding) | `just check`: fmt, clippy, tests |
+| Fast gate (while coding) | `just check`: fmt, clippy, tests, TypeScript typecheck and Biome lint |
 | Full gate (before every commit and merge) | `just check-full`: adds `layercheck`, `cargo deny`, regenerate-and-diff (empty so far), changeset check |
 | Layer rules only | `just layercheck` (layer map in `layers.toml`) |
 | Tests | `just test` (`cargo nextest run --workspace`) |
 | Add a changeset | `changesetter add --package fangst-core --bump patch --type fix -m "What changed, for users"` (`--no-bump` for tooling, docs and tests; `--bump minor` for new features). Packages share one version, so any package in the group works |
 | Web app | `just web-dev` (Vite with hot refresh on :5173, proxies `/api` to :5001), `just web-build` (production build into `web/dist`, part of the full gate) |
-| Old TS stack | `bun run dev`; `just ts-check` for typecheck and lint, which fails on main until #66 (until milestone 2) |
+| Old TS stack | `bun run dev` (until milestone 2). Biome skips `packages/` and the generated `web/src/api/`; typecheck still covers them |
 
-CI (`.github/workflows/check.yml`) runs `just check-full` on Linux, macOS and Windows for every push and for pull requests from forks. Run `just check-full` before committing. If you touched TypeScript, also run `just ts-check` and make sure you added no new errors (main fails it until #66).
+CI (`.github/workflows/check.yml`) runs `just check-full` on Linux, macOS and Windows for every push and for pull requests from forks. Run `just check-full` before committing.
 
 ## Architecture rules
 

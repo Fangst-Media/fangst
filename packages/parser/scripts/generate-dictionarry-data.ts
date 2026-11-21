@@ -7,10 +7,10 @@
  * Data source: https://github.com/Dictionarry-Hub/database
  */
 
-import { parse as parseYaml } from 'yaml'
-import { writeFileSync, mkdirSync } from 'node:fs'
-import { join, dirname } from 'node:path'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { parse as parseYaml } from 'yaml'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const DATA_DIR = join(__dirname, '../src/data')
@@ -77,7 +77,9 @@ async function fetchText(url: string): Promise<string> {
   return response.text()
 }
 
-async function fetchYamlFiles(directory: string): Promise<Map<string, DictionarryPattern | DictionarryCustomFormat>> {
+async function fetchYamlFiles(
+  directory: string
+): Promise<Map<string, DictionarryPattern | DictionarryCustomFormat>> {
   const files = await fetchJson<GitHubFile[]>(`${GITHUB_API}/${directory}?ref=${BRANCH}`)
   const results = new Map()
 
@@ -121,11 +123,17 @@ function extractStreamingServices(patterns: Map<string, DictionarryPattern>): St
     if (!pattern.tags?.includes('Streaming Service')) continue
 
     // Extract abbreviation from pattern name or pattern itself
-    const abbrevMatch = pattern.pattern.match(/\\b\(([A-Z]+)\|/i) || pattern.pattern.match(/\\b([A-Z]{2,5})\\b/i)
+    const abbrevMatch =
+      pattern.pattern.match(/\\b\(([A-Z]+)\|/i) || pattern.pattern.match(/\\b([A-Z]{2,5})\\b/i)
 
     services.push({
       name: pattern.name,
-      abbreviation: abbrevMatch?.[1]?.toUpperCase() || pattern.name.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4),
+      abbreviation:
+        abbrevMatch?.[1]?.toUpperCase() ||
+        pattern.name
+          .toUpperCase()
+          .replace(/[^A-Z]/g, '')
+          .slice(0, 4),
       pattern: pattern.pattern,
     })
   }
@@ -133,7 +141,9 @@ function extractStreamingServices(patterns: Map<string, DictionarryPattern>): St
   return services
 }
 
-function extractReleaseGroupTiers(customFormats: Map<string, DictionarryCustomFormat>): ReleaseGroupTier[] {
+function extractReleaseGroupTiers(
+  customFormats: Map<string, DictionarryCustomFormat>
+): ReleaseGroupTier[] {
   const tiers: ReleaseGroupTier[] = []
 
   for (const [, format] of customFormats) {
@@ -272,7 +282,10 @@ async function main() {
   console.log(`Loaded ${patterns.size} regex patterns`)
 
   // Fetch custom formats
-  const customFormats = (await fetchYamlFiles('custom_formats')) as Map<string, DictionarryCustomFormat>
+  const customFormats = (await fetchYamlFiles('custom_formats')) as Map<
+    string,
+    DictionarryCustomFormat
+  >
   console.log(`Loaded ${customFormats.size} custom formats`)
 
   // Extract and generate streaming services

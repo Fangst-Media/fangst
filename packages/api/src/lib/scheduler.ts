@@ -1,5 +1,5 @@
-import { runSearchJob } from '../jobs/searchRequests'
 import { runDownloadMonitor } from '../jobs/downloadMonitor'
+import { runSearchJob } from '../jobs/searchRequests'
 import { logger } from './logger'
 
 const SEARCH_JOB_INTERVAL = 15 * 60 * 1000 // 15 minutes
@@ -22,7 +22,10 @@ async function runSearchJobWithGuard() {
     const result = await runSearchJob()
     logger.info(result, 'Scheduled search job completed')
   } catch (error) {
-    logger.error({ error: error instanceof Error ? error.message : error }, 'Scheduled search job failed')
+    logger.error(
+      { error: error instanceof Error ? error.message : error },
+      'Scheduled search job failed'
+    )
   } finally {
     isSearchJobRunning = false
   }
@@ -41,7 +44,10 @@ async function runDownloadMonitorWithGuard() {
       logger.info(result, 'Scheduled download monitor completed')
     }
   } catch (error) {
-    logger.error({ error: error instanceof Error ? error.message : error }, 'Scheduled download monitor failed')
+    logger.error(
+      { error: error instanceof Error ? error.message : error },
+      'Scheduled download monitor failed'
+    )
   } finally {
     isDownloadMonitorRunning = false
   }

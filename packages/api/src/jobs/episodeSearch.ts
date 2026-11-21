@@ -1,22 +1,20 @@
 import { parseReleaseName } from '@jaeger/parser'
 import type { SearchResult } from '@jaeger/shared/types/indexer'
+import { logger } from '../lib/logger'
 import { configService } from '../services/config'
-import { type RequestWithUser, requestService } from '../services/requests'
 import { downloadService } from '../services/downloads'
-import { profileService } from '../services/profiles'
 import type { Episode } from '../services/episodes'
+import { profileService } from '../services/profiles'
+import { type RequestWithUser, requestService } from '../services/requests'
 import { searchService } from '../services/search'
 import { selectBestRelease } from './searchRequests'
-import { logger } from '../lib/logger'
 
 function isSeasonPack(title: string): boolean {
   const parsed = parseReleaseName(title)
   return parsed.season !== undefined && parsed.episode === undefined
 }
 
-async function searchForSeasonPack(
-  request: RequestWithUser
-): Promise<SearchResult | null> {
+async function searchForSeasonPack(request: RequestWithUser): Promise<SearchResult | null> {
   if (!request.season) return null
 
   logger.info({ title: request.title, season: request.season }, 'Searching for season pack')
@@ -123,7 +121,9 @@ export async function runEpisodeSearchJob(): Promise<EpisodeSearchResult> {
     if (pendingEpisodes.length === 0) continue
 
     const pendingRatio = pendingEpisodes.length / allEpisodes.length
-    const shouldTrySeasonPack = pendingRatio >= 0.5 && allEpisodes.every((ep) => ep.status === 'pending' || ep.status === 'failed')
+    const shouldTrySeasonPack =
+      pendingRatio >= 0.5 &&
+      allEpisodes.every((ep) => ep.status === 'pending' || ep.status === 'failed')
 
     if (shouldTrySeasonPack) {
       const seasonPack = await searchForSeasonPack(request)
@@ -139,7 +139,11 @@ export async function runEpisodeSearchJob(): Promise<EpisodeSearchResult> {
 
           const downloaders = configService.getEnabledDownloaders()
           const category = downloaders[0]?.categories?.tv
-          const { nzoId } = await downloadService.sendToDownloader(download.id, seasonPack.downloadUrl, category)
+          const { nzoId } = await downloadService.sendToDownloader(
+            download.id,
+            seasonPack.downloadUrl,
+            category
+          )
 
           // Mark all pending episodes as downloading (legacy compat)
           await requestService.updateAllEpisodesForSeason(
@@ -183,7 +187,11 @@ export async function runEpisodeSearchJob(): Promise<EpisodeSearchResult> {
 
           const downloaders = configService.getEnabledDownloaders()
           const category = downloaders[0]?.categories?.tv
-          const { nzoId } = await downloadService.sendToDownloader(download.id, result.downloadUrl, category)
+          const { nzoId } = await downloadService.sendToDownloader(
+            download.id,
+            result.downloadUrl,
+            category
+          )
 
           // Legacy compat
           await requestService.updateEpisodeStatus(episode.id, 'downloading', nzoId, result.title)

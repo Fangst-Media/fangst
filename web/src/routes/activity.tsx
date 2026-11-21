@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch, apiPost } from '../lib/api-client'
 
 type QueueItem = {
@@ -154,11 +154,11 @@ export default function Activity() {
               }`}
             >
               {isPaused ? (
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <svg aria-hidden="true" className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M8 5v14l11-7z" />
                 </svg>
               ) : (
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <svg aria-hidden="true" className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
                 </svg>
               )}
@@ -187,15 +187,28 @@ export default function Activity() {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-foreground">Queue</h2>
               {data.queue.length > 0 && (
-                <span className="text-sm text-muted">{data.queue.length} item{data.queue.length !== 1 ? 's' : ''}</span>
+                <span className="text-sm text-muted">
+                  {data.queue.length} item{data.queue.length !== 1 ? 's' : ''}
+                </span>
               )}
             </div>
 
             {data.queue.length === 0 ? (
               <div className="rounded-lg bg-card border border-border p-8 text-center">
                 <div className="w-12 h-12 rounded-full bg-background flex items-center justify-center mx-auto mb-3">
-                  <svg className="w-6 h-6 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 13l4 4L19 7" />
+                  <svg
+                    aria-hidden="true"
+                    className="w-6 h-6 text-muted"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M5 13l4 4L19 7"
+                    />
                   </svg>
                 </div>
                 <p className="text-muted">No active downloads</p>
@@ -222,22 +235,40 @@ export default function Activity() {
                           <span>·</span>
                           <span>{item.category || 'Default'}</span>
                           <span>·</span>
-                          <span>{(item.sizeMB - item.remainingMB).toFixed(0)} / {item.sizeMB.toFixed(0)} MB</span>
+                          <span>
+                            {(item.sizeMB - item.remainingMB).toFixed(0)} / {item.sizeMB.toFixed(0)}{' '}
+                            MB
+                          </span>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="text-right">
-                          <p className="text-sm font-medium text-foreground">{formatTimeLeft(item.timeLeft)}</p>
+                          <p className="text-sm font-medium text-foreground">
+                            {formatTimeLeft(item.timeLeft)}
+                          </p>
                           <p className="text-xs text-muted">{item.status}</p>
                         </div>
                         <button
                           type="button"
-                          onClick={() => deleteMutation.mutate({ id: item.id, downloaderId: item.downloaderId })}
+                          onClick={() =>
+                            deleteMutation.mutate({ id: item.id, downloaderId: item.downloaderId })
+                          }
                           className="p-1.5 rounded text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
                           title="Remove from queue"
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          <svg
+                            aria-hidden="true"
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M6 18L18 6M6 6l12 12"
+                            />
                           </svg>
                         </button>
                       </div>
@@ -251,7 +282,9 @@ export default function Activity() {
                           style={{ width: `${item.percentage}%` }}
                         />
                       </div>
-                      <span className="text-xs text-muted w-12 text-right">{item.percentage.toFixed(1)}%</span>
+                      <span className="text-xs text-muted w-12 text-right">
+                        {item.percentage.toFixed(1)}%
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -302,26 +335,43 @@ export default function Activity() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-border bg-background/50">
-                      <th className="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-wider">Name</th>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-wider">Status</th>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-wider">Size</th>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-wider">Duration</th>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-wider">Completed</th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-wider">
+                        Name
+                      </th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-wider">
+                        Size
+                      </th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-wider">
+                        Duration
+                      </th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-wider">
+                        Completed
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     {data.history.map((item) => (
                       <tr key={item.id} className="hover:bg-background/30">
                         <td className="px-4 py-3">
-                          <p className="text-sm text-foreground truncate max-w-md" title={item.name}>{item.name}</p>
+                          <p
+                            className="text-sm text-foreground truncate max-w-md"
+                            title={item.name}
+                          >
+                            {item.name}
+                          </p>
                           <p className="text-xs text-muted">{item.downloader}</p>
                         </td>
                         <td className="px-4 py-3">
-                          <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded ${
-                            item.status === 'Completed'
-                              ? 'bg-green-500/20 text-green-400'
-                              : 'bg-red-500/20 text-red-400'
-                          }`}>
+                          <span
+                            className={`inline-block px-2 py-0.5 text-xs font-medium rounded ${
+                              item.status === 'Completed'
+                                ? 'bg-green-500/20 text-green-400'
+                                : 'bg-red-500/20 text-red-400'
+                            }`}
+                          >
                             {item.status}
                           </span>
                           {item.failMessage && (
@@ -329,8 +379,12 @@ export default function Activity() {
                           )}
                         </td>
                         <td className="px-4 py-3 text-sm text-muted">{item.size}</td>
-                        <td className="px-4 py-3 text-sm text-muted">{formatDownloadTime(item.downloadTime)}</td>
-                        <td className="px-4 py-3 text-sm text-muted">{formatRelativeTime(item.completedAt)}</td>
+                        <td className="px-4 py-3 text-sm text-muted">
+                          {formatDownloadTime(item.downloadTime)}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-muted">
+                          {formatRelativeTime(item.completedAt)}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -342,7 +396,9 @@ export default function Activity() {
           {/* Errors */}
           {data.errors && data.errors.length > 0 && (
             <div className="rounded-lg bg-yellow-500/10 border border-yellow-500/20 p-4">
-              <p className="text-sm font-medium text-yellow-500 mb-2">Some downloaders had errors:</p>
+              <p className="text-sm font-medium text-yellow-500 mb-2">
+                Some downloaders had errors:
+              </p>
               {data.errors.map((err) => (
                 <p key={err.downloader} className="text-sm text-yellow-400/80">
                   {err.downloader}: {err.error}

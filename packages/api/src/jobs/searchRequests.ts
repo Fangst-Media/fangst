@@ -1,13 +1,13 @@
 import { type ParsedRelease, parseReleaseName } from '@jaeger/parser'
 import type { SearchResult } from '@jaeger/shared/types/indexer'
 import type { QualityProfile } from '@jaeger/shared/types/profiles'
+import { logger } from '../lib/logger'
+import { meetsCutoff, scoreReleaseWithProfile } from '../lib/profile-scoring'
 import { configService } from '../services/config'
-import { type RequestWithUser, requestService } from '../services/requests'
 import { downloadService } from '../services/downloads'
 import { profileService } from '../services/profiles'
+import { type RequestWithUser, requestService } from '../services/requests'
 import { searchService } from '../services/search'
-import { scoreReleaseWithProfile, meetsCutoff } from '../lib/profile-scoring'
-import { logger } from '../lib/logger'
 
 const QUALITY_ORDER = ['2160p', '1080p', '720p', '480p']
 
@@ -75,7 +75,15 @@ export function selectBestRelease(
 
     const best = eligible[0]
     if (best) {
-      logger.info({ release: best.result.title, score: best.totalScore, base: best.baseScore, bonus: best.profileBonus }, 'Selected release with profile')
+      logger.info(
+        {
+          release: best.result.title,
+          score: best.totalScore,
+          base: best.baseScore,
+          bonus: best.profileBonus,
+        },
+        'Selected release with profile'
+      )
     }
     return best?.result ?? null
   }
@@ -96,7 +104,10 @@ export function selectBestRelease(
 
   const best = filtered[0]
   if (best) {
-    logger.info({ release: best.result.title, score: best.parsed.qualityScore }, 'Selected release (legacy)')
+    logger.info(
+      { release: best.result.title, score: best.parsed.qualityScore },
+      'Selected release (legacy)'
+    )
   }
   return best?.result ?? null
 }
@@ -113,10 +124,13 @@ async function processRequest(request: RequestWithUser): Promise<'found' | 'not_
       : await profileService.getDefault()
 
     // Check if this is an upgrade search
-    if (request.status === 'completed' as string) {
+    if (request.status === ('completed' as string)) {
       const bestDownload = await downloadService.getBestComplete(request.id)
       if (bestDownload && profile && meetsCutoff(bestDownload.qualityScore ?? 0, profile)) {
-        logger.info({ title: request.title, score: bestDownload.qualityScore, cutoff: profile.cutoffScore }, 'Already meets cutoff, skipping')
+        logger.info(
+          { title: request.title, score: bestDownload.qualityScore, cutoff: profile.cutoffScore },
+          'Already meets cutoff, skipping'
+        )
         return 'not_found'
       }
     }
@@ -180,17 +194,20 @@ async function processRequest(request: RequestWithUser): Promise<'found' | 'not_
     // Determine category for downloader
     const downloaders = configService.getEnabledDownloaders()
     const downloader = downloaders[0]
-    const category = request.type === 'movie'
-      ? downloader?.categories?.movies
-      : request.type === 'book'
-        ? (request.format === 'audiobook' ? downloader?.categories?.audiobooks : downloader?.categories?.books)
-        : downloader?.categories?.tv
+    const category =
+      request.type === 'movie'
+        ? downloader?.categories?.movies
+        : request.type === 'book'
+          ? request.format === 'audiobook'
+            ? downloader?.categories?.audiobooks
+            : downloader?.categories?.books
+          : downloader?.categories?.tv
 
     try {
       await downloadService.sendToDownloader(download.id, bestRelease.downloadUrl, category)
 
       // If this is an upgrade, mark old downloads as replaced
-      if (request.status === 'completed' as string) {
+      if (request.status === ('completed' as string)) {
         const existingDownloads = await downloadService.getByRequestId(request.id)
         for (const existing of existingDownloads) {
           if (existing.id !== download.id && existing.status === 'complete') {
@@ -203,7 +220,11 @@ async function processRequest(request: RequestWithUser): Promise<'found' | 'not_
       return 'found'
     } catch (error) {
       logger.error({ error, title: request.title }, 'Failed to send to downloader')
-      await downloadService.updateStatus(download.id, 'failed', error instanceof Error ? error.message : 'Send failed')
+      await downloadService.updateStatus(
+        download.id,
+        'failed',
+        error instanceof Error ? error.message : 'Send failed'
+      )
       await requestService.updateStatus(request.id, 'failed')
       return 'error'
     }
@@ -227,7 +248,10 @@ export async function runSearchJob(): Promise<{ searched: number; found: number;
   })
 
   const requests = [...pendingRequests, ...upgradeEligible]
-  logger.info({ count: requests.length, pending: pendingRequests.length, upgrades: upgradeEligible.length }, 'Requests to search')
+  logger.info(
+    { count: requests.length, pending: pendingRequests.length, upgrades: upgradeEligible.length },
+    'Requests to search'
+  )
 
   let searched = 0
   let found = 0

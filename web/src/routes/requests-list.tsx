@@ -1,7 +1,7 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useAuth } from '../lib/auth'
 import { apiFetch, apiPost } from '../lib/api-client'
+import { useAuth } from '../lib/auth'
 
 import type { RequestStatus } from '../hooks/useRequestStatus'
 
@@ -65,15 +65,27 @@ async function runMonitorJob(): Promise<{ checked: number; completed: number; fa
   return apiPost('/api/requests/monitor-job', {})
 }
 
-async function runEpisodeSearchJob(): Promise<{ checked: number; found: number; errors: number; seasonPacks: number }> {
+async function runEpisodeSearchJob(): Promise<{
+  checked: number
+  found: number
+  errors: number
+  seasonPacks: number
+}> {
   return apiPost('/api/requests/episode-search-job', {})
 }
 
-async function runAirDateMonitor(): Promise<{ requestsChecked: number; episodesAdded: number; statusUpdates: number; errors: number }> {
+async function runAirDateMonitor(): Promise<{
+  requestsChecked: number
+  episodesAdded: number
+  statusUpdates: number
+  errors: number
+}> {
   return apiPost('/api/requests/air-date-monitor', {})
 }
 
-async function fetchEpisodesFromTmdb(requestId: string): Promise<{ success: boolean; episodesAdded: number; seriesStatus: string }> {
+async function fetchEpisodesFromTmdb(
+  requestId: string
+): Promise<{ success: boolean; episodesAdded: number; seriesStatus: string }> {
   const response = await fetch(`/api/requests/${requestId}/episodes/fetch`, { method: 'POST' })
   if (!response.ok) throw new Error('Failed to fetch episodes from TMDB')
   return response.json()
@@ -133,7 +145,9 @@ function SeriesStatusBadge({ status }: { status: 'returning' | 'ended' | 'upcomi
   }
 
   return (
-    <span className={`inline-block px-1.5 py-0.5 text-[10px] font-medium rounded ${styles[status]}`}>
+    <span
+      className={`inline-block px-1.5 py-0.5 text-[10px] font-medium rounded ${styles[status]}`}
+    >
       {labels[status]}
     </span>
   )
@@ -202,7 +216,14 @@ export default function RequestsList() {
   const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<FilterTab>('all')
 
-  const statusFilter = activeTab === 'all' ? undefined : activeTab === 'pending' ? 'pending_approval' : activeTab === 'searching' ? 'approved,searching,found,fetching_nzb,nzb_downloaded,sent_to_downloader,downloading,download_complete,importing' : 'completed'
+  const statusFilter =
+    activeTab === 'all'
+      ? undefined
+      : activeTab === 'pending'
+        ? 'pending_approval'
+        : activeTab === 'searching'
+          ? 'approved,searching,found,fetching_nzb,nzb_downloaded,sent_to_downloader,downloading,download_complete,importing'
+          : 'completed'
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['requests', statusFilter],
@@ -229,7 +250,9 @@ export default function RequestsList() {
     mutationFn: runSearchJob,
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['requests'] })
-      alert(`Search complete: ${result.found} found, ${result.searched} searched, ${result.errors} errors`)
+      alert(
+        `Search complete: ${result.found} found, ${result.searched} searched, ${result.errors} errors`
+      )
     },
   })
 
@@ -237,7 +260,9 @@ export default function RequestsList() {
     mutationFn: runMonitorJob,
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['requests'] })
-      alert(`Monitor complete: ${result.completed} completed, ${result.failed} failed, ${result.checked} checked`)
+      alert(
+        `Monitor complete: ${result.completed} completed, ${result.failed} failed, ${result.checked} checked`
+      )
     },
   })
 
@@ -245,7 +270,9 @@ export default function RequestsList() {
     mutationFn: runEpisodeSearchJob,
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['requests'] })
-      alert(`Episode search complete: ${result.found} found, ${result.seasonPacks} season packs, ${result.errors} errors`)
+      alert(
+        `Episode search complete: ${result.found} found, ${result.seasonPacks} season packs, ${result.errors} errors`
+      )
     },
   })
 
@@ -253,7 +280,9 @@ export default function RequestsList() {
     mutationFn: runAirDateMonitor,
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['requests'] })
-      alert(`Air date monitor complete: ${result.episodesAdded} episodes added, ${result.statusUpdates} status updates`)
+      alert(
+        `Air date monitor complete: ${result.episodesAdded} episodes added, ${result.statusUpdates} status updates`
+      )
     },
   })
 
@@ -293,8 +322,19 @@ export default function RequestsList() {
               {airDateMonitorMutation.isPending ? (
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-foreground border-t-transparent" />
               ) : (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                <svg
+                  aria-hidden="true"
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                  />
                 </svg>
               )}
               <span className="hidden sm:inline">Air Dates</span>
@@ -309,8 +349,19 @@ export default function RequestsList() {
               {monitorJobMutation.isPending ? (
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-foreground border-t-transparent" />
               ) : (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                <svg
+                  aria-hidden="true"
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
                 </svg>
               )}
               <span className="hidden sm:inline">Downloads</span>
@@ -325,8 +376,19 @@ export default function RequestsList() {
               {episodeSearchMutation.isPending ? (
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-foreground border-t-transparent" />
               ) : (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
+                <svg
+                  aria-hidden="true"
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"
+                  />
                 </svg>
               )}
               <span className="hidden sm:inline">Episodes</span>
@@ -341,8 +403,19 @@ export default function RequestsList() {
               {searchJobMutation.isPending ? (
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
               ) : (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                <svg
+                  aria-hidden="true"
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
                 </svg>
               )}
               <span className="hidden sm:inline">Search</span>
@@ -384,8 +457,19 @@ export default function RequestsList() {
       {data && data.requests.length === 0 && (
         <div className="rounded-lg bg-card border border-border p-8 text-center">
           <div className="w-12 h-12 rounded-full bg-background flex items-center justify-center mx-auto mb-3">
-            <svg className="w-6 h-6 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            <svg
+              aria-hidden="true"
+              className="w-6 h-6 text-muted"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+              />
             </svg>
           </div>
           <p className="text-muted">No requests found</p>
@@ -407,8 +491,19 @@ export default function RequestsList() {
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                      <svg className="w-6 h-6 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
+                      <svg
+                        aria-hidden="true"
+                        className="w-6 h-6 text-muted"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"
+                        />
                       </svg>
                     </div>
                   )}
@@ -418,7 +513,10 @@ export default function RequestsList() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <h3 className="font-medium text-foreground truncate" title={`${request.title}${request.year ? ` (${request.year})` : ''}`}>
+                      <h3
+                        className="font-medium text-foreground truncate"
+                        title={`${request.title}${request.year ? ` (${request.year})` : ''}`}
+                      >
                         {request.title}
                         {request.year && <span className="text-muted ml-1">({request.year})</span>}
                       </h3>
@@ -453,14 +551,17 @@ export default function RequestsList() {
                         </div>
                       )}
                       {/* Episode progress for TV requests */}
-                      {request.type === 'tv' && request.season && request.totalEpisodes !== null && request.totalEpisodes > 0 && (
-                        <div className="mt-2 max-w-xs">
-                          <EpisodeProgress
-                            downloaded={request.downloadedEpisodes ?? 0}
-                            total={request.totalEpisodes}
-                          />
-                        </div>
-                      )}
+                      {request.type === 'tv' &&
+                        request.season &&
+                        request.totalEpisodes !== null &&
+                        request.totalEpisodes > 0 && (
+                          <div className="mt-2 max-w-xs">
+                            <EpisodeProgress
+                              downloaded={request.downloadedEpisodes ?? 0}
+                              total={request.totalEpisodes}
+                            />
+                          </div>
+                        )}
                     </div>
                     <StatusBadge status={request.status} />
                   </div>
@@ -504,16 +605,20 @@ export default function RequestsList() {
                       </>
                     )}
                     {/* Fetch episodes button for TV requests without episodes */}
-                    {isAdmin && request.type === 'tv' && request.season && request.tmdbId && (request.totalEpisodes === null || request.totalEpisodes === 0) && (
-                      <button
-                        type="button"
-                        onClick={() => fetchEpisodesMutation.mutate(request.id)}
-                        disabled={fetchEpisodesMutation.isPending}
-                        className="px-3 py-1 text-xs font-medium rounded bg-accent/20 text-accent hover:bg-accent/30 transition-colors"
-                      >
-                        {fetchEpisodesMutation.isPending ? 'Fetching...' : 'Fetch Episodes'}
-                      </button>
-                    )}
+                    {isAdmin &&
+                      request.type === 'tv' &&
+                      request.season &&
+                      request.tmdbId &&
+                      (request.totalEpisodes === null || request.totalEpisodes === 0) && (
+                        <button
+                          type="button"
+                          onClick={() => fetchEpisodesMutation.mutate(request.id)}
+                          disabled={fetchEpisodesMutation.isPending}
+                          className="px-3 py-1 text-xs font-medium rounded bg-accent/20 text-accent hover:bg-accent/30 transition-colors"
+                        >
+                          {fetchEpisodesMutation.isPending ? 'Fetching...' : 'Fetch Episodes'}
+                        </button>
+                      )}
                     {isAdmin ? (
                       <button
                         type="button"

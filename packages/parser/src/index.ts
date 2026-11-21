@@ -1,5 +1,5 @@
-import { detectStreamingService } from './data/streaming-services'
 import { getReleaseGroupTier } from './data/release-groups'
+import { detectStreamingService } from './data/streaming-services'
 import { calculateQualityScore } from './scoring'
 
 export type ParsedRelease = {
@@ -10,7 +10,18 @@ export type ParsedRelease = {
   resolution?: '2160p' | '1080p' | '720p' | '480p'
   source?: 'bluray' | 'webdl' | 'webrip' | 'hdtv' | 'dvd'
   videoCodec?: 'x265' | 'x264' | 'av1' | 'xvid'
-  audioCodec?: 'atmos' | 'truehd' | 'dtsx' | 'dtshd' | 'dts' | 'ddp' | 'dd' | 'flac' | 'aac' | 'ac3' | 'opus'
+  audioCodec?:
+    | 'atmos'
+    | 'truehd'
+    | 'dtsx'
+    | 'dtshd'
+    | 'dts'
+    | 'ddp'
+    | 'dd'
+    | 'flac'
+    | 'aac'
+    | 'ac3'
+    | 'opus'
   hdr?: 'dv' | 'hdr10+' | 'hdr10' | 'hlg'
   releaseGroup?: string
   proper?: boolean

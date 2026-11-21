@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import { useAuth } from '../lib/auth'
-import { bookLanes } from '../lib/api-client'
 import { BookHeroSection } from '../components/BookHeroSection'
+import { bookLanes } from '../lib/api-client'
+import { useAuth } from '../lib/auth'
 import { ContentLane } from './requests/ContentLane'
 
 type BookFormat = 'ebook' | 'audiobook'

@@ -1,8 +1,8 @@
-import { eq, inArray, and, isNull } from 'drizzle-orm'
+import { and, eq, inArray, isNull } from 'drizzle-orm'
 import { db } from '../db'
-import { requests, users, requestUsers } from '../db/schema'
-import { episodeService } from './episodes'
+import { requestUsers, requests, users } from '../db/schema'
 import { triggerSearchJob } from '../lib/scheduler'
+import { episodeService } from './episodes'
 import type { Episode, MonitoringPreset } from './episodes'
 
 export type RequestStatus =
@@ -157,7 +157,9 @@ export class RequestService {
     isAdmin: boolean
   ): Promise<RequestWithUser> {
     if (!data.title) {
-      throw new Error(`Cannot create request: title is required (received: ${JSON.stringify({ title: data.title, type: data.type, tmdbId: data.tmdbId })})`)
+      throw new Error(
+        `Cannot create request: title is required (received: ${JSON.stringify({ title: data.title, type: data.type, tmdbId: data.tmdbId })})`
+      )
     }
     const now = new Date()
 
@@ -332,7 +334,12 @@ export class RequestService {
         mode: (row.request.mode ?? 'auto') as 'auto' | 'manual',
         nzoId: row.request.nzoId,
         releaseName: row.request.releaseName,
-        seriesStatus: row.request.seriesStatus as 'returning' | 'ended' | 'upcoming' | 'unknown' | null,
+        seriesStatus: row.request.seriesStatus as
+          | 'returning'
+          | 'ended'
+          | 'upcoming'
+          | 'unknown'
+          | null,
         totalEpisodes: row.request.totalEpisodes,
         downloadedEpisodes: row.request.downloadedEpisodes,
         monitoringPreset: row.request.monitoringPreset as MonitoringPreset | null,
@@ -368,11 +375,7 @@ export class RequestService {
       .select({ id: requests.id })
       .from(requests)
       .where(
-        and(
-          eq(requests.tmdbId, tmdbId),
-          eq(requests.type, 'tv'),
-          eq(requests.season, seasonNumber)
-        )
+        and(eq(requests.tmdbId, tmdbId), eq(requests.type, 'tv'), eq(requests.season, seasonNumber))
       )
       .limit(1)
 
@@ -489,10 +492,7 @@ export class RequestService {
   }
 
   async updateLastSearched(id: string): Promise<void> {
-    await db
-      .update(requests)
-      .set({ lastSearchedAt: new Date() })
-      .where(eq(requests.id, id))
+    await db.update(requests).set({ lastSearchedAt: new Date() }).where(eq(requests.id, id))
   }
 
   async getApprovedForSearch(): Promise<RequestWithUser[]> {
@@ -513,7 +513,12 @@ export class RequestService {
 
   async createEpisodesForSeason(
     requestId: string,
-    episodeList: { seasonNumber: number; episodeNumber: number; title?: string; airDate?: string }[],
+    episodeList: {
+      seasonNumber: number
+      episodeNumber: number
+      title?: string
+      airDate?: string
+    }[],
     monitoringPreset?: MonitoringPreset
   ): Promise<Episode[]> {
     return episodeService.createWithPreset(requestId, episodeList, monitoringPreset ?? 'all')

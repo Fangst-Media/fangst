@@ -1,7 +1,7 @@
+import type { CreateProfile, QualityProfile, UpdateProfile } from '@jaeger/shared/types/profiles'
 import { eq } from 'drizzle-orm'
 import { db } from '../db'
 import { qualityProfiles } from '../db/schema'
-import type { QualityProfile, CreateProfile, UpdateProfile } from '@jaeger/shared/types/profiles'
 
 function generateId(): string {
   return crypto.randomUUID()
@@ -90,13 +90,20 @@ class ProfileService {
 
     if (data.name !== undefined) updates.name = data.name
     if (data.minResolution !== undefined) updates.minResolution = data.minResolution
-    if (data.preferredResolution !== undefined) updates.preferredResolution = data.preferredResolution
-    if (data.preferredSources !== undefined) updates.preferredSources = data.preferredSources ? JSON.stringify(data.preferredSources) : null
+    if (data.preferredResolution !== undefined)
+      updates.preferredResolution = data.preferredResolution
+    if (data.preferredSources !== undefined)
+      updates.preferredSources = data.preferredSources
+        ? JSON.stringify(data.preferredSources)
+        : null
     if (data.requireHdr !== undefined) updates.requireHdr = data.requireHdr
-    if (data.preferredHdr !== undefined) updates.preferredHdr = data.preferredHdr ? JSON.stringify(data.preferredHdr) : null
-    if (data.preferredAudio !== undefined) updates.preferredAudio = data.preferredAudio ? JSON.stringify(data.preferredAudio) : null
+    if (data.preferredHdr !== undefined)
+      updates.preferredHdr = data.preferredHdr ? JSON.stringify(data.preferredHdr) : null
+    if (data.preferredAudio !== undefined)
+      updates.preferredAudio = data.preferredAudio ? JSON.stringify(data.preferredAudio) : null
     if (data.sizeFilterEnabled !== undefined) updates.sizeFilterEnabled = data.sizeFilterEnabled
-    if (data.sizeFilterMinMbPerMin !== undefined) updates.sizeFilterMinMbPerMin = data.sizeFilterMinMbPerMin
+    if (data.sizeFilterMinMbPerMin !== undefined)
+      updates.sizeFilterMinMbPerMin = data.sizeFilterMinMbPerMin
     if (data.cutoffScore !== undefined) updates.cutoffScore = data.cutoffScore
     if (data.upgradeAllowed !== undefined) updates.upgradeAllowed = data.upgradeAllowed
     if (data.isDefault !== undefined) updates.isDefault = data.isDefault

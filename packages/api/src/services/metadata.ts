@@ -1,11 +1,11 @@
 import { MetadataRelayClient } from '@jaeger/shared/clients/metadata-relay'
-import { OpenLibraryProvider } from './openlibrary'
 import type {
   MetadataRelayResult,
-  TvSeriesDetails,
   SeasonDetails,
+  TvSeriesDetails,
 } from '@jaeger/shared/clients/metadata-relay'
 import { logger } from '../lib/logger'
+import { OpenLibraryProvider } from './openlibrary'
 
 export type { MetadataRelayResult as MetadataResult, TvSeriesDetails, SeasonDetails }
 
@@ -804,7 +804,10 @@ export class MetadataService {
         try {
           return await provider.searchBooks(query)
         } catch (error) {
-          logger.warn({ provider: provider.name, error: error instanceof Error ? error.message : error }, 'Provider failed, trying next')
+          logger.warn(
+            { provider: provider.name, error: error instanceof Error ? error.message : error },
+            'Provider failed, trying next'
+          )
           continue
         }
       }
@@ -818,7 +821,10 @@ export class MetadataService {
         try {
           return await provider.getTrendingBooks()
         } catch (error) {
-          logger.warn({ provider: provider.name, error: error instanceof Error ? error.message : error }, 'Provider failed, trying next')
+          logger.warn(
+            { provider: provider.name, error: error instanceof Error ? error.message : error },
+            'Provider failed, trying next'
+          )
           continue
         }
       }
@@ -832,7 +838,10 @@ export class MetadataService {
         try {
           return await provider.getPopularBooks()
         } catch (error) {
-          logger.warn({ provider: provider.name, error: error instanceof Error ? error.message : error }, 'Provider failed, trying next')
+          logger.warn(
+            { provider: provider.name, error: error instanceof Error ? error.message : error },
+            'Provider failed, trying next'
+          )
           continue
         }
       }
@@ -846,7 +855,10 @@ export class MetadataService {
         try {
           return await provider.getClassicBooks()
         } catch (error) {
-          logger.warn({ provider: provider.name, error: error instanceof Error ? error.message : error }, 'Provider failed, trying next')
+          logger.warn(
+            { provider: provider.name, error: error instanceof Error ? error.message : error },
+            'Provider failed, trying next'
+          )
           continue
         }
       }
@@ -860,7 +872,10 @@ export class MetadataService {
         try {
           return await provider.getBookDetails(workId)
         } catch (error) {
-          logger.warn({ provider: provider.name, error: error instanceof Error ? error.message : error }, 'Provider failed, trying next')
+          logger.warn(
+            { provider: provider.name, error: error instanceof Error ? error.message : error },
+            'Provider failed, trying next'
+          )
           continue
         }
       }
@@ -872,7 +887,10 @@ export class MetadataService {
 // Singleton instance (disabled for now to support hot reload)
 let metadataService: MetadataService | null = null
 
-export function getMetadataService(config: { relayUrl: string; tmdbApiKey?: string }): MetadataService {
+export function getMetadataService(config: {
+  relayUrl: string
+  tmdbApiKey?: string
+}): MetadataService {
   // Always create new instance until hot reload issue is resolved
   metadataService = new MetadataService(config)
 

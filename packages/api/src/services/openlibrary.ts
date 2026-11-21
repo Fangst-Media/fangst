@@ -1,5 +1,5 @@
 import { logger } from '../lib/logger'
-import type { MetadataProvider, MetadataCapability, BookDetails } from './metadata'
+import type { BookDetails, MetadataCapability, MetadataProvider } from './metadata'
 
 type OpenLibraryWork = {
   key: string
@@ -106,18 +106,12 @@ export class OpenLibraryProvider implements MetadataProvider {
   }
 
   async getTrendingBooks(): Promise<MetadataResult[]> {
-    const data = await this.fetch<{ works: OpenLibraryWork[] }>(
-      '/trending/daily.json',
-      'trending'
-    )
+    const data = await this.fetch<{ works: OpenLibraryWork[] }>('/trending/daily.json', 'trending')
     return data.works.slice(0, 20).map(mapWork)
   }
 
   async getPopularBooks(): Promise<MetadataResult[]> {
-    const data = await this.fetch<{ works: OpenLibraryWork[] }>(
-      '/trending/weekly.json',
-      'popular'
-    )
+    const data = await this.fetch<{ works: OpenLibraryWork[] }>('/trending/weekly.json', 'popular')
     return data.works.slice(0, 20).map(mapWork)
   }
 
@@ -156,7 +150,9 @@ export class OpenLibraryProvider implements MetadataProvider {
       title: data.title,
       author,
       authorId,
-      year: data.first_publish_date ? parseInt(data.first_publish_date, 10) || undefined : undefined,
+      year: data.first_publish_date
+        ? Number.parseInt(data.first_publish_date, 10) || undefined
+        : undefined,
       cover: coverId ? getCoverUrl(coverId, 'L') : undefined,
       overview: extractDescription(data.description),
       subjects: data.subjects?.slice(0, 10),

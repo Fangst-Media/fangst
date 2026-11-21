@@ -6,7 +6,19 @@ export const sourceSchema = z.enum(['remux', 'bluray', 'webdl', 'webrip', 'hdtv'
 
 export const hdrSchema = z.enum(['dv', 'hdr10+', 'hdr10', 'hlg'])
 
-export const audioSchema = z.enum(['atmos', 'truehd', 'dtsx', 'dtshd', 'dts', 'ddp', 'dd', 'flac', 'aac', 'ac3', 'opus'])
+export const audioSchema = z.enum([
+  'atmos',
+  'truehd',
+  'dtsx',
+  'dtshd',
+  'dts',
+  'ddp',
+  'dd',
+  'flac',
+  'aac',
+  'ac3',
+  'opus',
+])
 
 export const qualityProfileSchema = z.object({
   id: z.string(),

@@ -1,4 +1,4 @@
-import type { SearchResult, IndexerTestResult } from '../types/indexer'
+import type { IndexerTestResult, SearchResult } from '../types/indexer'
 
 export interface NewznabSearchParams {
   query?: string
@@ -174,8 +174,12 @@ export class NewznabClient {
     indexerId: string
   ): SearchResult | null {
     // Handle both direct attrs and @attributes nested format
-    const rawAttrs = item.attr as Array<{ '@attributes'?: { name: string; value: string }; name?: string; value?: string }> | undefined
-    const attrs = rawAttrs?.map(a => a['@attributes'] ?? a) as Array<{ name: string; value: string }> | undefined
+    const rawAttrs = item.attr as
+      | Array<{ '@attributes'?: { name: string; value: string }; name?: string; value?: string }>
+      | undefined
+    const attrs = rawAttrs?.map((a) => a['@attributes'] ?? a) as
+      | Array<{ name: string; value: string }>
+      | undefined
     const guid = (item.guid as string) || attrs?.find((a) => a.name === 'guid')?.value
     const title = item.title as string
     const enclosure = item.enclosure as Record<string, unknown> | undefined
@@ -218,7 +222,9 @@ export class NewznabClient {
     indexerId: string
   ): SearchResult | null {
     const getTag = (tag: string): string | undefined => {
-      const match = itemXml.match(new RegExp(`<${tag}><!\\[CDATA\\[([^\\]]*?)\\]\\]><\\/${tag}>|<${tag}>([^<]*)<\\/${tag}>`))
+      const match = itemXml.match(
+        new RegExp(`<${tag}><!\\[CDATA\\[([^\\]]*?)\\]\\]><\\/${tag}>|<${tag}>([^<]*)<\\/${tag}>`)
+      )
       return match?.[1] || match?.[2]
     }
 

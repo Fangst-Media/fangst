@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'bun:test'
-import { parseReleaseName, detectStreamingService, getReleaseGroupTier, calculateQualityScore } from './index'
+import {
+  detectStreamingService,
+  getReleaseGroupTier,
+  parseReleaseName,
+} from './index'
 
 describe('parseReleaseName', () => {
   test('parses movie release', () => {

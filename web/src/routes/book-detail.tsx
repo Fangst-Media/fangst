@@ -1,9 +1,9 @@
 import type { BookDetails } from '@jaeger/shared/schemas/metadata'
 import type { ExternalLink } from '@jaeger/shared/types/settings'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { bookLanes, apiFetch, apiPost } from '../lib/api-client'
-import { useBookRequestStatus } from '../hooks/useRequestStatus'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { DownloadStatus } from '../components/DownloadStatus'
+import { useBookRequestStatus } from '../hooks/useRequestStatus'
+import { apiFetch, apiPost, bookLanes } from '../lib/api-client'
 
 function RequestButton({
   label,
@@ -15,7 +15,10 @@ function RequestButton({
   format: 'ebook' | 'audiobook'
 }) {
   const queryClient = useQueryClient()
-  const { request: formatRequest, isLoading: isLoadingStatus } = useBookRequestStatus(book.id, format)
+  const { request: formatRequest, isLoading: isLoadingStatus } = useBookRequestStatus(
+    book.id,
+    format
+  )
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -133,8 +136,19 @@ export default function BookDetail({ openLibraryId }: { openLibraryId: string })
               />
             ) : (
               <div className="w-48 md:w-56 aspect-[2/3] rounded-lg bg-card border border-border flex items-center justify-center">
-                <svg className="w-12 h-12 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                <svg
+                  aria-hidden="true"
+                  className="w-12 h-12 text-muted"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1}
+                    d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                  />
                 </svg>
               </div>
             )}
@@ -142,9 +156,7 @@ export default function BookDetail({ openLibraryId }: { openLibraryId: string })
 
           {/* Info */}
           <div className="flex-1 min-w-0">
-            <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
-              {book.title}
-            </h1>
+            <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">{book.title}</h1>
 
             <div className="flex flex-wrap items-center gap-3 mb-4 text-sm text-muted">
               {book.author && <span className="text-foreground/70">{book.author}</span>}
@@ -155,7 +167,10 @@ export default function BookDetail({ openLibraryId }: { openLibraryId: string })
             {book.subjects && book.subjects.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mb-4">
                 {book.subjects.slice(0, 5).map((subject) => (
-                  <span key={subject} className="px-2 py-0.5 rounded bg-foreground/10 text-xs text-muted">
+                  <span
+                    key={subject}
+                    className="px-2 py-0.5 rounded bg-foreground/10 text-xs text-muted"
+                  >
                     {subject}
                   </span>
                 ))}
@@ -163,9 +178,7 @@ export default function BookDetail({ openLibraryId }: { openLibraryId: string })
             )}
 
             {book.overview && (
-              <p className="text-foreground/80 leading-relaxed mb-6 max-w-2xl">
-                {book.overview}
-              </p>
+              <p className="text-foreground/80 leading-relaxed mb-6 max-w-2xl">{book.overview}</p>
             )}
 
             {/* Request buttons */}

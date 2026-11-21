@@ -1,12 +1,12 @@
-import { client } from '../api/client.gen'
-import { Movies, Tv, Books, Collections, IndexerTrending } from '../api'
 import type {
+  BookDetails,
+  CollectionDetails,
   LaneResponse,
   MovieDetails,
   TvSeriesDetails,
-  CollectionDetails,
-  BookDetails,
 } from '@jaeger/shared/schemas/metadata'
+import { Books, Collections, IndexerTrending, Movies, Tv } from '../api'
+import { client } from '../api/client.gen'
 
 // Configure the generated client with cookie-based auth
 client.setConfig({ credentials: 'include' })

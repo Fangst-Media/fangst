@@ -1,14 +1,14 @@
-import { MetadataRelayClient } from '@jaeger/shared/clients/metadata-relay'
 import { OpenAPIHono } from '@hono/zod-openapi'
+import { MetadataRelayClient } from '@jaeger/shared/clients/metadata-relay'
 import { runAirDateMonitor } from '../jobs/airDateMonitor'
 import { runDownloadMonitor } from '../jobs/downloadMonitor'
 import { runEpisodeSearchJob } from '../jobs/episodeSearch'
 import { runSearchJob } from '../jobs/searchRequests'
 import type { User } from '../services/auth'
 import { configService } from '../services/config'
-import { episodeService, type MonitoringPreset } from '../services/episodes'
-import { type CreateRequestData, type RequestStatus, requestService } from '../services/requests'
 import { downloadService } from '../services/downloads'
+import { type MonitoringPreset, episodeService } from '../services/episodes'
+import { type CreateRequestData, type RequestStatus, requestService } from '../services/requests'
 
 type AuthEnv = {
   Variables: {
@@ -114,7 +114,7 @@ requestsRouter.get('/season/:tmdbId/:seasonNumber', async (c) => {
   }
 
   const tmdbId = c.req.param('tmdbId')
-  const seasonNumber = parseInt(c.req.param('seasonNumber'), 10)
+  const seasonNumber = Number.parseInt(c.req.param('seasonNumber'), 10)
 
   if (isNaN(seasonNumber)) {
     return c.json({ error: 'Invalid season number' }, 400)
@@ -285,7 +285,10 @@ requestsRouter.post('/:id/downloads', async (c) => {
     }
 
     if (!body.downloadUrl || !body.downloaderId || !body.releaseName) {
-      return c.json({ error: 'Missing required fields: downloadUrl, downloaderId, releaseName' }, 400)
+      return c.json(
+        { error: 'Missing required fields: downloadUrl, downloaderId, releaseName' },
+        400
+      )
     }
 
     // Create the download
@@ -295,7 +298,11 @@ requestsRouter.post('/:id/downloads', async (c) => {
     })
 
     // Send to downloader
-    const result = await downloadService.sendToDownloader(download.id, body.downloadUrl, body.category)
+    const result = await downloadService.sendToDownloader(
+      download.id,
+      body.downloadUrl,
+      body.category
+    )
 
     return c.json({
       success: true,

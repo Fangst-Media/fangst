@@ -1,6 +1,6 @@
-import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { getPosterUrl, getMediaSlug, type MediaItem } from '../lib/api'
+import { useState } from 'react'
+import { type MediaItem, getMediaSlug, getPosterUrl } from '../lib/api'
 
 type MediaCardProps = {
   item: MediaItem
@@ -30,8 +30,19 @@ export function MediaCard({ item, episodeCount }: MediaCardProps) {
         ) : (
           <div className="h-full w-full flex items-center justify-center bg-card">
             <div className="text-center p-4">
-              <svg className="w-12 h-12 text-muted mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
+              <svg
+                aria-hidden="true"
+                className="w-12 h-12 text-muted mx-auto mb-2"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"
+                />
               </svg>
               <p className="text-xs text-muted line-clamp-2">{title}</p>
             </div>
@@ -41,8 +52,19 @@ export function MediaCard({ item, episodeCount }: MediaCardProps) {
         {/* Hover overlay with info icon */}
         <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100 flex items-center justify-center">
           <div className="rounded-full bg-white/20 p-3">
-            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <svg
+              aria-hidden="true"
+              className="w-6 h-6 text-white"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
             </svg>
           </div>
         </div>
@@ -73,13 +95,15 @@ export function MediaCard({ item, episodeCount }: MediaCardProps) {
               {episodeCount} {episodeCount === 1 ? 'episode' : 'episodes'}
             </span>
           </div>
-        ) : parsed.season !== undefined && (
-          <div className="absolute bottom-2 right-2">
-            <span className="rounded bg-accent px-1.5 py-0.5 text-[10px] font-medium text-white">
-              S{String(parsed.season).padStart(2, '0')}
-              {parsed.episode !== undefined && `E${String(parsed.episode).padStart(2, '0')}`}
-            </span>
-          </div>
+        ) : (
+          parsed.season !== undefined && (
+            <div className="absolute bottom-2 right-2">
+              <span className="rounded bg-accent px-1.5 py-0.5 text-[10px] font-medium text-white">
+                S{String(parsed.season).padStart(2, '0')}
+                {parsed.episode !== undefined && `E${String(parsed.episode).padStart(2, '0')}`}
+              </span>
+            </div>
+          )
         )}
       </div>
 

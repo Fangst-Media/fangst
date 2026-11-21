@@ -69,7 +69,8 @@ export default function Login({ onSuccess }: LoginProps) {
         <div className="mt-6 p-4 rounded-md bg-card border border-border">
           <p className="text-xs text-muted text-center mb-2">Mock Auth Mode</p>
           <p className="text-xs text-muted text-center">
-            Use <span className="text-accent font-medium">admin</span> for admin access, any other name for regular user
+            Use <span className="text-accent font-medium">admin</span> for admin access, any other
+            name for regular user
           </p>
         </div>
       </div>

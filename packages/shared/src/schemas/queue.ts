@@ -16,10 +16,14 @@ export const queueItemSchema = z.object({
   sizeleft: z.number(),
   status: queueStatusSchema,
   trackedDownloadStatus: z.string().optional(),
-  statusMessages: z.array(z.object({
-    title: z.string(),
-    messages: z.array(z.string()),
-  })).optional(),
+  statusMessages: z
+    .array(
+      z.object({
+        title: z.string(),
+        messages: z.array(z.string()),
+      })
+    )
+    .optional(),
   downloadClient: z.string().optional(),
   indexer: z.string().optional(),
   protocol: z.enum(['torrent', 'usenet']).optional(),

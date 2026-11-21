@@ -1,8 +1,14 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
-import { cors } from 'hono/cors'
 import { apiReference } from '@scalar/hono-api-reference'
+import { cors } from 'hono/cors'
+import { initializeDatabase } from './db/init'
+import { logger } from './lib/logger'
+import { startScheduler } from './lib/scheduler'
+import { authMiddleware } from './middleware/auth'
+import { requestLogger } from './middleware/logging'
 import activity from './routes/activity'
 import auth from './routes/auth'
+import booksRouter from './routes/books'
 import calendarRouter from './routes/calendar'
 import downloaders from './routes/downloaders'
 import indexers from './routes/indexers'
@@ -10,20 +16,14 @@ import libraryRouter from './routes/library'
 import logsRouter from './routes/logs'
 import media from './routes/media'
 import metadata from './routes/metadata'
-import booksRouter from './routes/books'
+import profilesRouter from './routes/profiles'
 import requestsRouter from './routes/requests'
 import search from './routes/search'
 import settings from './routes/settings'
 import usersRouter from './routes/users'
-import profilesRouter from './routes/profiles'
-import { authMiddleware } from './middleware/auth'
-import { requestLogger } from './middleware/logging'
-import { configService } from './services/config'
-import { logger } from './lib/logger'
-import { startScheduler } from './lib/scheduler'
-import { initializeDatabase } from './db/init'
-import { profileService } from './services/profiles'
 import { migrateRequestsToDownloads } from './scripts/migrate-requests-to-downloads'
+import { configService } from './services/config'
+import { profileService } from './services/profiles'
 
 // Initialize database and config before starting server
 await initializeDatabase()
@@ -68,10 +68,13 @@ app.doc('/api/openapi.json', {
   },
 })
 
-app.get('/api/docs', apiReference({
-  url: '/api/openapi.json',
-  pageTitle: 'Jæger API',
-}))
+app.get(
+  '/api/docs',
+  apiReference({
+    url: '/api/openapi.json',
+    pageTitle: 'Jæger API',
+  })
+)
 
 app.route('/api/auth', auth)
 app.route('/api/logs', logsRouter)

@@ -2,39 +2,34 @@ import type { MetadataResult } from '@jaeger/shared/schemas/metadata'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { SimpleRequestModal } from '../components/SimpleRequestModal'
-import { useAuth } from '../lib/auth'
 import { movieLanes, tvLanes } from '../lib/api-client'
+import { useAuth } from '../lib/auth'
 import { ContentLane } from './requests/ContentLane'
 import { ReleaseModal, type SearchResult } from './requests/ReleaseModal'
 
 async function searchContent(query: string): Promise<SearchResult[]> {
   if (!query.trim()) return []
 
-  const [movies, tv] = await Promise.all([
-    movieLanes.search(query),
-    tvLanes.search(query),
-  ])
+  const [movies, tv] = await Promise.all([movieLanes.search(query), tvLanes.search(query)])
 
-  const movieResults: SearchResult[] =
-    movies.results.slice(0, 5).map((m) => ({
-      id: m.id,
-      title: m.title,
-      year: m.year,
-      releaseDate: m.releaseDate,
-      overview: m.overview,
-      posterPath: m.poster,
-      type: 'movie' as const,
-    }))
+  const movieResults: SearchResult[] = movies.results.slice(0, 5).map((m) => ({
+    id: m.id,
+    title: m.title,
+    year: m.year,
+    releaseDate: m.releaseDate,
+    overview: m.overview,
+    posterPath: m.poster,
+    type: 'movie' as const,
+  }))
 
-  const tvResults: SearchResult[] =
-    tv.results.slice(0, 5).map((t) => ({
-      id: t.id,
-      title: t.title,
-      year: t.year,
-      overview: t.overview,
-      posterPath: t.poster,
-      type: 'tv' as const,
-    }))
+  const tvResults: SearchResult[] = tv.results.slice(0, 5).map((t) => ({
+    id: t.id,
+    title: t.title,
+    year: t.year,
+    overview: t.overview,
+    posterPath: t.poster,
+    type: 'tv' as const,
+  }))
 
   return [...movieResults, ...tvResults]
 }
@@ -124,7 +119,7 @@ export default function Requests() {
   }
 
   function formatReleaseDate(releaseDate: string): string {
-    const date = new Date(releaseDate + 'T00:00:00')
+    const date = new Date(`${releaseDate}T00:00:00`)
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   }
 
@@ -158,7 +153,13 @@ export default function Requests() {
             onClick={() => setRequestMode(requestMode === 'simple' ? 'detailed' : 'simple')}
             className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm text-muted hover:text-foreground border border-border hover:border-foreground/30 transition-colors"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg
+              aria-hidden="true"
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -270,17 +271,62 @@ export default function Requests() {
         {!debouncedQuery && (
           <div className="mt-8">
             {/* Movie lanes */}
-            <ContentLane title="Trending Movies" data={trendingMovies} isAdmin={isAdmin} onSelect={handleTrendingSelect} />
-            <ContentLane title="Upcoming Movies" data={upcomingMovies} isAdmin={isAdmin} onSelect={handleTrendingSelect} />
-            <ContentLane title="Now Playing" data={nowPlayingMovies} isAdmin={isAdmin} onSelect={handleTrendingSelect} />
-            <ContentLane title="Popular Movies" data={popularMovies} isAdmin={isAdmin} onSelect={handleTrendingSelect} />
-            <ContentLane title="Top Rated Movies" data={topRatedMovies} isAdmin={isAdmin} onSelect={handleTrendingSelect} />
+            <ContentLane
+              title="Trending Movies"
+              data={trendingMovies}
+              isAdmin={isAdmin}
+              onSelect={handleTrendingSelect}
+            />
+            <ContentLane
+              title="Upcoming Movies"
+              data={upcomingMovies}
+              isAdmin={isAdmin}
+              onSelect={handleTrendingSelect}
+            />
+            <ContentLane
+              title="Now Playing"
+              data={nowPlayingMovies}
+              isAdmin={isAdmin}
+              onSelect={handleTrendingSelect}
+            />
+            <ContentLane
+              title="Popular Movies"
+              data={popularMovies}
+              isAdmin={isAdmin}
+              onSelect={handleTrendingSelect}
+            />
+            <ContentLane
+              title="Top Rated Movies"
+              data={topRatedMovies}
+              isAdmin={isAdmin}
+              onSelect={handleTrendingSelect}
+            />
 
             {/* TV lanes */}
-            <ContentLane title="Trending TV Shows" data={trendingTv} isAdmin={isAdmin} onSelect={handleTrendingSelect} />
-            <ContentLane title="On Air" data={onAirTv} isAdmin={isAdmin} onSelect={handleTrendingSelect} />
-            <ContentLane title="Popular TV Shows" data={popularTv} isAdmin={isAdmin} onSelect={handleTrendingSelect} />
-            <ContentLane title="Top Rated TV Shows" data={topRatedTv} isAdmin={isAdmin} onSelect={handleTrendingSelect} />
+            <ContentLane
+              title="Trending TV Shows"
+              data={trendingTv}
+              isAdmin={isAdmin}
+              onSelect={handleTrendingSelect}
+            />
+            <ContentLane
+              title="On Air"
+              data={onAirTv}
+              isAdmin={isAdmin}
+              onSelect={handleTrendingSelect}
+            />
+            <ContentLane
+              title="Popular TV Shows"
+              data={popularTv}
+              isAdmin={isAdmin}
+              onSelect={handleTrendingSelect}
+            />
+            <ContentLane
+              title="Top Rated TV Shows"
+              data={topRatedTv}
+              isAdmin={isAdmin}
+              onSelect={handleTrendingSelect}
+            />
           </div>
         )}
       </div>

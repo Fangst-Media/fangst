@@ -1,5 +1,5 @@
 import { createRoute, z } from '@hono/zod-openapi'
-import { laneResponseSchema, errorResponseSchema } from '@jaeger/shared/schemas/metadata'
+import { errorResponseSchema, laneResponseSchema } from '@jaeger/shared/schemas/metadata'
 
 const errorContent = { 'application/json': { schema: errorResponseSchema } }
 
@@ -10,7 +10,10 @@ export function createLaneRoute(path: string, summary: string, tag: string) {
     tags: [tag],
     summary,
     responses: {
-      200: { content: { 'application/json': { schema: laneResponseSchema } }, description: summary },
+      200: {
+        content: { 'application/json': { schema: laneResponseSchema } },
+        description: summary,
+      },
       401: { content: errorContent, description: 'Unauthorized' },
       500: { content: errorContent, description: 'Server error' },
     },
@@ -29,7 +32,10 @@ export function createSearchRoute(path: string, summary: string, tag: string) {
       }),
     },
     responses: {
-      200: { content: { 'application/json': { schema: laneResponseSchema } }, description: summary },
+      200: {
+        content: { 'application/json': { schema: laneResponseSchema } },
+        description: summary,
+      },
       400: { content: errorContent, description: 'Bad request' },
       401: { content: errorContent, description: 'Unauthorized' },
       500: { content: errorContent, description: 'Server error' },

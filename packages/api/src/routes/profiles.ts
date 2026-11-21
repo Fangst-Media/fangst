@@ -1,7 +1,7 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
-import { profileService } from '../services/profiles'
 import type { CreateProfile, UpdateProfile } from '@jaeger/shared/types/profiles'
 import type { User } from '../services/auth'
+import { profileService } from '../services/profiles'
 
 type AuthEnv = {
   Variables: {

@@ -1,7 +1,7 @@
 import { parseReleaseName } from '@jaeger/parser'
-import { db } from '../db'
-import { requests, downloads, episodes } from '../db/schema'
 import { isNotNull } from 'drizzle-orm'
+import { db } from '../db'
+import { downloads, episodes, requests } from '../db/schema'
 import { logger } from '../lib/logger'
 
 /**
@@ -86,10 +86,14 @@ export async function migrateRequestsToDownloads(): Promise<void> {
 
     const parsed = episode.releaseName ? parseReleaseName(episode.releaseName) : null
 
-    const downloadStatus = episode.status === 'completed' ? 'complete' as const
-      : episode.status === 'failed' ? 'failed' as const
-      : episode.status === 'downloading' ? 'downloading' as const
-      : 'fetching' as const
+    const downloadStatus =
+      episode.status === 'completed'
+        ? ('complete' as const)
+        : episode.status === 'failed'
+          ? ('failed' as const)
+          : episode.status === 'downloading'
+            ? ('downloading' as const)
+            : ('fetching' as const)
 
     await db.insert(downloads).values({
       id: crypto.randomUUID(),
@@ -117,11 +121,16 @@ export async function migrateRequestsToDownloads(): Promise<void> {
   }
 
   if (migrated > 0 || episodeMigrated > 0) {
-    logger.info({ migrated, episodeMigrated }, 'Migrated request/episode downloads to downloads table')
+    logger.info(
+      { migrated, episodeMigrated },
+      'Migrated request/episode downloads to downloads table'
+    )
   }
 }
 
-function mapRequestStatusToDownloadStatus(requestStatus: string): 'fetching' | 'downloading' | 'complete' | 'failed' {
+function mapRequestStatusToDownloadStatus(
+  requestStatus: string
+): 'fetching' | 'downloading' | 'complete' | 'failed' {
   switch (requestStatus) {
     case 'fetching_nzb':
     case 'nzb_downloaded':

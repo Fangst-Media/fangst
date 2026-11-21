@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import { useAuth } from '../lib/auth'
-import { movieLanes } from '../lib/api-client'
 import { HeroSection } from '../components/HeroSection'
+import { movieLanes } from '../lib/api-client'
+import { useAuth } from '../lib/auth'
 import { ContentLane } from './requests/ContentLane'
 
 export default function Movies() {

@@ -1,6 +1,6 @@
+import { existsSync, readFileSync } from 'node:fs'
 import { readdir, stat } from 'node:fs/promises'
-import { readFileSync, existsSync } from 'node:fs'
-import { join, extname } from 'node:path'
+import { extname, join } from 'node:path'
 
 export type FileEntry = {
   path: string

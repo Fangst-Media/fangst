@@ -31,7 +31,10 @@ export const mockAuthSettingsSchema = z.object({
 // Auth settings
 export const authSettingsSchema = z.object({
   provider: z.enum(['jellyfin', 'mock']).default('jellyfin'),
-  jellyfin: jellyfinSettingsSchema.default({ url: 'http://localhost:8096', syncAdminFromProvider: true }),
+  jellyfin: jellyfinSettingsSchema.default({
+    url: 'http://localhost:8096',
+    syncAdminFromProvider: true,
+  }),
   mock: mockAuthSettingsSchema.default({ enabled: false }),
 })
 
@@ -69,11 +72,7 @@ export const uiSettingsSchema = z.object({
 })
 
 // Request mode permission options
-export const requestModePermissionSchema = z.enum([
-  'simple_only',
-  'detailed_only',
-  'user_choice',
-])
+export const requestModePermissionSchema = z.enum(['simple_only', 'detailed_only', 'user_choice'])
 
 // Request settings
 export const requestSettingsSchema = z.object({
@@ -210,11 +209,17 @@ export const settingsSchema = z.object({
     defaultSimpleQuality: '1080p',
   }),
   sizeFilter: sizeFilterSettingsSchema.default({
-    enabled: true, minMbPerMin720p: 12.5, minMbPerMin1080p: 12.5, minMbPerMin2160p: 34.5,
+    enabled: true,
+    minMbPerMin720p: 12.5,
+    minMbPerMin1080p: 12.5,
+    minMbPerMin2160p: 34.5,
   }),
   download: downloadSettingsSchema.default({ nzbBackupPath: '' }),
   metadataStore: metadataStoreSettingsSchema.default({
-    enabled: true, itemTtlDays: 30, listTtlHours: 4, indexerTrendingTtlMinutes: 60,
+    enabled: true,
+    itemTtlDays: 30,
+    listTtlHours: 4,
+    indexerTrendingTtlMinutes: 60,
   }),
   externalLinks: externalLinksSettingsSchema.default({ links: defaultExternalLinks }),
 })

@@ -1,7 +1,7 @@
+import type { CreateProfile, QualityProfile } from '@jaeger/shared/types/profiles'
+import type { ExternalLink, SettingsResponse, SettingsUpdate } from '@jaeger/shared/types/settings'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { SettingsResponse, SettingsUpdate, ExternalLink } from '@jaeger/shared/types/settings'
-import type { QualityProfile, CreateProfile } from '@jaeger/shared/types/profiles'
 import { apiFetch, apiPost } from '../lib/api-client'
 
 async function fetchSettings(): Promise<SettingsResponse> {
@@ -48,10 +48,10 @@ function SettingField({ label, description, locked, children }: SettingFieldProp
     <div className="py-4 border-b border-border last:border-0">
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1">
-          <label className="font-medium text-foreground flex items-center">
+          <p className="font-medium text-foreground flex items-center">
             {label}
             <LockedIndicator locked={locked ?? false} />
-          </label>
+          </p>
           {description && <p className="text-sm text-muted mt-1">{description}</p>}
         </div>
         <div className="shrink-0">{children}</div>
@@ -146,7 +146,8 @@ function QualityProfilesSection() {
                 {profile.preferredResolution && ` · Preferred: ${profile.preferredResolution}`}
                 {profile.preferredSources && ` · ${profile.preferredSources.join(', ')}`}
                 {profile.requireHdr && ' · HDR required'}
-                {' · Cutoff: '}{profile.cutoffScore}
+                {' · Cutoff: '}
+                {profile.cutoffScore}
               </p>
             </div>
             <div className="flex items-center gap-1 shrink-0">
@@ -155,8 +156,19 @@ function QualityProfilesSection() {
                 onClick={() => setEditingProfile(profile)}
                 className="p-1.5 text-muted hover:text-foreground transition-colors"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                <svg
+                  aria-hidden="true"
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"
+                  />
                 </svg>
               </button>
               <button
@@ -164,8 +176,19 @@ function QualityProfilesSection() {
                 onClick={() => deleteMutation.mutate(profile.id)}
                 className="p-1.5 text-muted hover:text-red-400 transition-colors"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  aria-hidden="true"
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
@@ -176,8 +199,13 @@ function QualityProfilesSection() {
       {(editingProfile || adding) && (
         <ProfileForm
           profile={editingProfile}
-          onSave={(data) => saveMutation.mutate(editingProfile ? { id: editingProfile.id, ...data } : data)}
-          onCancel={() => { setEditingProfile(null); setAdding(false) }}
+          onSave={(data) =>
+            saveMutation.mutate(editingProfile ? { id: editingProfile.id, ...data } : data)
+          }
+          onCancel={() => {
+            setEditingProfile(null)
+            setAdding(false)
+          }}
           isPending={saveMutation.isPending}
         />
       )}
@@ -188,8 +216,19 @@ function QualityProfilesSection() {
           onClick={() => setAdding(true)}
           className="mt-4 flex items-center gap-2 text-sm text-muted hover:text-foreground transition-colors"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.5v15m7.5-7.5h-15" />
+          <svg
+            aria-hidden="true"
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M12 4.5v15m7.5-7.5h-15"
+            />
           </svg>
           Add profile
         </button>
@@ -220,6 +259,7 @@ function ProfileForm({
     cutoffScore: profile?.cutoffScore ?? 80,
     upgradeAllowed: profile?.upgradeAllowed ?? false,
     isDefault: profile?.isDefault ?? false,
+    sortOrder: profile?.sortOrder ?? 0,
   })
 
   function toggleArrayItem<T extends string>(arr: T[] | undefined, item: T): T[] {
@@ -239,38 +279,63 @@ function ProfileForm({
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="text-xs text-muted block mb-1">Min Resolution</label>
+          <label htmlFor="settings-min-resolution" className="text-xs text-muted block mb-1">
+            Min Resolution
+          </label>
           <select
+            id="settings-min-resolution"
             className="w-full rounded-md bg-card border border-border px-3 py-1.5 text-foreground text-sm"
             value={form.minResolution}
-            onChange={(e) => setForm((f) => ({ ...f, minResolution: e.target.value as typeof f.minResolution }))}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, minResolution: e.target.value as typeof f.minResolution }))
+            }
           >
-            {RESOLUTION_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+            {RESOLUTION_OPTIONS.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
           </select>
         </div>
         <div>
-          <label className="text-xs text-muted block mb-1">Preferred Resolution</label>
+          <label htmlFor="settings-preferred-resolution" className="text-xs text-muted block mb-1">
+            Preferred Resolution
+          </label>
           <select
+            id="settings-preferred-resolution"
             className="w-full rounded-md bg-card border border-border px-3 py-1.5 text-foreground text-sm"
             value={form.preferredResolution ?? ''}
-            onChange={(e) => setForm((f) => ({ ...f, preferredResolution: e.target.value as typeof f.preferredResolution || undefined }))}
+            onChange={(e) =>
+              setForm((f) => ({
+                ...f,
+                preferredResolution: (e.target.value as typeof f.preferredResolution) || undefined,
+              }))
+            }
           >
             <option value="">Any</option>
-            {RESOLUTION_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+            {RESOLUTION_OPTIONS.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
           </select>
         </div>
       </div>
 
       <div>
-        <label className="text-xs text-muted block mb-1">Preferred Sources (ordered)</label>
+        <p className="text-xs text-muted block mb-1">Preferred Sources (ordered)</p>
         <div className="flex flex-wrap gap-1.5">
           {SOURCE_OPTIONS.map((s) => (
             <button
               key={s}
               type="button"
-              onClick={() => setForm((f) => ({ ...f, preferredSources: toggleArrayItem(f.preferredSources, s) }))}
+              onClick={() =>
+                setForm((f) => ({ ...f, preferredSources: toggleArrayItem(f.preferredSources, s) }))
+              }
               className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
-                form.preferredSources?.includes(s) ? 'bg-accent text-white' : 'bg-foreground/10 text-muted hover:text-foreground'
+                form.preferredSources?.includes(s)
+                  ? 'bg-accent text-white'
+                  : 'bg-foreground/10 text-muted hover:text-foreground'
               }`}
             >
               {s}
@@ -280,15 +345,19 @@ function ProfileForm({
       </div>
 
       <div>
-        <label className="text-xs text-muted block mb-1">Preferred HDR</label>
+        <p className="text-xs text-muted block mb-1">Preferred HDR</p>
         <div className="flex flex-wrap gap-1.5">
           {HDR_OPTIONS.map((h) => (
             <button
               key={h}
               type="button"
-              onClick={() => setForm((f) => ({ ...f, preferredHdr: toggleArrayItem(f.preferredHdr, h) }))}
+              onClick={() =>
+                setForm((f) => ({ ...f, preferredHdr: toggleArrayItem(f.preferredHdr, h) }))
+              }
               className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
-                form.preferredHdr?.includes(h) ? 'bg-accent text-white' : 'bg-foreground/10 text-muted hover:text-foreground'
+                form.preferredHdr?.includes(h)
+                  ? 'bg-accent text-white'
+                  : 'bg-foreground/10 text-muted hover:text-foreground'
               }`}
             >
               {h}
@@ -298,15 +367,19 @@ function ProfileForm({
       </div>
 
       <div>
-        <label className="text-xs text-muted block mb-1">Preferred Audio</label>
+        <p className="text-xs text-muted block mb-1">Preferred Audio</p>
         <div className="flex flex-wrap gap-1.5">
           {AUDIO_OPTIONS.map((a) => (
             <button
               key={a}
               type="button"
-              onClick={() => setForm((f) => ({ ...f, preferredAudio: toggleArrayItem(f.preferredAudio, a) }))}
+              onClick={() =>
+                setForm((f) => ({ ...f, preferredAudio: toggleArrayItem(f.preferredAudio, a) }))
+              }
               className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
-                form.preferredAudio?.includes(a) ? 'bg-accent text-white' : 'bg-foreground/10 text-muted hover:text-foreground'
+                form.preferredAudio?.includes(a)
+                  ? 'bg-accent text-white'
+                  : 'bg-foreground/10 text-muted hover:text-foreground'
               }`}
             >
               {a}
@@ -317,14 +390,19 @@ function ProfileForm({
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="text-xs text-muted block mb-1">Cutoff Score (0-100)</label>
+          <label htmlFor="settings-cutoff-score-0-100" className="text-xs text-muted block mb-1">
+            Cutoff Score (0-100)
+          </label>
           <input
+            id="settings-cutoff-score-0-100"
             type="number"
             min="0"
             max="100"
             className="w-full rounded-md bg-card border border-border px-3 py-1.5 text-foreground text-sm"
             value={form.cutoffScore}
-            onChange={(e) => setForm((f) => ({ ...f, cutoffScore: Number.parseInt(e.target.value, 10) }))}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, cutoffScore: Number.parseInt(e.target.value, 10) }))
+            }
           />
         </div>
         <div className="flex flex-col gap-2 pt-4">
@@ -431,13 +509,18 @@ function ExternalLinksSection({
       onUpdate(
         links.map((l) =>
           l.id === editId
-            ? { ...l, name: form.name, urlTemplate: form.urlTemplate, mediaTypes: form.mediaTypes as ExternalLink['mediaTypes'] }
+            ? {
+                ...l,
+                name: form.name,
+                urlTemplate: form.urlTemplate,
+                mediaTypes: form.mediaTypes as ExternalLink['mediaTypes'],
+              }
             : l
         )
       )
       setEditId(null)
     } else {
-      const id = form.name.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now()
+      const id = `${form.name.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`
       onUpdate([
         ...links,
         {
@@ -517,8 +600,19 @@ function ExternalLinksSection({
                 className="p-1.5 text-muted hover:text-foreground transition-colors"
                 title="Edit"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                <svg
+                  aria-hidden="true"
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"
+                  />
                 </svg>
               </button>
               <button
@@ -527,8 +621,19 @@ function ExternalLinksSection({
                 className="p-1.5 text-muted hover:text-red-400 transition-colors"
                 title="Remove"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  aria-hidden="true"
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
@@ -595,8 +700,19 @@ function ExternalLinksSection({
           onClick={startAdd}
           className="mt-4 flex items-center gap-2 text-sm text-muted hover:text-foreground transition-colors"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.5v15m7.5-7.5h-15" />
+          <svg
+            aria-hidden="true"
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M12 4.5v15m7.5-7.5h-15"
+            />
           </svg>
           Add link
         </button>
@@ -687,7 +803,9 @@ export default function Settings() {
               value={settings.ui.theme}
               disabled={isLocked('ui.theme')}
               onChange={(e) =>
-                updateMutation.mutate({ ui: { theme: e.target.value as 'dark' | 'light' | 'system' } })
+                updateMutation.mutate({
+                  ui: { theme: e.target.value as 'dark' | 'light' | 'system' },
+                })
               }
             >
               <option value="system">System</option>
@@ -809,7 +927,10 @@ export default function Settings() {
         </SettingsSection>
 
         {/* Request Permissions */}
-        <SettingsSection title="Request Permissions" description="Configure how different roles can make requests">
+        <SettingsSection
+          title="Request Permissions"
+          description="Configure how different roles can make requests"
+        >
           <SettingField
             label="Member Request Mode"
             description="How members interact with the request system"
@@ -819,7 +940,12 @@ export default function Settings() {
               value={settings.requests?.memberRequestMode ?? 'simple_only'}
               onChange={(e) =>
                 updateMutation.mutate({
-                  requests: { memberRequestMode: e.target.value as 'simple_only' | 'detailed_only' | 'user_choice' },
+                  requests: {
+                    memberRequestMode: e.target.value as
+                      | 'simple_only'
+                      | 'detailed_only'
+                      | 'user_choice',
+                  },
                 })
               }
             >
@@ -838,7 +964,12 @@ export default function Settings() {
               value={settings.requests?.adminRequestMode ?? 'detailed_only'}
               onChange={(e) =>
                 updateMutation.mutate({
-                  requests: { adminRequestMode: e.target.value as 'simple_only' | 'detailed_only' | 'user_choice' },
+                  requests: {
+                    adminRequestMode: e.target.value as
+                      | 'simple_only'
+                      | 'detailed_only'
+                      | 'user_choice',
+                  },
                 })
               }
             >
@@ -857,7 +988,9 @@ export default function Settings() {
               value={settings.requests?.defaultSimpleQuality ?? '1080p'}
               onChange={(e) =>
                 updateMutation.mutate({
-                  requests: { defaultSimpleQuality: e.target.value as '2160p' | '1080p' | '720p' | 'any' },
+                  requests: {
+                    defaultSimpleQuality: e.target.value as '2160p' | '1080p' | '720p' | 'any',
+                  },
                 })
               }
             >
@@ -880,7 +1013,9 @@ export default function Settings() {
               className="w-64 rounded-md bg-background border border-border px-3 py-1.5 text-foreground text-sm font-mono"
               value={settings.download?.nzbBackupPath ?? ''}
               placeholder="Leave empty to disable"
-              onChange={(e) => updateMutation.mutate({ download: { nzbBackupPath: e.target.value } })}
+              onChange={(e) =>
+                updateMutation.mutate({ download: { nzbBackupPath: e.target.value } })
+              }
             />
           </SettingField>
         </SettingsSection>
@@ -913,10 +1048,7 @@ export default function Settings() {
             </button>
           </SettingField>
 
-          <SettingField
-            label="720p Minimum"
-            description="Minimum MB per minute for 720p releases"
-          >
+          <SettingField label="720p Minimum" description="Minimum MB per minute for 720p releases">
             <div className="flex items-center gap-2">
               <input
                 type="number"
