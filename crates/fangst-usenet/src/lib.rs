@@ -67,6 +67,41 @@ impl FileReport {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Report {
     pub files: Vec<FileReport>,
+    /// What each server did, in the order the servers were given.
+    pub servers: Vec<ServerReport>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ServerReport {
+    pub name: String,
+    pub backfill: bool,
+    /// Segments this server delivered.
+    pub served: usize,
+    /// Segments this server answered 430 for.
+    pub missed: usize,
+}
+
+/// One usenet server and how it may be used.
+#[derive(Clone)]
+pub struct Server {
+    /// Shown in reports and timelines.
+    pub name: String,
+    pub pool: Arc<Pool>,
+    /// Backfill servers (often block accounts billed per GB) only get segments every primary
+    /// server has already reported missing.
+    pub backfill: bool,
+}
+
+impl Server {
+    /// A primary server named after its host.
+    #[must_use]
+    pub fn primary(pool: Arc<Pool>) -> Self {
+        Self {
+            name: pool.config().host.clone(),
+            pool,
+            backfill: false,
+        }
+    }
 }
 
 impl Report {
@@ -79,12 +114,15 @@ impl Report {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
     OutputFolder(String),
+    /// Downloads need between 1 and 64 servers.
+    Servers(usize),
 }
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::OutputFolder(msg) => write!(f, "could not use the output folder: {msg}"),
+            Self::Servers(n) => write!(f, "a download needs between 1 and 64 servers, got {n}"),
         }
     }
 }
@@ -116,7 +154,12 @@ struct Job {
     file: usize,
     segment: usize,
     attempts: u32,
+    /// Bit `i` set: server `i` answered 430 for this segment.
+    tried: u64,
 }
+
+/// Servers are tracked in a u64 bitmask per segment.
+const MAX_SERVERS: usize = 64;
 
 struct FileState {
     name: String,
@@ -135,7 +178,12 @@ struct FileState {
 struct Shared {
     files: Vec<FileState>,
     queue: Mutex<VecDeque<Job>>,
-    pool: Arc<Pool>,
+    servers: Vec<Server>,
+    served: Vec<AtomicUsize>,
+    missed: Vec<AtomicUsize>,
+    /// Jobs taken by a worker and not yet stored, requeued or given up on.
+    in_flight: AtomicUsize,
+    changed: tokio::sync::Notify,
     options: Options,
     progress: ProgressFn,
     on_stored: Arc<dyn Fn(usize, u32) + Send + Sync>,
@@ -173,6 +221,41 @@ pub async fn download_resumable(
     progress: ProgressFn,
     resume: Resume,
 ) -> Result<Report, Error> {
+    let name = pool.config().host.clone();
+    download_from(
+        nzb,
+        out_dir,
+        vec![Server {
+            name,
+            pool,
+            backfill: false,
+        }],
+        options,
+        progress,
+        resume,
+    )
+    .await
+}
+
+/// Downloads from several servers: primaries first, backfill servers only for segments every
+/// primary reported missing. A segment counts as missing once every server has reported it missing.
+///
+/// # Errors
+/// When `out_dir` can't be created, or when no servers (or more than 64) are given.
+///
+/// # Panics
+/// If an internal lock was poisoned by a panic in another worker.
+pub async fn download_from(
+    nzb: &Nzb,
+    out_dir: &Path,
+    servers: Vec<Server>,
+    options: Options,
+    progress: ProgressFn,
+    resume: Resume,
+) -> Result<Report, Error> {
+    if servers.is_empty() || servers.len() > MAX_SERVERS {
+        return Err(Error::Servers(servers.len()));
+    }
     tokio::fs::create_dir_all(out_dir)
         .await
         .map_err(|e| Error::OutputFolder(e.to_string()))?;
@@ -227,25 +310,52 @@ pub async fn download_resumable(
                     file: f,
                     segment: s,
                     attempts: 0,
+                    tried: 0,
                 })
         })
         .collect();
     let shared = Arc::new(Shared {
         files,
         queue: Mutex::new(queue),
-        pool,
+        served: servers.iter().map(|_| AtomicUsize::new(0)).collect(),
+        missed: servers.iter().map(|_| AtomicUsize::new(0)).collect(),
+        in_flight: AtomicUsize::new(0),
+        changed: tokio::sync::Notify::new(),
+        servers,
         options,
         progress,
         on_stored: resume.on_stored,
     });
 
     let mut workers = tokio::task::JoinSet::new();
-    for _ in 0..options.connections.max(1) {
-        workers.spawn(worker(Arc::clone(&shared)));
+    for (index, server) in shared.servers.iter().enumerate() {
+        let count = options
+            .connections
+            .max(1)
+            .min(server.pool.config().max_connections.max(1));
+        for _ in 0..count {
+            workers.spawn(worker(Arc::clone(&shared), index));
+        }
     }
     while workers.join_next().await.is_some() {}
 
     let shared = Arc::into_inner(shared).expect("all workers finished");
+    Ok(into_report(shared).await)
+}
+
+async fn into_report(shared: Shared) -> Report {
+    let server_reports = shared
+        .servers
+        .iter()
+        .zip(shared.served)
+        .zip(shared.missed)
+        .map(|((server, served), missed)| ServerReport {
+            name: server.name.clone(),
+            backfill: server.backfill,
+            served: served.into_inner(),
+            missed: missed.into_inner(),
+        })
+        .collect();
     let mut reports = Vec::new();
     for state in shared.files {
         if let Some(mut file) = state.handle.into_inner() {
@@ -266,7 +376,10 @@ pub async fn download_resumable(
             segments_total: state.segments.len(),
         });
     }
-    Ok(Report { files: reports })
+    Report {
+        files: reports,
+        servers: server_reports,
+    }
 }
 
 fn unique_name(base: &str, used: &mut HashSet<String>) -> String {
@@ -279,45 +392,107 @@ fn unique_name(base: &str, used: &mut HashSet<String>) -> String {
     name
 }
 
-async fn worker(shared: Arc<Shared>) {
+fn eligible(shared: &Shared, job: &Job, server: usize) -> bool {
+    if job.tried & (1 << server) != 0 {
+        return false;
+    }
+    if !shared.servers[server].backfill {
+        return true;
+    }
+    shared
+        .servers
+        .iter()
+        .enumerate()
+        .filter(|(_, s)| !s.backfill)
+        .all(|(i, _)| job.tried & (1 << i) != 0)
+}
+
+fn take_batch(shared: &Shared, server: usize, depth: usize) -> Vec<Job> {
+    let mut queue = shared.queue.lock().expect("queue lock");
+    let mut batch = Vec::new();
+    let mut i = 0;
+    while i < queue.len() && batch.len() < depth {
+        if eligible(shared, &queue[i], server) {
+            batch.extend(queue.remove(i));
+        } else {
+            i += 1;
+        }
+    }
+    shared.in_flight.fetch_add(batch.len(), Ordering::SeqCst);
+    batch
+}
+
+async fn worker(shared: Arc<Shared>, server: usize) {
     let depth = shared.options.pipeline_depth.max(1);
     loop {
-        let batch: Vec<Job> = {
-            let mut queue = shared.queue.lock().expect("queue lock");
-            let n = depth.min(queue.len());
-            queue.drain(..n).collect()
-        };
+        let batch = take_batch(&shared, server, depth);
         if batch.is_empty() {
-            return;
-        }
-        let mut conn = match shared.pool.get().await {
-            Ok(conn) => conn,
-            Err(e) => {
-                requeue_or_fail(&shared, &batch, &e.to_string());
-                continue;
+            let done = shared.queue.lock().expect("queue lock").is_empty()
+                && shared.in_flight.load(Ordering::SeqCst) == 0;
+            if done {
+                shared.changed.notify_waiters();
+                return;
             }
-        };
-        let ids: Vec<&str> = batch
-            .iter()
-            .map(|j| shared.files[j.file].segments[j.segment].message_id.as_str())
-            .collect();
-        let results = conn.bodies(&ids, depth).await;
-        drop(conn);
-        for (job, result) in batch.iter().zip(results) {
-            match result {
-                Ok(body) => store(&shared, *job, &body).await,
-                Err(fangst_nntp::Error::NoSuchArticle) => {
-                    let number = shared.files[job.file].segments[job.segment].number;
-                    shared.files[job.file]
-                        .missing
-                        .lock()
-                        .expect("lock")
-                        .push(number);
-                    finish_segment(&shared, job.file);
+            // Work may come back for this server when another server reports a segment missing.
+            let _ = tokio::time::timeout(
+                std::time::Duration::from_millis(50),
+                shared.changed.notified(),
+            )
+            .await;
+            continue;
+        }
+        let pool = Arc::clone(&shared.servers[server].pool);
+        match pool.get().await {
+            Ok(mut conn) => {
+                let ids: Vec<&str> = batch
+                    .iter()
+                    .map(|j| shared.files[j.file].segments[j.segment].message_id.as_str())
+                    .collect();
+                let results = conn.bodies(&ids, depth).await;
+                drop(conn);
+                for (job, result) in batch.iter().zip(results) {
+                    match result {
+                        Ok(body) => {
+                            shared.served[server].fetch_add(1, Ordering::Relaxed);
+                            store(&shared, *job, &body).await;
+                        }
+                        Err(fangst_nntp::Error::NoSuchArticle) => {
+                            shared.missed[server].fetch_add(1, Ordering::Relaxed);
+                            missing_on(&shared, *job, server);
+                        }
+                        Err(e) => {
+                            requeue_or_fail(&shared, std::slice::from_ref(job), &e.to_string());
+                        }
+                    }
                 }
-                Err(e) => requeue_or_fail(&shared, std::slice::from_ref(job), &e.to_string()),
             }
+            Err(e) => requeue_or_fail(&shared, &batch, &e.to_string()),
         }
+        // Requeues above happen before this, so nobody sees an empty queue with nothing in flight
+        // while a segment is about to come back.
+        shared.in_flight.fetch_sub(batch.len(), Ordering::SeqCst);
+        shared.changed.notify_waiters();
+    }
+}
+
+fn missing_on(shared: &Shared, job: Job, server: usize) {
+    let tried = job.tried | (1 << server);
+    let all = shared.servers.len();
+    let everyone_tried = (0..all).all(|i| tried & (1 << i) != 0);
+    if everyone_tried {
+        let number = shared.files[job.file].segments[job.segment].number;
+        shared.files[job.file]
+            .missing
+            .lock()
+            .expect("lock")
+            .push(number);
+        finish_segment(shared, job.file);
+    } else {
+        shared
+            .queue
+            .lock()
+            .expect("queue lock")
+            .push_back(Job { tried, ..job });
     }
 }
 

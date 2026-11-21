@@ -22,15 +22,17 @@ fn library(len: usize, segment: usize) -> (Library, Vec<u8>, Vec<String>) {
 fn runner(store: Store, server: &MockServer, root: &std::path::Path) -> Runner {
     Runner {
         store,
-        pool: Arc::new(Pool::new(ServerConfig {
-            host: "127.0.0.1".to_owned(),
-            port: server.addr.port(),
-            tls: None,
-            credentials: None,
-            max_connections: 2,
-            connect_timeout: Duration::from_secs(5),
-            command_timeout: Duration::from_secs(5),
-        })),
+        servers: vec![fangst_usenet::Server::primary(Arc::new(Pool::new(
+            ServerConfig {
+                host: "127.0.0.1".to_owned(),
+                port: server.addr.port(),
+                tls: None,
+                credentials: None,
+                max_connections: 2,
+                connect_timeout: Duration::from_secs(5),
+                command_timeout: Duration::from_secs(5),
+            },
+        )))],
         root: root.to_owned(),
         options: fangst_usenet::Options {
             connections: 2,
@@ -259,7 +261,7 @@ async fn fresh_database_needs_no_backup() {
 
 /// The backup is named after the newest pending migration, which changes with every new one.
 fn newest_migration_backup() -> String {
-    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/migrations");
+    let dir = manifest_dir().join("migrations");
     let newest = std::fs::read_dir(dir)
         .unwrap()
         .filter_map(|entry| {
@@ -269,4 +271,13 @@ fn newest_migration_backup() -> String {
         .max()
         .unwrap();
     format!("downloads.db.before-{newest}.bak")
+}
+
+/// The crate folder at run time. `env!("CARGO_MANIFEST_DIR")` is baked in at compile time, and a
+/// build folder shared between git worktrees can hand back a test binary built in another (perhaps
+/// deleted) worktree; cargo and nextest set the variable correctly for every run.
+fn manifest_dir() -> std::path::PathBuf {
+    std::path::PathBuf::from(
+        std::env::var("CARGO_MANIFEST_DIR").expect("run through cargo or nextest"),
+    )
 }

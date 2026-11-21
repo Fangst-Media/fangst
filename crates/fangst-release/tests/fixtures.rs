@@ -1,15 +1,13 @@
 //! Checks the parser against `fixtures/release-names/`, which were produced by running the old
 //! TypeScript parser (`fixtures/release-names/export.ts`), so every field must match exactly.
 
-use std::path::PathBuf;
-
 use fangst_release::{
     ParsedRelease, TierSource, detect_streaming_service, parse, release_group_tier,
 };
 use serde_json::{Map, Value, json};
 
 fn fixture(name: &str) -> Vec<Value> {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    let path = manifest_dir()
         .join("../../fixtures/release-names")
         .join(name);
     let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
@@ -111,4 +109,13 @@ fn every_group_tier_fixture_matches() {
         let want = case["expected"].as_u64().map(|t| u8::try_from(t).unwrap());
         assert_eq!(got, want, "{group} {resolution} {source:?}");
     }
+}
+
+/// The crate folder at run time. `env!("CARGO_MANIFEST_DIR")` is baked in at compile time, and a
+/// build folder shared between git worktrees can hand back a test binary built in another (perhaps
+/// deleted) worktree; cargo and nextest set the variable correctly for every run.
+fn manifest_dir() -> std::path::PathBuf {
+    std::path::PathBuf::from(
+        std::env::var("CARGO_MANIFEST_DIR").expect("run through cargo or nextest"),
+    )
 }
