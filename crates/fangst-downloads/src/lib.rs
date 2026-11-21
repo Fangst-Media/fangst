@@ -77,6 +77,17 @@ pub struct Job {
     pub finished_at: Option<i64>,
 }
 
+/// One entry in a job's timeline.
+#[derive(Debug, Clone, PartialEq, Eq, FromRow)]
+pub struct Event {
+    /// Unix seconds.
+    pub at: i64,
+    /// Stable machine name: `added`, `status`, `resumed`, `file`, ...
+    pub kind: String,
+    /// What happened, in words a user can act on.
+    pub message: String,
+}
+
 #[derive(FromRow)]
 struct JobRow {
     id: i64,
@@ -233,8 +244,46 @@ impl Store {
             .bind(nzb)
             .execute(&mut *tx)
             .await?;
+        sqlx::query("INSERT INTO job_events (job_id, at, kind, message) VALUES (?, ?, 'added', ?)")
+            .bind(id)
+            .bind(now())
+            .bind(format!(
+                "added with {} files, {} bytes",
+                parsed.files.len(),
+                parsed.total_bytes()
+            ))
+            .execute(&mut *tx)
+            .await?;
         tx.commit().await?;
         Ok(id)
+    }
+
+    /// Appends an entry to a job's timeline.
+    ///
+    /// # Errors
+    /// When the database write fails.
+    pub async fn add_event(&self, id: i64, kind: &str, message: &str) -> Result<(), Error> {
+        sqlx::query("INSERT INTO job_events (job_id, at, kind, message) VALUES (?, ?, ?, ?)")
+            .bind(id)
+            .bind(now())
+            .bind(kind)
+            .bind(message)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// A job's timeline, oldest first.
+    ///
+    /// # Errors
+    /// When the database read fails.
+    pub async fn timeline(&self, id: i64) -> Result<Vec<Event>, Error> {
+        Ok(sqlx::query_as::<_, Event>(
+            "SELECT at, kind, message FROM job_events WHERE job_id = ? ORDER BY id",
+        )
+        .bind(id)
+        .fetch_all(&self.pool)
+        .await?)
     }
 
     /// Every job, newest first.
@@ -294,13 +343,28 @@ impl Store {
         error: Option<&str>,
     ) -> Result<(), Error> {
         let finished = matches!(status, Status::Completed | Status::Failed).then(now);
+        let message = match error {
+            Some(reason) => format!("{}: {reason}", status.as_str()),
+            None => status.as_str().to_owned(),
+        };
+        // The status change and its timeline entry land together or not at all.
+        let mut tx = self.pool.begin().await?;
         sqlx::query("UPDATE jobs SET status = ?, error = ?, finished_at = ? WHERE id = ?")
             .bind(status.as_str())
             .bind(error)
             .bind(finished)
             .bind(id)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await?;
+        sqlx::query(
+            "INSERT INTO job_events (job_id, at, kind, message) VALUES (?, ?, 'status', ?)",
+        )
+        .bind(id)
+        .bind(now())
+        .bind(message)
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
         Ok(())
     }
 
@@ -309,9 +373,19 @@ impl Store {
     /// # Errors
     /// When the database write fails.
     pub async fn requeue_interrupted(&self) -> Result<u64, Error> {
+        let mut tx = self.pool.begin().await?;
+        sqlx::query(
+            "INSERT INTO job_events (job_id, at, kind, message)
+             SELECT id, ?, 'status', 'queued: the previous run stopped before this job finished'
+             FROM jobs WHERE status = 'downloading'",
+        )
+        .bind(now())
+        .execute(&mut *tx)
+        .await?;
         let result = sqlx::query("UPDATE jobs SET status = 'queued' WHERE status = 'downloading'")
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await?;
+        tx.commit().await?;
         Ok(result.rows_affected())
     }
 
@@ -425,6 +499,19 @@ impl Runner {
         };
 
         let done = self.store.done_segments(job.id).await?;
+        if !done.is_empty() {
+            let total: usize = nzb.files.iter().map(|f| f.segments.len()).sum();
+            self.store
+                .add_event(
+                    job.id,
+                    "resumed",
+                    &format!(
+                        "resuming: {} of {total} segments already on disk",
+                        done.len()
+                    ),
+                )
+                .await?;
+        }
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<(usize, u32)>();
         let store = self.store.clone();
         let job_id = job.id;
@@ -454,6 +541,13 @@ impl Runner {
             .await
             .map_err(|e| Error::Download(e.to_string()))??;
 
+        if let Ok(report) = &result {
+            for file in &report.files {
+                self.store
+                    .add_event(job.id, "file", &describe_file(file))
+                    .await?;
+            }
+        }
         match result {
             Ok(report) if report.is_complete() => {
                 self.store.set_status(job.id, Status::Completed, None).await
@@ -475,4 +569,27 @@ impl Runner {
             }
         }
     }
+}
+
+fn describe_file(file: &fangst_usenet::FileReport) -> String {
+    use std::fmt::Write as _;
+    let mut text = format!(
+        "{}: {} of {} segments stored",
+        file.name, file.segments_done, file.segments_total
+    );
+    if !file.missing_segments.is_empty() {
+        let _ = write!(
+            text,
+            ", {} missing on the server (430)",
+            file.missing_segments.len()
+        );
+    }
+    if let Some((number, reason)) = file.failed_segments.first() {
+        let _ = write!(
+            text,
+            ", {} failed (first: segment {number}, {reason})",
+            file.failed_segments.len()
+        );
+    }
+    text
 }

@@ -191,6 +191,17 @@ async fn restart_resumes_without_refetching_finished_segments() {
 
     let job = reopened.get(id).await.unwrap();
     assert_eq!(job.status, Status::Completed, "{:?}", job.error);
+    let resumed = reopened
+        .timeline(id)
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|e| e.kind == "resumed")
+        .unwrap();
+    assert_eq!(
+        resumed.message,
+        format!("resuming: {recorded_before} of {total} segments already on disk")
+    );
     assert_eq!(
         std::fs::read(job.output_path.unwrap().join("payload.bin")).unwrap(),
         file
@@ -220,7 +231,7 @@ async fn existing_database_is_backed_up_before_migrating() {
 
     Store::open(&db).await.unwrap();
 
-    let backup = dir.path().join("downloads.db.before-1.bak");
+    let backup = dir.path().join("downloads.db.before-2.bak");
     assert!(backup.exists(), "expected {}", backup.display());
     Store::open(&db).await.unwrap();
     assert!(
@@ -243,5 +254,5 @@ async fn existing_database_is_backed_up_before_migrating() {
 async fn fresh_database_needs_no_backup() {
     let dir = tempfile::tempdir().unwrap();
     Store::open(&dir.path().join("downloads.db")).await.unwrap();
-    assert!(!dir.path().join("downloads.db.before-1.bak").exists());
+    assert!(!dir.path().join("downloads.db.before-2.bak").exists());
 }
