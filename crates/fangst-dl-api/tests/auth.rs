@@ -54,6 +54,7 @@ async fn harness_with_hash_slots(slots: usize) -> Harness {
             pipeline_depth: 1,
             retries: 0,
         },
+        post_processors: Vec::new(),
     };
     let settings = AuthSettings {
         login: LoginLimits {

@@ -1,0 +1,20 @@
+[package]
+name = "fangst-postproc-par2"
+description = "PAR2 verify and repair for a downloaded job folder, and picking which recovery volumes to fetch."
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+fangst-core = { version = "0.1.0", path = "../fangst-core" }
+rust-par2 = "0.2.0"
+
+[dev-dependencies]
+fangst-bench = { path = "../../tools/fangst-bench" }
+tempfile = "3.27.0"

@@ -54,6 +54,7 @@ async fn harness() -> Harness {
             pipeline_depth: 2,
             retries: 1,
         },
+        post_processors: Vec::new(),
     };
     Harness {
         service: Service::new(runner),

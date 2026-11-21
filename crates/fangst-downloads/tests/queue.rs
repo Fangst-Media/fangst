@@ -39,6 +39,7 @@ fn runner(store: Store, server: &MockServer, root: &std::path::Path) -> Runner {
             pipeline_depth: 2,
             retries: 1,
         },
+        post_processors: Vec::new(),
     }
 }
 
