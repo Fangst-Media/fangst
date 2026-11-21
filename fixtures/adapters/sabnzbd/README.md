@@ -23,8 +23,22 @@ SABnzbd container was available when they were written. Each was built from:
 - the request each client sends, read from the SABnzbd clients in Sonarr and Radarr (`develop`)
   and HolyArrs (`main`). `client` names which one sends the request in this form.
 
-Replace a file with a recorded one when a real SABnzbd is captured (#23 brings containers); keep
-the `exact` pointers that still hold.
+Replace a file with a recorded one when a real SABnzbd is captured; keep the `exact` pointers
+that still hold.
+
+## Recorded from clients
+
+`recorded/<client>/` holds what Sonarr, Radarr and HolyArrs actually sent to Fangst in the
+end-to-end test (`tests/adapters`), one file per distinct request, with Fangst's answer, which the
+client accepted: the run imported its releases. `"source": "recorded"`, `client` and
+`client_version` say who sent it. These record the requests as real clients send them; the
+answers are Fangst's, not SABnzbd's. `just test-adapters` then `just record-adapter-fixtures`
+writes them again.
+
+`recorded_client_requests_are_understood` in the fixture tests replays each request against the
+jobs above. Answers that depend on which jobs exist (`"job_specific": true`) only have to be
+understood (no 400, 403, 415 or 5xx unless the recorded answer was one); the others must match
+in status and JSON shape.
 
 ## Jobs behind the fixtures
 

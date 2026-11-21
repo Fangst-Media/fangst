@@ -18,13 +18,95 @@ Format for each entry:
 **Handled in:** `crates/fangst-adapter-<name>/src/<file>.rs`.
 ```
 
+## Recorded from real clients
+
+`tests/adapters` runs Sonarr 4.0.20.3014, Radarr 7.0.3.10918 and HolyArrs 1.2.0 against Fangst
+(`just test-adapters`), and every request they send is kept in
+`fixtures/adapters/<adapter>/recorded/<client>/`. The derived entries below were checked against
+those recordings; where a client did something else, the entry here wins. The answers in the
+recordings are Fangst's, which the clients accepted, not real SABnzbd or qBittorrent answers.
+
+### HolyArrs: SABnzbd's history must not list torrent jobs
+
+**Request:** `mode=history&start=0&limit=200` (no category on the first polls, later
+`category=movies`), `last_history_update=<n>` once it has a counter.
+**Expects:** only jobs it can map to its own grabs or that are really SABnzbd's. Fangst listed every
+job, so a torrent HolyArrs had just sent to the qBittorrent adapter also showed up as a finished
+SABnzbd job in its download list. The SABnzbd adapter now lists, pauses, deletes and retries only
+usenet jobs, as the qBittorrent adapter already did for torrents.
+**Fixture:** `sabnzbd/recorded/holyarrs/history.json`.
+**Handled in:** `crates/fangst-adapter-sabnzbd/src/modes.rs` (`usenet_jobs`).
+
+### HolyArrs: the complete folder must exist when the downloader is tested
+
+**Request:** after `version`, `queue&limit=1` and `get_cats`, the SABnzbd test also sends
+`mode=fullstatus&skip_dashboard=1` and `mode=get_config&section=categories`.
+**Expects:** `status.completedir` and category `dir`s that exist on HolyArrs' side at that moment;
+then it saves them as a path pair. A fresh Fangst had no download folder until the first job, so
+HolyArrs saved no pair and parked the first usenet import under "needs a decision" ("HOLYARRS_SAVE_PATH
+is not set and the downloader has no path pair"). The download service now creates its folder when
+it starts.
+**Fixture:** `sabnzbd/recorded/holyarrs/fullstatus.json`, `get_config.json`.
+**Handled in:** `crates/fangst-downloads/src/service.rs` (`run`).
+
+### HolyArrs 1.2.0: adds by URL, and adds torrents without state fields
+
+**Request:** SABnzbd: `GET mode=addurl&name=<indexer link>&nzbname=<release>&cat=movies`, also when
+the indexer link serves a plain NZB (no `addfile`), so Fangst fetches the NZB. qBittorrent:
+`torrents/info?hashes=<hash>` first (a duplicate check, `[]` expected), `torrents/createCategory`,
+then `torrents/add` as multipart with only `category` and `torrents` (filename `release.torrent`).
+No `stopped`, `paused` or `savepath` when `HOLYARRS_SAVE_PATH` is unset; the derived
+`add-stopped-holyarrs.json` describes the case with them. After import it sends
+`mode=queue&name=delete&del_files=1` (Fangst answers `status: false`, the job is finished) and
+then `mode=history&name=delete&del_files=1&archive=0`; it leaves torrents seeding.
+**Fixture:** `sabnzbd/recorded/holyarrs/addurl.json`, `queue-delete.json`, `history-delete.json`,
+`qbittorrent/recorded/holyarrs/torrents-info.json`, `torrents-add.json`.
+
+### HolyArrs 1.2.0: qBittorrent sign-in
+
+**Request:** `GET app/version` without a cookie first (not `app/webapiVersion`), which gets 403;
+then `POST auth/login` with `password=...&username=...` (password first) and the version again.
+`Referer: http://<host>:<port>` without a trailing slash on every call; user agent
+`Go-http-client/1.1`. Polls `sync/maindata?rid=N` and `torrents/files?hash=`.
+**Fixture:** `qbittorrent/recorded/holyarrs/app-version-403.json`, `auth-login.json`, `sync-maindata.json`.
+
+### Sonarr and Radarr: Basic auth on every qBittorrent call
+
+**Request:** `Authorization: Basic base64(username:password)` on every qBittorrent request,
+including the first `app/webapiVersion` and `auth/login`, next to the `SID` cookie once signed in.
+With Fangst the password is an API key, so it travels on every call; use HTTPS when the client
+and Fangst are on different machines.
+**Expects:** the Basic header is ignored: the request without a cookie still gets 403 `Forbidden`,
+then sign-in works as described below.
+**Fixture:** `qbittorrent/recorded/sonarr/app-webapiVersion-403.json`, `auth-login.json`.
+
+### Sonarr and Radarr: what a grab and import sends
+
+**Request:** SABnzbd: `addfile&cat=tv&priority=-100` (Radarr `cat=movies`) with one part
+`name="name"; filename="<release>.nzb"`, `application/x-nzb`, as derived. After import with
+"remove completed" on: `mode=history&name=delete&del_files=1&archive=1&value=<id>`.
+qBittorrent: `torrents/add` multipart with `torrents` (`<release>.torrent`), `category`
+(`tv-sonarr`, `radarr`) and `stopped=False`; no `paused`, no follow-ups, and no
+`torrents/properties` polling with the default settings. After import `torrents/delete` with
+`hashes=<hash>&deleteFiles=true`.
+**Fixture:** `sabnzbd/recorded/sonarr/addfile.json`, `history-delete.json`,
+`qbittorrent/recorded/sonarr/torrents-add.json`, `torrents-delete.json`; the same under `radarr/`.
+
+### Media checks the clients run on import
+
+Not adapter behaviour, but it decides whether an end-to-end import passes. Sonarr 4.0.20 and Radarr
+7.0.3 refuse a file without an audio track ("No audio tracks detected") and treat a file shorter
+than 10 minutes as a sample for an hour-long episode or a movie. HolyArrs 1.2.0 compares the
+video's resolution with the release name ("file is 480p, name said 1080p") and, unless
+`refuse_tiny_releases` is off, the downloaded size with the size the indexer claimed.
+
 ## SABnzbd
 
 Read from Sonarr and Radarr `develop` (`src/NzbDrone.Core/Download/Clients/Sabnzbd/`), HolyArrs
 `main` (`app/backend/internal/downloads/client_sabnzbd*.go`) and SABnzbd 4.5.x, 5.1.3 and develop
 (`api.py`, `interface.py`, `misc.py`) in November 2026. Radarr sends the same requests as Sonarr.
-Every fixture is derived from these sources and SABnzbd's API docs, not recorded; see
-`fixtures/adapters/sabnzbd/README.md`. Handled in `crates/fangst-adapter-sabnzbd/src/modes.rs`
+The top-level fixtures are derived from these sources and SABnzbd's API docs; the client side is
+also recorded (see "Recorded from real clients" above and `fixtures/adapters/sabnzbd/README.md`). Handled in `crates/fangst-adapter-sabnzbd/src/modes.rs`
 unless named otherwise.
 
 ### All clients: where the key lives and what a failure looks like
@@ -123,8 +205,9 @@ Read from Sonarr and Radarr `develop` (`src/NzbDrone.Core/Download/Clients/QBitt
 `main` (`app/backend/internal/downloads/client_qbit*.go`) and qBittorrent `v4_6_x`, `v5_0_x` and
 `master` (`src/webui/webapplication.cpp`, `api/authcontroller.cpp`, `api/torrentscontroller.cpp`,
 `api/serialize/serialize_torrent.cpp`) in November 2026. Radarr sends the same requests as Sonarr,
-without tags and without the inactive seeding limit. Every fixture is derived, not recorded; see
-`fixtures/adapters/qbittorrent/README.md`. Handled in `crates/fangst-adapter-qbittorrent/src/api.rs`
+without tags and without the inactive seeding limit. The top-level fixtures are derived; the client
+side is also recorded (see "Recorded from real clients" above and
+`fixtures/adapters/qbittorrent/README.md`). Handled in `crates/fangst-adapter-qbittorrent/src/api.rs`
 unless named otherwise.
 
 ### All clients: signing in and what a failure looks like

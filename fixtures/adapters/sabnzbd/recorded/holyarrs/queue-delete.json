@@ -1,0 +1,34 @@
+{
+  "source": "recorded",
+  "client": "holyarrs",
+  "client_version": "1.2.0",
+  "recorded": "2026-11-21",
+  "note": "The request as holyarrs 1.2.0 sent it to Fangst in the end-to-end test (tests/adapters), and Fangst's answer, which holyarrs accepted. Credentials are placeholders.",
+  "job_specific": true,
+  "request": {
+    "method": "GET",
+    "path": "/",
+    "query": [
+      ["apikey", "fixture-api-key-0000"],
+      ["del_files", "1"],
+      ["mode", "queue"],
+      ["name", "delete"],
+      ["output", "json"],
+      ["value", "SABnzbd_nzo_1"]
+    ],
+    "headers": [
+      ["accept-encoding", "gzip"],
+      ["host", "recorder:8083"],
+      ["user-agent", "Go-http-client/1.1"]
+    ]
+  },
+  "response": {
+    "status": 200,
+    "content_type": "json",
+    "body": {
+      "nzo_ids": [],
+      "status": false
+    },
+    "headers": [["content-type", "application/json"]]
+  }
+}

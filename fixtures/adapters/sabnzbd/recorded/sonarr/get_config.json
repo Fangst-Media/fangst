@@ -1,0 +1,88 @@
+{
+  "source": "recorded",
+  "client": "sonarr",
+  "client_version": "4.0.20.3014",
+  "recorded": "2026-11-21",
+  "note": "The request as sonarr 4.0.20.3014 sent it to Fangst in the end-to-end test (tests/adapters), and Fangst's answer, which sonarr accepted. Credentials are placeholders.",
+  "job_specific": false,
+  "request": {
+    "method": "GET",
+    "path": "/",
+    "query": [["mode", "get_config"], ["apikey", "fixture-api-key-0000"], ["output", "json"]],
+    "headers": [
+      ["accept", "application/json"],
+      ["accept-encoding", "gzip, br"],
+      ["connection", "close"],
+      ["host", "recorder:8081"],
+      ["traceparent", "00-35677e1ed151c6dec8930290dc2f92cc-be5bc4ce66d13c5f-00"],
+      ["user-agent", "Sonarr/4.0.20.3014 (alpine 3.24.4)"]
+    ]
+  },
+  "response": {
+    "status": 200,
+    "content_type": "json",
+    "body": {
+      "config": {
+        "categories": [
+          {
+            "dir": "",
+            "name": "*",
+            "newzbin": "",
+            "order": 0,
+            "pp": "3",
+            "priority": 0,
+            "script": "None"
+          },
+          {
+            "dir": "",
+            "name": "audio",
+            "newzbin": "",
+            "order": 1,
+            "pp": "",
+            "priority": -100,
+            "script": "Default"
+          },
+          {
+            "dir": "",
+            "name": "movies",
+            "newzbin": "",
+            "order": 2,
+            "pp": "",
+            "priority": -100,
+            "script": "Default"
+          },
+          {
+            "dir": "",
+            "name": "software",
+            "newzbin": "",
+            "order": 3,
+            "pp": "",
+            "priority": -100,
+            "script": "Default"
+          },
+          {
+            "dir": "",
+            "name": "tv",
+            "newzbin": "",
+            "order": 4,
+            "pp": "",
+            "priority": -100,
+            "script": "Default"
+          }
+        ],
+        "misc": {
+          "complete_dir": "/data/fangst/downloads",
+          "download_dir": "/data/fangst/downloads",
+          "history_retention": "",
+          "history_retention_number": 1,
+          "history_retention_option": "all",
+          "pre_check": 0
+        },
+        "rss": [],
+        "servers": [],
+        "sorters": []
+      }
+    },
+    "headers": [["content-type", "application/json"]]
+  }
+}

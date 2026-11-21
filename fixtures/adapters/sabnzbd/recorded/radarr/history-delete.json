@@ -1,0 +1,36 @@
+{
+  "source": "recorded",
+  "client": "radarr",
+  "client_version": "7.0.3.10918",
+  "recorded": "2026-11-21",
+  "note": "The request as radarr 7.0.3.10918 sent it to Fangst in the end-to-end test (tests/adapters), and Fangst's answer, which radarr accepted. Credentials are placeholders.",
+  "job_specific": true,
+  "request": {
+    "method": "GET",
+    "path": "/",
+    "query": [
+      ["mode", "history"],
+      ["name", "delete"],
+      ["del_files", "1"],
+      ["value", "SABnzbd_nzo_3"],
+      ["archive", "1"],
+      ["apikey", "fixture-api-key-0000"],
+      ["output", "json"]
+    ],
+    "headers": [
+      ["accept", "application/json"],
+      ["accept-encoding", "gzip, br"],
+      ["connection", "close"],
+      ["host", "recorder:8082"],
+      ["user-agent", "Radarr/7.0.3.10918 (alpine 3.24.4)"]
+    ]
+  },
+  "response": {
+    "status": 200,
+    "content_type": "json",
+    "body": {
+      "status": true
+    },
+    "headers": [["content-type", "application/json"]]
+  }
+}

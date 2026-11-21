@@ -27,6 +27,7 @@ Commands marked "planned" arrive with the issue named; until then they do not ex
 | Layer rules only | `just layercheck` (layer map in `layers.toml`) |
 | Run the download daemon | `FANGST_API_KEY=<16+ chars> cargo run -p fangst-dl -- serve --data-dir data --host news.example.com` (API on 127.0.0.1:7740; without `--host` usenet jobs wait in the queue; the torrent engine is on unless `--no-torrent`) |
 | Usenet benchmark | `just bench-usenet` compares throughput, CPU per Gbit and yEnc decode speed with this machine's baseline in `bench/` (git-ignored) and fails on a regression over 15%; `just bench-baseline` records it. Not part of the gate; a nightly CI job keeps results as artifacts |
+| Adapter end-to-end test | `just test-adapters [sabnzbd\|qbittorrent\|holyarrs\|all]` runs real Sonarr, Radarr and HolyArrs against both adapters in Docker (`tests/adapters/README.md`); `just record-adapter-fixtures` then rewrites `fixtures/adapters/*/recorded`. Not part of the gate; CI runs it on adapter changes and nightly |
 | Update the OpenAPI document | `just openapi` after changing an API route or type; `openapi/dl.json` is committed and the gate fails when it drifts |
 | Tests | `just test` (`cargo nextest run --workspace`) |
 | Add a changeset | `changesetter add --package fangst-core --bump patch --type fix -m "What changed, for users"` (`--no-bump` for tooling, docs and tests; `--bump minor` for new features). Packages share one version, so any package in the group works |

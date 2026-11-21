@@ -1,0 +1,36 @@
+{
+  "source": "recorded",
+  "client": "sonarr",
+  "client_version": "4.0.20.3014",
+  "recorded": "2026-11-21",
+  "note": "The request as sonarr 4.0.20.3014 sent it to Fangst in the end-to-end test (tests/adapters), and Fangst's answer, which sonarr accepted. Credentials are placeholders.",
+  "job_specific": true,
+  "request": {
+    "method": "GET",
+    "path": "/",
+    "query": [
+      ["mode", "history"],
+      ["name", "delete"],
+      ["del_files", "1"],
+      ["value", "SABnzbd_nzo_4"],
+      ["archive", "1"],
+      ["apikey", "fixture-api-key-0000"],
+      ["output", "json"]
+    ],
+    "headers": [
+      ["accept", "application/json"],
+      ["accept-encoding", "gzip, br"],
+      ["connection", "close"],
+      ["host", "recorder:8081"],
+      ["user-agent", "Sonarr/4.0.20.3014 (alpine 3.24.4)"]
+    ]
+  },
+  "response": {
+    "status": 200,
+    "content_type": "json",
+    "body": {
+      "status": true
+    },
+    "headers": [["content-type", "application/json"]]
+  }
+}

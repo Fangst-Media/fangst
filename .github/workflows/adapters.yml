@@ -1,0 +1,73 @@
+name: adapters
+
+# Real Sonarr, Radarr and HolyArrs against the SABnzbd and qBittorrent adapters (tests/adapters).
+on:
+  pull_request:
+    paths:
+      - "crates/fangst-adapter-*/**"
+      - "crates/fangst-dl-api/**"
+      - "crates/fangst-dl/**"
+      - "crates/fangst-providers/**"
+      - "tests/adapters/**"
+      - "tools/e2e-mocks/**"
+      - "tools/fangst-bench/**"
+      - "fixtures/adapters/**"
+      - ".github/workflows/adapters.yml"
+  schedule:
+    - cron: "41 2 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: adapters-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  # Debug info only makes the binaries copied into the images bigger.
+  CARGO_PROFILE_DEV_DEBUG: "0"
+
+jobs:
+  e2e:
+    name: Sonarr, Radarr and HolyArrs end to end
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the pinned Rust toolchain
+        run: rustup toolchain install
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: adapters-e2e
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install JS dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck the driver and stubs
+        run: bun x tsc -p tests/adapters
+
+      # Built here rather than in Docker so the Rust cache above carries over between runs.
+      - name: Build fangst-dl and the mocks
+        run: |
+          cargo build --locked -p fangst-dl -p e2e-mocks
+          mkdir -p tests/adapters/.bin
+          cp target/debug/fangst-dl target/debug/e2e-mocks tests/adapters/.bin/
+
+      - name: Run the end-to-end test
+        env:
+          E2E_PREBUILT: -prebuilt
+        run: bun run tests/adapters/run.ts all
+
+      - name: Keep logs and recorded traffic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: adapters-e2e-${{ github.run_number }}
+          path: tests/adapters/.records
+          retention-days: 14

@@ -1,0 +1,30 @@
+{
+  "source": "recorded",
+  "client": "sonarr",
+  "client_version": "4.0.20.3014",
+  "recorded": "2026-11-21",
+  "note": "The request as sonarr 4.0.20.3014 sent it to Fangst in the end-to-end test (tests/adapters), and Fangst's answer, which sonarr accepted. Credentials are placeholders.",
+  "job_specific": true,
+  "request": {
+    "method": "POST",
+    "path": "/torrents/createCategory",
+    "query": [],
+    "headers": [
+      ["accept-encoding", "gzip, br"],
+      ["authorization", "Basic ZmFuZ3N0OmZpeHR1cmUtYXBpLWtleS0wMDAw"],
+      ["connection", "close"],
+      ["content-type", "application/x-www-form-urlencoded"],
+      ["cookie", "SID=fixture-session-0000"],
+      ["host", "recorder:8081"],
+      ["traceparent", "00-02d2b1721b43e3928211ac961cac3008-93177c1f5373b603-00"],
+      ["user-agent", "Sonarr/4.0.20.3014 (alpine 3.24.4)"]
+    ],
+    "body": "category=tv-sonarr"
+  },
+  "response": {
+    "status": 200,
+    "content_type": "text",
+    "body": "",
+    "headers": [["content-type", "text/plain; charset=utf-8"]]
+  }
+}

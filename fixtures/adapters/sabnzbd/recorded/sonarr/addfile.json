@@ -1,0 +1,40 @@
+{
+  "source": "recorded",
+  "client": "sonarr",
+  "client_version": "4.0.20.3014",
+  "recorded": "2026-11-21",
+  "note": "The request as sonarr 4.0.20.3014 sent it to Fangst in the end-to-end test (tests/adapters), and Fangst's answer, which sonarr accepted. Credentials are placeholders.",
+  "job_specific": true,
+  "request": {
+    "method": "POST",
+    "path": "/",
+    "query": [
+      ["mode", "addfile"],
+      ["cat", "tv"],
+      ["priority", "-100"],
+      ["apikey", "fixture-api-key-0000"],
+      ["output", "json"]
+    ],
+    "headers": [
+      ["accept", "application/json"],
+      ["accept-encoding", "gzip, br"],
+      ["connection", "close"],
+      [
+        "content-type",
+        "multipart/form-data; boundary=-----------------------------8df4803ffca971d"
+      ],
+      ["host", "recorder:8081"],
+      ["user-agent", "Sonarr/4.0.20.3014 (alpine 3.24.4)"]
+    ],
+    "body": "-------------------------------8df4803ffca971d\r\nContent-Disposition: form-data; name=\"name\"; filename=\"Breaking.Bad.S01E01.1080p.WEB-DL.DD5.1.H.264-FANGST.nzb\"\r\nContent-Type: application/x-nzb\r\n\r\n<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<nzb xmlns=\"http://www.newzbin.com/DTD/2003/nzb\">\n  <file poster=\"fangst-bench\" date=\"1700000000\" subject=\"[1/1] - &quot;Breaking.Bad.S01E01.1080p.WEB-DL.DD5.1.H.264-FANGST.mkv&quot; yEnc (1/8)\">\n    <groups><group>alt.binaries.fangst</group></groups>\n    <segments>\n      <segment bytes=\"16384\" number=\"1\">f0.p1@fangst-bench.invalid</segment>\n      <segment bytes=\"16384\" number=\"2\">f0.p2@fangst-bench.invalid</segment>\n      <segment bytes=\"16384\" number=\"3\">f0.p3@fangst-bench.invalid</segment>\n      <segment bytes=\"16384\" number=\"4\">f0.p4@fangst-bench.invalid</segment>\n      <segment bytes=\"16384\" number=\"5\">f0.p5@fangst-bench.invalid</segment>\n      <segment bytes=\"16384\" number=\"6\">f0.p6@fangst-bench.invalid</segment>\n      <segment bytes=\"16384\" number=\"7\">f0.p7@fangst-bench.invalid</segment>\n      <segment bytes=\"1852\" number=\"8\">f0.p8@fangst-bench.invalid</segment>\n    </segments>\n  </file>\n</nzb>\n\r\n-------------------------------8df4803ffca971d--\r\n"
+  },
+  "response": {
+    "status": 200,
+    "content_type": "json",
+    "body": {
+      "nzo_ids": ["SABnzbd_nzo_4"],
+      "status": true
+    },
+    "headers": [["content-type", "application/json"]]
+  }
+}

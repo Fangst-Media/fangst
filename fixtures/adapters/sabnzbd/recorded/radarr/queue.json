@@ -1,0 +1,69 @@
+{
+  "source": "recorded",
+  "client": "radarr",
+  "client_version": "7.0.3.10918",
+  "recorded": "2026-11-21",
+  "note": "The request as radarr 7.0.3.10918 sent it to Fangst in the end-to-end test (tests/adapters), and Fangst's answer, which radarr accepted. Credentials are placeholders.",
+  "job_specific": true,
+  "request": {
+    "method": "GET",
+    "path": "/",
+    "query": [
+      ["mode", "queue"],
+      ["start", "0"],
+      ["limit", "0"],
+      ["category", "movies"],
+      ["apikey", "fixture-api-key-0000"],
+      ["output", "json"]
+    ],
+    "headers": [
+      ["accept", "application/json"],
+      ["accept-encoding", "gzip, br"],
+      ["connection", "close"],
+      ["host", "recorder:8082"],
+      ["user-agent", "Radarr/7.0.3.10918 (alpine 3.24.4)"]
+    ]
+  },
+  "response": {
+    "status": 200,
+    "content_type": "json",
+    "body": {
+      "queue": {
+        "cache_art": "0",
+        "cache_size": "0 B",
+        "diskspace1": "0.00",
+        "diskspace1_norm": "0 ",
+        "diskspace2": "0.00",
+        "diskspace2_norm": "0 ",
+        "diskspacetotal1": "0.00",
+        "diskspacetotal2": "0.00",
+        "finish": 0,
+        "finishaction": null,
+        "have_quota": false,
+        "have_warnings": "0",
+        "kbpersec": "0.00",
+        "left_quota": "0 ",
+        "limit": 0,
+        "mb": "0.00",
+        "mbleft": "0.00",
+        "noofslots": 0,
+        "noofslots_total": 0,
+        "pause_int": "0",
+        "paused": false,
+        "paused_all": false,
+        "quota": "0 ",
+        "size": "0 B",
+        "sizeleft": "0 B",
+        "slots": [],
+        "speed": "0 ",
+        "speedlimit": "100",
+        "speedlimit_abs": "",
+        "start": 0,
+        "status": "Idle",
+        "timeleft": "0:00:00",
+        "version": "4.5.5"
+      }
+    },
+    "headers": [["content-type", "application/json"]]
+  }
+}

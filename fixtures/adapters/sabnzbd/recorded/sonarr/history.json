@@ -1,0 +1,78 @@
+{
+  "source": "recorded",
+  "client": "sonarr",
+  "client_version": "4.0.20.3014",
+  "recorded": "2026-11-21",
+  "note": "The request as sonarr 4.0.20.3014 sent it to Fangst in the end-to-end test (tests/adapters), and Fangst's answer, which sonarr accepted. Credentials are placeholders.",
+  "job_specific": true,
+  "request": {
+    "method": "GET",
+    "path": "/",
+    "query": [
+      ["mode", "history"],
+      ["start", "0"],
+      ["limit", "60"],
+      ["category", "tv"],
+      ["apikey", "fixture-api-key-0000"],
+      ["output", "json"]
+    ],
+    "headers": [
+      ["accept", "application/json"],
+      ["accept-encoding", "gzip, br"],
+      ["connection", "close"],
+      ["host", "recorder:8081"],
+      ["user-agent", "Sonarr/4.0.20.3014 (alpine 3.24.4)"]
+    ]
+  },
+  "response": {
+    "status": 200,
+    "content_type": "json",
+    "body": {
+      "history": {
+        "day_size": "114 K",
+        "last_history_update": 1795288612,
+        "month_size": "114 K",
+        "noofslots": 1,
+        "ppslots": 0,
+        "slots": [
+          {
+            "action_line": "",
+            "archive": false,
+            "bytes": 116540,
+            "category": "tv",
+            "completed": 1795288612,
+            "download_time": 0,
+            "downloaded": 116540,
+            "duplicate_key": "",
+            "fail_message": "",
+            "loaded": false,
+            "md5sum": "",
+            "meta": null,
+            "name": "Breaking.Bad.S01E01.1080p.WEB-DL.DD5.1.H.264-FANGST",
+            "nzb_name": "Breaking.Bad.S01E01.1080p.WEB-DL.DD5.1.H.264-FANGST.nzb",
+            "nzo_id": "SABnzbd_nzo_4",
+            "password": "",
+            "path": "/data/fangst/downloads/4-Breaking.Bad.S01E01.1080p.WEB-DL.DD5.1.H.264-FANGST",
+            "postproc_time": 0,
+            "pp": "D",
+            "report": "",
+            "retry": 0,
+            "script": "None",
+            "script_line": "",
+            "size": "114 KB",
+            "stage_log": [],
+            "status": "Completed",
+            "storage": "/data/fangst/downloads/4-Breaking.Bad.S01E01.1080p.WEB-DL.DD5.1.H.264-FANGST",
+            "time_added": 1795288612,
+            "url": "",
+            "url_info": ""
+          }
+        ],
+        "total_size": "114 K",
+        "version": "4.5.5",
+        "week_size": "114 K"
+      }
+    },
+    "headers": [["content-type", "application/json"]]
+  }
+}

@@ -82,14 +82,29 @@ impl Library {
     /// The NZB document listing every file added so far.
     #[must_use]
     pub fn nzb(&self) -> String {
+        Self::nzb_document(&self.files.iter().collect::<Vec<_>>())
+    }
+
+    /// An NZB listing only the named files, so one server can serve several releases.
+    #[must_use]
+    pub fn nzb_of(&self, names: &[&str]) -> String {
+        let files: Vec<&FileEntry> = self
+            .files
+            .iter()
+            .filter(|f| names.contains(&f.name.as_str()))
+            .collect();
+        Self::nzb_document(&files)
+    }
+
+    fn nzb_document(files: &[&FileEntry]) -> String {
         let mut xml = String::from(
             "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<nzb xmlns=\"http://www.newzbin.com/DTD/2003/nzb\">\n",
         );
-        for (i, file) in self.files.iter().enumerate() {
+        for (i, file) in files.iter().enumerate() {
             let subject = format!(
                 "[{}/{}] - \"{}\" yEnc (1/{})",
                 i + 1,
-                self.files.len(),
+                files.len(),
                 file.name,
                 file.segments.len()
             );
@@ -184,7 +199,20 @@ impl MockServer {
     /// # Errors
     /// When binding fails or the TLS certificate can't be generated.
     pub async fn start(library: Library, config: Config) -> std::io::Result<Self> {
-        let listener = TcpListener::bind("127.0.0.1:0").await?;
+        Self::start_at(([127, 0, 0, 1], 0).into(), library, config).await
+    }
+
+    /// Like [`MockServer::start`], on a chosen address, for a server other machines or
+    /// containers reach.
+    ///
+    /// # Errors
+    /// When binding fails or the TLS certificate can't be generated.
+    pub async fn start_at(
+        addr: SocketAddr,
+        library: Library,
+        config: Config,
+    ) -> std::io::Result<Self> {
+        let listener = TcpListener::bind(addr).await?;
         let addr = listener.local_addr()?;
         let (acceptor, cert_der) = if config.tls {
             let (acceptor, der) = tls_acceptor().map_err(std::io::Error::other)?;

@@ -1,0 +1,174 @@
+# Sonarr, Radarr and HolyArrs against Fangst's SABnzbd and qBittorrent adapters. Run it with
+# `just test-adapters`; tests/adapters/README.md explains the parts. Nothing is published to the
+# host: the driver runs inside the network.
+#
+# Credentials here are throwaway values for this network only.
+
+name: fangst-adapters-e2e
+
+x-build: &build
+  context: ../..
+  dockerfile: tests/adapters/Dockerfile
+
+x-fangst-key: &fangst-key e2e-fangst-api-key-0000
+
+services:
+  # Shared /data with the ownership every app runs as (1000:1000); downloads and libraries live on
+  # one volume so imports are moves or hard links, as on a real server.
+  prepare:
+    build:
+      <<: *build
+      target: runtime
+    user: "0:0"
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        mkdir -p /data/fangst /data/tv /data/movies /data/holyarrs/tv /data/holyarrs/movies
+        && chown -R 1000:1000 /data
+    volumes:
+      - data:/data
+
+  mocks:
+    build:
+      <<: *build
+      target: mocks${E2E_PREBUILT:-}
+    command:
+      - --releases=/adapters/releases.json
+      - --video=/adapters/media/sample.mkv
+      - --out=/releases
+      - --announce-url=http://mocks:6969/announce
+    stop_signal: SIGINT
+    volumes:
+      - ./releases.json:/adapters/releases.json:ro
+      - ./media:/adapters/media:ro
+      - releases:/releases
+    healthcheck:
+      test: ["CMD", "test", "-f", "/releases/ready"]
+      interval: 2s
+      timeout: 2s
+      retries: 60
+
+  fangst:
+    build:
+      <<: *build
+      target: fangst${E2E_PREBUILT:-}
+    command:
+      - serve
+      - --data-dir=/data/fangst
+      - --listen=0.0.0.0:7740
+      - --enable=adapter-sabnzbd
+      - --enable=adapter-qbittorrent
+      - --host=mocks
+      - --port=1119
+      - --no-tls
+      - --torrent-port=6881
+      - --no-dht
+      - --no-local-discovery
+      - --no-upnp
+    environment:
+      FANGST_API_KEY: *fangst-key
+      RUST_LOG: info
+    stop_signal: SIGINT
+    volumes:
+      - data:/data
+    depends_on:
+      prepare:
+        condition: service_completed_successfully
+      mocks:
+        condition: service_healthy
+
+  # The indexer and the recording proxies in front of Fangst; see stub/main.ts.
+  stub:
+    image: oven/bun:1.4.5-slim
+    working_dir: /adapters
+    command: ["bun", "run", "stub/main.ts"]
+    environment:
+      UPSTREAM: http://fangst:7740
+      INDEXER_URL: http://indexer:9117
+    volumes:
+      - ./:/adapters:ro
+      - ./.records:/records
+      - releases:/releases:ro
+    networks:
+      default:
+        aliases: [indexer, recorder, tmdb]
+    depends_on:
+      mocks:
+        condition: service_healthy
+
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:4.0.20.3014-ls6
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Etc/UTC
+      SONARR__AUTH__APIKEY: e2esonarrapikey00000000000000000
+      SONARR__AUTH__METHOD: External
+      SONARR__AUTH__REQUIRED: DisabledForLocalAddresses
+      SONARR__LOG__ANALYTICSENABLED: "False"
+    volumes:
+      - data:/data
+    depends_on:
+      prepare:
+        condition: service_completed_successfully
+
+  radarr:
+    image: lscr.io/linuxserver/radarr:7.0.3.10918-ls328
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Etc/UTC
+      RADARR__AUTH__APIKEY: e2eradarrapikey00000000000000000
+      RADARR__AUTH__METHOD: External
+      RADARR__AUTH__REQUIRED: DisabledForLocalAddresses
+      RADARR__LOG__ANALYTICSENABLED: "False"
+    volumes:
+      - data:/data
+    depends_on:
+      prepare:
+        condition: service_completed_successfully
+
+  holyarrs:
+    image: holyarrs/holyarrs:1.2.0
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Etc/UTC
+      # Titles are looked up on the TMDB stand-in in the stub instead of the internet.
+      HOLYARRS_METADATA_MODE: own
+      HOLYARRS_TMDB_KEY: e2e-tmdb-key-not-real
+      HOLYARRS_TMDB_URL: http://tmdb:9118
+    volumes:
+      - holyarrs-config:/config
+      - data:/data
+    depends_on:
+      prepare:
+        condition: service_completed_successfully
+      # A failed metadata lookup at startup makes HolyArrs refuse new titles for a while.
+      stub:
+        condition: service_started
+
+  driver:
+    image: oven/bun:1.4.5-slim
+    working_dir: /adapters
+    entrypoint: ["bun", "run", "driver/main.ts"]
+    environment:
+      FANGST_API_KEY: *fangst-key
+      SONARR_API_KEY: e2esonarrapikey00000000000000000
+      RADARR_API_KEY: e2eradarrapikey00000000000000000
+      HOLYARRS_VERSION: "1.2.0"
+    volumes:
+      - ./:/adapters:ro
+      - ./.records:/records
+    profiles: [driver]
+    depends_on:
+      - fangst
+      - stub
+      - sonarr
+      - radarr
+      - holyarrs
+
+volumes:
+  data:
+  releases:
+  holyarrs-config:

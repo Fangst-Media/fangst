@@ -244,7 +244,22 @@ fn request(fixture: &Value) -> HttpRequest {
         path: "/".to_owned(),
         query: pairs(r.get("query")),
         headers: pairs(r.get("headers")),
-        body: r["body"].as_str().unwrap_or_default().as_bytes().to_vec(),
+        body: body(r),
+    }
+}
+
+/// Recorded binary bodies are stored as hex, since fixtures are JSON.
+fn body(request: &Value) -> Vec<u8> {
+    match request["body_hex"].as_str() {
+        Some(hex) => (0..hex.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap())
+            .collect(),
+        None => request["body"]
+            .as_str()
+            .unwrap_or_default()
+            .as_bytes()
+            .to_vec(),
     }
 }
 
@@ -423,6 +438,116 @@ async fn an_empty_key_counts_as_missing() {
         (response.status, response.body.as_slice()),
         (403, &b"API Key Required"[..])
     );
+}
+
+fn recorded_paths(dir: &Path, found: &mut Vec<PathBuf>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries {
+        let path = entry.unwrap().path();
+        if path.is_dir() {
+            recorded_paths(&path, found);
+        } else if path.extension().is_some_and(|e| e == "json") {
+            found.push(path);
+        }
+    }
+}
+
+/// Requests real clients sent in the end-to-end test (`fixtures/adapters/sabnzbd/recorded`). Their
+/// answers came from the jobs of that run, so only answers that don't depend on jobs are compared
+/// in full; for the rest the adapter must at least understand the request.
+#[tokio::test]
+async fn recorded_client_requests_are_understood() {
+    let mut paths = Vec::new();
+    recorded_paths(&fixture_dir().join("recorded"), &mut paths);
+    paths.sort();
+    let mut failures = Vec::new();
+    for path in &paths {
+        let fixture: Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+        let response = send(request(&fixture), FakeJobs::seeded()).await;
+        let expected = &fixture["response"];
+        let mut problems = Vec::new();
+        let want_status = expected["status"].as_u64().unwrap();
+        if fixture["job_specific"] == Value::Bool(false) {
+            if u64::from(response.status) != want_status {
+                problems.push(format!("status {}", response.status));
+            }
+            if expected["content_type"] == "json" {
+                match serde_json::from_slice::<Value>(&response.body) {
+                    Ok(actual) => same_shape(&expected["body"], &actual, "", &mut problems),
+                    Err(e) => problems.push(format!("not JSON: {e}")),
+                }
+            }
+        } else if u64::from(response.status) != want_status
+            && (matches!(response.status, 400 | 403 | 415) || response.status >= 500)
+        {
+            problems.push(format!(
+                "status {}: {}",
+                response.status,
+                String::from_utf8_lossy(&response.body)
+            ));
+        }
+        if !problems.is_empty() {
+            failures.push(format!("{}: {}", path.display(), problems.join("; ")));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+fn get(query: &[(&str, &str)]) -> HttpRequest {
+    HttpRequest {
+        method: "GET".to_owned(),
+        path: "/".to_owned(),
+        query: query
+            .iter()
+            .chain(&[("apikey", KEY)])
+            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+            .collect(),
+        headers: Vec::new(),
+        body: Vec::new(),
+    }
+}
+
+/// Seen with HolyArrs 1.2.0, which polls history without a category: a torrent it had sent to
+/// the qBittorrent adapter also came back as a finished SABnzbd job.
+#[tokio::test]
+async fn torrent_jobs_stay_out_of_the_sabnzbd_api() {
+    let jobs = FakeJobs::seeded();
+    for (id, status) in [(9, "completed"), (10, "downloading")] {
+        let mut torrent = job(id, "Show.S01E01.1080p.WEB-DL", "tv", status, 0, 79_765);
+        torrent.kind = "torrent".to_owned();
+        jobs.jobs.lock().unwrap().push(torrent);
+    }
+    for query in [
+        &[("mode", "queue")][..],
+        &[("mode", "history")],
+        &[
+            ("mode", "queue"),
+            ("name", "pause"),
+            ("value", "SABnzbd_nzo_10"),
+        ],
+        &[
+            ("mode", "queue"),
+            ("name", "delete"),
+            ("value", "SABnzbd_nzo_10"),
+        ],
+        &[
+            ("mode", "history"),
+            ("name", "delete"),
+            ("value", "SABnzbd_nzo_9"),
+        ],
+        &[("mode", "retry"), ("value", "SABnzbd_nzo_9")],
+    ] {
+        let response = send(get(query), Arc::clone(&jobs)).await;
+        let body = String::from_utf8_lossy(&response.body).into_owned();
+        assert!(
+            !body.contains("SABnzbd_nzo_9") && !body.contains("SABnzbd_nzo_10"),
+            "{query:?}: {body}"
+        );
+    }
+    assert_eq!(jobs.get(10).unwrap().status, "downloading");
+    assert!(jobs.get(9).is_some());
 }
 
 #[tokio::test]

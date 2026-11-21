@@ -1,0 +1,30 @@
+{
+  "source": "recorded",
+  "client": "holyarrs",
+  "client_version": "1.2.0",
+  "recorded": "2026-11-21",
+  "note": "The request as holyarrs 1.2.0 sent it to Fangst in the end-to-end test (tests/adapters), and Fangst's answer, which holyarrs accepted. Credentials are placeholders.",
+  "job_specific": false,
+  "request": {
+    "method": "POST",
+    "path": "/auth/login",
+    "query": [],
+    "headers": [
+      ["accept-encoding", "gzip"],
+      ["content-type", "application/x-www-form-urlencoded"],
+      ["host", "recorder:8083"],
+      ["referer", "http://recorder:8083"],
+      ["user-agent", "Go-http-client/1.1"]
+    ],
+    "body": "password=fixture-api-key-0000&username=fangst"
+  },
+  "response": {
+    "status": 200,
+    "content_type": "text",
+    "body": "Ok.",
+    "headers": [
+      ["content-type", "text/plain; charset=utf-8"],
+      ["set-cookie", "SID=fixture-session-0000; HttpOnly; Path=/; SameSite=Strict; Max-Age=2592000"]
+    ]
+  }
+}

@@ -308,6 +308,13 @@ impl Service {
     /// # Panics
     /// If the running-jobs lock was poisoned by a panic elsewhere.
     pub async fn run(&self) -> Result<(), Error> {
+        // Clients check the folder the API reports before the first job exists; HolyArrs only
+        // maps paths it can see at that moment.
+        tokio::fs::create_dir_all(&self.runner.root)
+            .await
+            .map_err(|e| {
+                Error::Download(format!("creating {}: {e}", self.runner.root.display()))
+            })?;
         let interrupted = self.runner.store.requeue_interrupted().await?;
         if interrupted > 0 {
             for job in self.runner.store.list().await? {

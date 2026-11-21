@@ -60,3 +60,7 @@ dev-data/
 
 # Per-machine benchmark baselines
 /bench/
+
+# Adapter end-to-end test: recorded traffic, logs and binaries copied into the images
+/tests/adapters/.records/
+/tests/adapters/.bin/

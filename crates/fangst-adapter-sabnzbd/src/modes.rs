@@ -298,7 +298,7 @@ async fn queue(params: &Params, jobs: &dyn Jobs) -> Result<HttpResponse, Provide
         "resume" => return queue_toggle(params, jobs, false).await,
         _ => return Ok(error("not implemented")),
     }
-    let all = jobs.list().await?;
+    let all = usenet_jobs(jobs).await?;
     let mut matching = filtered(params, &all, is_queue);
     // Queue order is run order: higher priority first, then oldest first.
     matching.sort_by(|a, b| b.priority.cmp(&a.priority).then(a.id.cmp(&b.id)));
@@ -321,6 +321,22 @@ async fn queue(params: &Params, jobs: &dyn Jobs) -> Result<HttpResponse, Provide
         ),
     );
     Ok(ok_json(&json!({ "queue": body })))
+}
+
+/// Torrent jobs belong to the qBittorrent adapter. Listed here they showed up as finished SABnzbd
+/// jobs in HolyArrs, which polls history without a category, and could be paused or deleted
+/// through this protocol.
+async fn usenet_jobs(jobs: &dyn Jobs) -> Result<Vec<JobSummary>, ProviderError> {
+    Ok(jobs
+        .list()
+        .await?
+        .into_iter()
+        .filter(|j| j.kind == "usenet")
+        .collect())
+}
+
+async fn is_usenet(jobs: &dyn Jobs, id: i64) -> Result<bool, ProviderError> {
+    Ok(usenet_jobs(jobs).await?.iter().any(|j| j.id == id))
 }
 
 fn wants_files(params: &Params) -> bool {
@@ -353,7 +369,7 @@ async fn queue_delete(params: &Params, jobs: &dyn Jobs) -> Result<HttpResponse, 
     if params.non_empty("value").is_none() {
         return Ok(error("expects one parameter"));
     }
-    let all = jobs.list().await?;
+    let all = usenet_jobs(jobs).await?;
     let mut deleted = Vec::new();
     for id in targets(params, &all, is_queue) {
         if jobs.delete(id, wants_files(params)).await.is_ok() {
@@ -375,6 +391,9 @@ async fn queue_toggle(
     };
     let mut changed = Vec::new();
     for id in ids(value) {
+        if !is_usenet(jobs, id).await? {
+            continue;
+        }
         let result = if pause {
             jobs.pause(id).await
         } else {
@@ -443,7 +462,7 @@ async fn history(params: &Params, jobs: &dyn Jobs) -> Result<HttpResponse, Provi
         "delete" => return history_delete(params, jobs).await,
         _ => return Ok(error("not implemented")),
     }
-    let all = jobs.list().await?;
+    let all = usenet_jobs(jobs).await?;
     let mut matching = filtered(params, &all, is_history);
     // Newest first, as SABnzbd lists history.
     matching.sort_by(|a, b| {
@@ -486,7 +505,7 @@ async fn history_delete(params: &Params, jobs: &dyn Jobs) -> Result<HttpResponse
     if params.non_empty("value").is_none() {
         return Ok(error("expects one parameter"));
     }
-    let all = jobs.list().await?;
+    let all = usenet_jobs(jobs).await?;
     // Fangst keeps no archive, so `archive=1` removes the entry as `archive=0` does.
     for id in targets(params, &all, is_history) {
         jobs.delete(id, wants_files(params)).await?;
@@ -634,7 +653,7 @@ async fn get_config(params: &Params, jobs: &dyn Jobs) -> Result<HttpResponse, Pr
 }
 
 async fn full_status(jobs: &dyn Jobs) -> Result<HttpResponse, ProviderError> {
-    let all = jobs.list().await?;
+    let all = usenet_jobs(jobs).await?;
     let root = jobs.download_root().to_string_lossy().into_owned();
     let mut status = header(&all);
     for (key, value) in [
@@ -653,6 +672,9 @@ async fn retry(params: &Params, jobs: &dyn Jobs) -> Result<HttpResponse, Provide
     let Some(id) = params.non_empty("value").and_then(parse_nzo_id) else {
         return Ok(error("expects one parameter"));
     };
+    if !is_usenet(jobs, id).await? {
+        return Ok(error("item does not exist"));
+    }
     // Fangst resumes the failed job in place, so its id stays the same.
     Ok(match jobs.resume(id).await {
         Ok(job) => ok_json(&json!({ "status": true, "nzo_id": nzo_id(job.id) })),

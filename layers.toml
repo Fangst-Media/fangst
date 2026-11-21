@@ -4,7 +4,7 @@
 # A crate missing from this file fails the check.
 
 core = ["fangst-core"]
-tools = ["layercheck", "fangst-bench", "usenet-bench"]
+tools = ["layercheck", "fangst-bench", "usenet-bench", "e2e-mocks"]
 
 [layers]
 0 = ["fangst-nntp", "fangst-yenc", "fangst-nzb", "fangst-release", "fangst-providers"]

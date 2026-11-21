@@ -368,8 +368,83 @@ fn request(fixture: &Value) -> HttpRequest {
         path: r["path"].as_str().unwrap().to_owned(),
         query: pairs(r.get("query")),
         headers: pairs(r.get("headers")),
-        body: r["body"].as_str().unwrap_or_default().as_bytes().to_vec(),
+        body: body(r),
     }
+}
+
+/// Recorded binary bodies, such as a torrent upload, are stored as hex, since fixtures are JSON.
+fn body(request: &Value) -> Vec<u8> {
+    match request["body_hex"].as_str() {
+        Some(hex) => (0..hex.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap())
+            .collect(),
+        None => request["body"]
+            .as_str()
+            .unwrap_or_default()
+            .as_bytes()
+            .to_vec(),
+    }
+}
+
+fn recorded_paths(dir: &Path, found: &mut Vec<PathBuf>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries {
+        let path = entry.unwrap().path();
+        if path.is_dir() {
+            recorded_paths(&path, found);
+        } else if path.extension().is_some_and(|e| e == "json") {
+            found.push(path);
+        }
+    }
+}
+
+/// Requests real clients sent in the end-to-end test (`fixtures/adapters/qbittorrent/recorded`).
+/// Their answers came from the jobs of that run, so only answers that don't depend on jobs are
+/// compared in full; for the rest the adapter must at least understand the request.
+#[tokio::test]
+async fn recorded_client_requests_are_understood() {
+    let mut paths = Vec::new();
+    recorded_paths(&fixture_dir().join("recorded"), &mut paths);
+    paths.sort();
+    let mut failures = Vec::new();
+    for path in &paths {
+        let fixture: Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+        let response = send(request(&fixture), FakeJobs::seeded()).await;
+        let expected = &fixture["response"];
+        let mut problems = Vec::new();
+        let want_status = expected["status"].as_u64().unwrap();
+        if fixture["job_specific"] == Value::Bool(false) {
+            if u64::from(response.status) != want_status {
+                problems.push(format!("status {}", response.status));
+            }
+            if expected["content_type"] == "json" {
+                match serde_json::from_slice::<Value>(&response.body) {
+                    Ok(actual) => same_shape(&expected["body"], &actual, "", &mut problems),
+                    Err(e) => problems.push(format!("not JSON: {e}")),
+                }
+            } else if response.body != expected["body"].as_str().unwrap_or_default().as_bytes() {
+                problems.push(format!(
+                    "body {:?}",
+                    String::from_utf8_lossy(&response.body)
+                ));
+            }
+        } else if u64::from(response.status) != want_status
+            && (matches!(response.status, 400 | 401 | 403 | 415) || response.status >= 500)
+        {
+            problems.push(format!(
+                "status {}: {}",
+                response.status,
+                String::from_utf8_lossy(&response.body)
+            ));
+        }
+        if !problems.is_empty() {
+            failures.push(format!("{}: {}", path.display(), problems.join("; ")));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
 fn kind(value: &Value) -> &'static str {

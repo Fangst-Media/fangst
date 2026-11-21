@@ -1,0 +1,41 @@
+{
+  "source": "recorded",
+  "client": "radarr",
+  "client_version": "7.0.3.10918",
+  "recorded": "2026-11-21",
+  "note": "The request as radarr 7.0.3.10918 sent it to Fangst in the end-to-end test (tests/adapters), and Fangst's answer, which radarr accepted. Credentials are placeholders.",
+  "job_specific": true,
+  "request": {
+    "method": "GET",
+    "path": "/torrents/categories",
+    "query": [],
+    "headers": [
+      ["accept-encoding", "gzip, br"],
+      ["authorization", "Basic ZmFuZ3N0OmZpeHR1cmUtYXBpLWtleS0wMDAw"],
+      ["connection", "close"],
+      ["cookie", "SID=fixture-session-0000"],
+      ["host", "recorder:8082"],
+      ["traceparent", "00-d1f86c9d7c1453cfe7f10ed5a7f1a352-eafe0199ce18a20b-00"],
+      ["user-agent", "Radarr/7.0.3.10918 (alpine 3.24.4)"]
+    ]
+  },
+  "response": {
+    "status": 200,
+    "content_type": "json",
+    "body": {
+      "movies": {
+        "name": "movies",
+        "savePath": ""
+      },
+      "radarr": {
+        "name": "radarr",
+        "savePath": ""
+      },
+      "tv-sonarr": {
+        "name": "tv-sonarr",
+        "savePath": ""
+      }
+    },
+    "headers": [["content-type", "application/json"]]
+  }
+}

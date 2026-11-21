@@ -1,0 +1,32 @@
+{
+  "source": "recorded",
+  "client": "radarr",
+  "client_version": "7.0.3.10918",
+  "recorded": "2026-11-21",
+  "note": "The request as radarr 7.0.3.10918 sent it to Fangst in the end-to-end test (tests/adapters), and Fangst's answer, which radarr accepted. Credentials are placeholders.",
+  "job_specific": false,
+  "request": {
+    "method": "POST",
+    "path": "/auth/login",
+    "query": [],
+    "headers": [
+      ["accept-encoding", "gzip, br"],
+      ["authorization", "Basic ZmFuZ3N0OmZpeHR1cmUtYXBpLWtleS0wMDAw"],
+      ["connection", "close"],
+      ["content-type", "application/x-www-form-urlencoded"],
+      ["host", "recorder:8082"],
+      ["traceparent", "00-d1f86c9d7c1453cfe7f10ed5a7f1a352-dfc432bb1e4e98f4-00"],
+      ["user-agent", "Radarr/7.0.3.10918 (alpine 3.24.4)"]
+    ],
+    "body": "username=fangst&password=fixture-api-key-0000"
+  },
+  "response": {
+    "status": 200,
+    "content_type": "text",
+    "body": "Ok.",
+    "headers": [
+      ["content-type", "text/plain; charset=utf-8"],
+      ["set-cookie", "SID=fixture-session-0000; HttpOnly; Path=/; SameSite=Strict; Max-Age=2592000"]
+    ]
+  }
+}

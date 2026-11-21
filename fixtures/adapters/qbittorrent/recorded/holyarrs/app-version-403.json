@@ -1,0 +1,25 @@
+{
+  "source": "recorded",
+  "client": "holyarrs",
+  "client_version": "1.2.0",
+  "recorded": "2026-11-21",
+  "note": "The request as holyarrs 1.2.0 sent it to Fangst in the end-to-end test (tests/adapters), and Fangst's answer, which holyarrs accepted. Credentials are placeholders.",
+  "job_specific": false,
+  "request": {
+    "method": "GET",
+    "path": "/app/version",
+    "query": [],
+    "headers": [
+      ["accept-encoding", "gzip"],
+      ["host", "recorder:8083"],
+      ["referer", "http://recorder:8083"],
+      ["user-agent", "Go-http-client/1.1"]
+    ]
+  },
+  "response": {
+    "status": 403,
+    "content_type": "text",
+    "body": "Forbidden",
+    "headers": [["content-type", "text/plain; charset=utf-8"]]
+  }
+}

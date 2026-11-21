@@ -1,0 +1,79 @@
+{
+  "source": "recorded",
+  "client": "holyarrs",
+  "client_version": "1.2.0",
+  "recorded": "2026-11-21",
+  "note": "The request as holyarrs 1.2.0 sent it to Fangst in the end-to-end test (tests/adapters), and Fangst's answer, which holyarrs accepted. Credentials are placeholders.",
+  "job_specific": false,
+  "request": {
+    "method": "GET",
+    "path": "/",
+    "query": [
+      ["apikey", "fixture-api-key-0000"],
+      ["mode", "get_config"],
+      ["output", "json"],
+      ["section", "categories"]
+    ],
+    "headers": [
+      ["accept-encoding", "gzip"],
+      ["host", "recorder:8083"],
+      ["user-agent", "Go-http-client/1.1"]
+    ]
+  },
+  "response": {
+    "status": 200,
+    "content_type": "json",
+    "body": {
+      "config": {
+        "categories": [
+          {
+            "dir": "",
+            "name": "*",
+            "newzbin": "",
+            "order": 0,
+            "pp": "3",
+            "priority": 0,
+            "script": "None"
+          },
+          {
+            "dir": "",
+            "name": "audio",
+            "newzbin": "",
+            "order": 1,
+            "pp": "",
+            "priority": -100,
+            "script": "Default"
+          },
+          {
+            "dir": "",
+            "name": "movies",
+            "newzbin": "",
+            "order": 2,
+            "pp": "",
+            "priority": -100,
+            "script": "Default"
+          },
+          {
+            "dir": "",
+            "name": "software",
+            "newzbin": "",
+            "order": 3,
+            "pp": "",
+            "priority": -100,
+            "script": "Default"
+          },
+          {
+            "dir": "",
+            "name": "tv",
+            "newzbin": "",
+            "order": 4,
+            "pp": "",
+            "priority": -100,
+            "script": "Default"
+          }
+        ]
+      }
+    },
+    "headers": [["content-type", "application/json"]]
+  }
+}

@@ -1,0 +1,53 @@
+[
+  {
+    "app": "sonarr",
+    "protocol": "usenet",
+    "title": "Breaking.Bad.S01E01.1080p.WEB-DL.DD5.1.H.264-FANGST",
+    "tvdbId": 81189,
+    "season": 1,
+    "episode": 1,
+    "reportedBytes": 1610612736
+  },
+  {
+    "app": "sonarr",
+    "protocol": "torrent",
+    "title": "Breaking.Bad.S01E02.1080p.WEB-DL.DD5.1.H.264-FANGST",
+    "tvdbId": 81189,
+    "season": 1,
+    "episode": 2,
+    "reportedBytes": 1610612736
+  },
+  {
+    "app": "radarr",
+    "protocol": "usenet",
+    "title": "The.Matrix.1999.1080p.BluRay.x264-FANGST",
+    "tmdbId": 603,
+    "imdbId": "tt0133093",
+    "reportedBytes": 8589934592
+  },
+  {
+    "app": "radarr",
+    "protocol": "torrent",
+    "title": "Night.of.the.Living.Dead.1968.1080p.BluRay.x264-FANGST",
+    "tmdbId": 10331,
+    "imdbId": "tt0063350",
+    "reportedBytes": 8589934592
+  },
+  {
+    "app": "holyarrs",
+    "protocol": "usenet",
+    "title": "The.Matrix.1999.1080p.BluRay.x264-FANGSTHA",
+    "tmdbId": 603,
+    "imdbId": "tt0133093",
+    "reportedBytes": 8589934592
+  },
+  {
+    "app": "holyarrs",
+    "protocol": "torrent",
+    "title": "Breaking.Bad.S01E03.1080p.WEB-DL.DD5.1.H.264-FANGSTHA",
+    "tvdbId": 81189,
+    "season": 1,
+    "episode": 3,
+    "reportedBytes": 1610612736
+  }
+]

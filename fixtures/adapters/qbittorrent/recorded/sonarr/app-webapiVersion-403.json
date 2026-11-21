@@ -1,0 +1,27 @@
+{
+  "source": "recorded",
+  "client": "sonarr",
+  "client_version": "4.0.20.3014",
+  "recorded": "2026-11-21",
+  "note": "The request as sonarr 4.0.20.3014 sent it to Fangst in the end-to-end test (tests/adapters), and Fangst's answer, which sonarr accepted. Credentials are placeholders.",
+  "job_specific": false,
+  "request": {
+    "method": "GET",
+    "path": "/app/webapiVersion",
+    "query": [],
+    "headers": [
+      ["accept-encoding", "gzip, br"],
+      ["authorization", "Basic ZmFuZ3N0OmZpeHR1cmUtYXBpLWtleS0wMDAw"],
+      ["connection", "close"],
+      ["host", "recorder:8081"],
+      ["traceparent", "00-02d2b1721b43e3928211ac961cac3008-fc5693548be16c43-00"],
+      ["user-agent", "Sonarr/4.0.20.3014 (alpine 3.24.4)"]
+    ]
+  },
+  "response": {
+    "status": 403,
+    "content_type": "text",
+    "body": "Forbidden",
+    "headers": [["content-type", "text/plain; charset=utf-8"]]
+  }
+}

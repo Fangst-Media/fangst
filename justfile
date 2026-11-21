@@ -46,6 +46,16 @@ bench-usenet *ARGS:
 bench-baseline:
     cargo run --release --quiet -p usenet-bench -- --save-baseline
 
+# Sonarr, Radarr and HolyArrs against the adapters in Docker (sabnzbd, qbittorrent, holyarrs or all).
+# Not part of the gate; needs Docker and internet for the images and Sonarr/Radarr metadata.
+test-adapters SUITE="all" *ARGS:
+    bun x tsc -p tests/adapters
+    bun run tests/adapters/run.ts {{SUITE}} {{ARGS}}
+
+# Turn the last adapter run's recordings into fixtures/adapters/*/recorded
+record-adapter-fixtures:
+    bun run tests/adapters/fixtures.ts
+
 # Format all Rust code
 fmt:
     cargo fmt --all

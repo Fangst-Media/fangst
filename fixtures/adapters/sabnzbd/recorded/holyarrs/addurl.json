@@ -1,0 +1,37 @@
+{
+  "source": "recorded",
+  "client": "holyarrs",
+  "client_version": "1.2.0",
+  "recorded": "2026-11-21",
+  "note": "The request as holyarrs 1.2.0 sent it to Fangst in the end-to-end test (tests/adapters), and Fangst's answer, which holyarrs accepted. Credentials are placeholders.",
+  "job_specific": true,
+  "request": {
+    "method": "GET",
+    "path": "/",
+    "query": [
+      ["apikey", "fixture-api-key-0000"],
+      ["cat", "movies"],
+      ["mode", "addurl"],
+      [
+        "name",
+        "http://indexer:9117/files/The.Matrix.1999.1080p.BluRay.x264-FANGSTHA.nzb?apikey=holyarrs"
+      ],
+      ["nzbname", "The.Matrix.1999.1080p.BluRay.x264-FANGSTHA"],
+      ["output", "json"]
+    ],
+    "headers": [
+      ["accept-encoding", "gzip"],
+      ["host", "recorder:8083"],
+      ["user-agent", "Go-http-client/1.1"]
+    ]
+  },
+  "response": {
+    "status": 200,
+    "content_type": "json",
+    "body": {
+      "nzo_ids": ["SABnzbd_nzo_1"],
+      "status": true
+    },
+    "headers": [["content-type", "application/json"]]
+  }
+}

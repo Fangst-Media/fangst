@@ -30,7 +30,16 @@ impl Tracker {
     /// # Errors
     /// When no local port can be bound.
     pub async fn start() -> std::io::Result<Self> {
-        let listener = TcpListener::bind("127.0.0.1:0").await?;
+        Self::start_at(([127, 0, 0, 1], 0).into()).await
+    }
+
+    /// Like [`Tracker::start`], on a chosen address. Peers are handed out with the address they
+    /// connected from, so on a container network they reach each other by container address.
+    ///
+    /// # Errors
+    /// When the address can't be bound.
+    pub async fn start_at(addr: SocketAddr) -> std::io::Result<Self> {
+        let listener = TcpListener::bind(addr).await?;
         let addr = listener.local_addr()?;
         let swarms = Swarms::default();
         let shared = Arc::clone(&swarms);

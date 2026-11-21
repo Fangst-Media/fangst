@@ -1,0 +1,64 @@
+{
+  "source": "recorded",
+  "client": "holyarrs",
+  "client_version": "1.2.0",
+  "recorded": "2026-11-21",
+  "note": "The request as holyarrs 1.2.0 sent it to Fangst in the end-to-end test (tests/adapters), and Fangst's answer, which holyarrs accepted. Credentials are placeholders.",
+  "job_specific": false,
+  "request": {
+    "method": "GET",
+    "path": "/",
+    "query": [
+      ["apikey", "fixture-api-key-0000"],
+      ["mode", "fullstatus"],
+      ["output", "json"],
+      ["skip_dashboard", "1"]
+    ],
+    "headers": [
+      ["accept-encoding", "gzip"],
+      ["host", "recorder:8083"],
+      ["user-agent", "Go-http-client/1.1"]
+    ]
+  },
+  "response": {
+    "status": 200,
+    "content_type": "json",
+    "body": {
+      "status": {
+        "cache_art": "0",
+        "cache_size": "0 B",
+        "completedir": "/data/fangst/downloads",
+        "diskspace1": "0.00",
+        "diskspace1_norm": "0 ",
+        "diskspace2": "0.00",
+        "diskspace2_norm": "0 ",
+        "diskspacetotal1": "0.00",
+        "diskspacetotal2": "0.00",
+        "downloaddir": "/data/fangst/downloads",
+        "finishaction": null,
+        "folders": [],
+        "have_quota": false,
+        "have_warnings": "0",
+        "kbpersec": "0.00",
+        "left_quota": "0 ",
+        "mb": "0.00",
+        "mbleft": "0.00",
+        "pause_int": "0",
+        "paused": false,
+        "paused_all": false,
+        "quota": "0 ",
+        "servers": [],
+        "size": "0 B",
+        "sizeleft": "0 B",
+        "speed": "0 ",
+        "speedlimit": "100",
+        "speedlimit_abs": "",
+        "status": "Idle",
+        "timeleft": "0:00:00",
+        "version": "4.5.5",
+        "warnings": []
+      }
+    },
+    "headers": [["content-type", "application/json"]]
+  }
+}

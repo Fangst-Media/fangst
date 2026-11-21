@@ -1,0 +1,75 @@
+{
+  "source": "recorded",
+  "client": "holyarrs",
+  "client_version": "1.2.0",
+  "recorded": "2026-11-21",
+  "note": "The request as holyarrs 1.2.0 sent it to Fangst in the end-to-end test (tests/adapters), and Fangst's answer, which holyarrs accepted. Credentials are placeholders.",
+  "job_specific": true,
+  "request": {
+    "method": "GET",
+    "path": "/",
+    "query": [
+      ["apikey", "fixture-api-key-0000"],
+      ["limit", "200"],
+      ["mode", "history"],
+      ["output", "json"],
+      ["start", "0"]
+    ],
+    "headers": [
+      ["accept-encoding", "gzip"],
+      ["host", "recorder:8083"],
+      ["user-agent", "Go-http-client/1.1"]
+    ]
+  },
+  "response": {
+    "status": 200,
+    "content_type": "json",
+    "body": {
+      "history": {
+        "day_size": "114 K",
+        "last_history_update": 1795288602,
+        "month_size": "114 K",
+        "noofslots": 1,
+        "ppslots": 0,
+        "slots": [
+          {
+            "action_line": "",
+            "archive": false,
+            "bytes": 116540,
+            "category": "movies",
+            "completed": 1795288602,
+            "download_time": 0,
+            "downloaded": 116540,
+            "duplicate_key": "",
+            "fail_message": "",
+            "loaded": false,
+            "md5sum": "",
+            "meta": null,
+            "name": "The.Matrix.1999.1080p.BluRay.x264-FANGSTHA",
+            "nzb_name": "The.Matrix.1999.1080p.BluRay.x264-FANGSTHA.nzb",
+            "nzo_id": "SABnzbd_nzo_1",
+            "password": "",
+            "path": "/data/fangst/downloads/1-The.Matrix.1999.1080p.BluRay.x264-FANGSTHA",
+            "postproc_time": 0,
+            "pp": "D",
+            "report": "",
+            "retry": 0,
+            "script": "None",
+            "script_line": "",
+            "size": "114 KB",
+            "stage_log": [],
+            "status": "Completed",
+            "storage": "/data/fangst/downloads/1-The.Matrix.1999.1080p.BluRay.x264-FANGSTHA",
+            "time_added": 1795288602,
+            "url": "",
+            "url_info": ""
+          }
+        ],
+        "total_size": "114 K",
+        "version": "4.5.5",
+        "week_size": "114 K"
+      }
+    },
+    "headers": [["content-type", "application/json"]]
+  }
+}
