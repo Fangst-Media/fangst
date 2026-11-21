@@ -86,9 +86,7 @@ fn http(addr: &str, path: &str, key: Option<&str>) -> (u16, String) {
 
 fn request(addr: &str, method: &str, path: &str, key: Option<&str>, json: &str) -> (u16, String) {
     let mut stream = TcpStream::connect(addr).unwrap();
-    let key_header = key
-        .map(|k| format!("X-Api-Key: {k}\r\n"))
-        .unwrap_or_default();
+    let key_header = key.map_or_default(|k| format!("X-Api-Key: {k}\r\n"));
     write!(
         stream,
         "{method} {path} HTTP/1.1\r\nHost: {addr}\r\n{key_header}Content-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{json}",

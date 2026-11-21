@@ -67,7 +67,7 @@ fn groups_par2_file_names_into_sets() {
         .iter()
         .find(|s| s.index.as_deref() == Some("Other.par2"))
         .unwrap();
-    assert!(other.volumes.is_empty());
+    assert_eq!(other.volumes, [] as [fangst_postproc_par2::Volume; 0]);
 }
 
 #[test]

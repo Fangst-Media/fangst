@@ -86,8 +86,7 @@ impl Torrent {
             .map_or_else(|| root.to_path_buf(), Path::to_path_buf);
         let prefix = folder
             .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_default();
+            .map_or_default(|n| n.to_string_lossy().into_owned());
         Paths {
             save_path: text(&parent),
             content_path: text(&folder),

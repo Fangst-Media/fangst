@@ -93,7 +93,7 @@ pub(crate) async fn status(
     let files = row
         .metainfo
         .and_then(|bytes| fangst_torrent::inspect(&bytes).ok())
-        .map(|meta| {
+        .map_or_default(|meta| {
             meta.files
                 .into_iter()
                 .map(|file| TorrentFile {
@@ -106,8 +106,7 @@ pub(crate) async fn status(
                     bytes: file.len,
                 })
                 .collect()
-        })
-        .unwrap_or_default();
+        });
     let total = u64::try_from(job.total_bytes).unwrap_or(0);
     let progress = live.and_then(|live| live.progress(id));
     Ok(Some(TorrentStatus {

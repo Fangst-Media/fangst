@@ -274,7 +274,10 @@ mod tests {
 
     #[test]
     fn within_tolerance_passes() {
-        assert!(compare(&result(1000.0, 1.0, 2.0), &result(860.0, 1.14, 1.71), 0.15).is_empty());
+        assert_eq!(
+            compare(&result(1000.0, 1.0, 2.0), &result(860.0, 1.14, 1.71), 0.15),
+            [] as [std::string::String; 0]
+        );
     }
 
     #[test]
@@ -288,7 +291,10 @@ mod tests {
 
     #[test]
     fn getting_faster_is_never_a_regression() {
-        assert!(compare(&result(1000.0, 1.0, 2.0), &result(5000.0, 0.1, 9.0), 0.15).is_empty());
+        assert_eq!(
+            compare(&result(1000.0, 1.0, 2.0), &result(5000.0, 0.1, 9.0), 0.15),
+            [] as [std::string::String; 0]
+        );
     }
 
     #[test]

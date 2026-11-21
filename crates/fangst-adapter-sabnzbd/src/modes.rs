@@ -399,8 +399,7 @@ fn history_slot(job: &JobSummary) -> Value {
     let storage = job
         .output_path
         .as_ref()
-        .map(|p| p.to_string_lossy().into_owned())
-        .unwrap_or_default();
+        .map_or_default(|p| p.to_string_lossy().into_owned());
     let completed = job.finished_at.unwrap_or(job.added_at);
     let failed = job.status == "failed";
     json!({

@@ -136,12 +136,15 @@ async fn par2_intact_download_never_fetches_recovery_volumes() {
         std::fs::read(outcome.folder.join("show.bin")).unwrap(),
         payload
     );
-    assert!(volumes_on_disk(&outcome.folder).is_empty());
+    assert_eq!(
+        volumes_on_disk(&outcome.folder),
+        [] as [std::string::String; 0]
+    );
     assert_eq!(
         messages(&outcome.events, "verify"),
         ["show.par2: all 1 files intact"]
     );
-    assert!(messages(&outcome.events, "repair").is_empty());
+    assert_eq!(messages(&outcome.events, "repair"), [] as [&str; 0]);
 }
 
 #[tokio::test]
