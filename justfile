@@ -25,9 +25,13 @@ layercheck:
 deny:
     cargo deny check
 
-# Regenerate generated files and fail if any changed; OpenAPI specs and clients join here as they appear
+# Fail when a committed generated file no longer matches the code that generates it
 generated:
-    @echo "generated: nothing to regenerate yet"
+    cargo run --quiet -p fangst-dl -- openapi --check openapi/dl.json
+
+# Rewrite the committed OpenAPI documents after an API change
+openapi:
+    cargo run --quiet -p fangst-dl -- openapi openapi/dl.json
 
 # Fail when the branch adds no changeset; passes on main and when nothing changed
 changeset:

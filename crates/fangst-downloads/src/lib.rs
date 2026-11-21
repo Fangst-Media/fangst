@@ -16,6 +16,9 @@ use sqlx::sqlite::{
 };
 use sqlx::{FromRow, Row};
 
+mod service;
+pub use service::{Change, Service};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Kind {
     Usenet,
@@ -130,6 +133,11 @@ pub enum Error {
     NotFound(i64),
     Corrupt(String),
     Download(String),
+    InvalidState {
+        id: i64,
+        status: Status,
+        action: &'static str,
+    },
 }
 
 impl fmt::Display for Error {
@@ -141,6 +149,9 @@ impl fmt::Display for Error {
             Self::NotFound(id) => write!(f, "job {id} does not exist"),
             Self::Corrupt(e) => write!(f, "downloads.db holds unexpected data: {e}"),
             Self::Download(e) => write!(f, "download failed: {e}"),
+            Self::InvalidState { id, status, action } => {
+                write!(f, "job {id} is {} and can't be {action}d", status.as_str())
+            }
         }
     }
 }
@@ -368,6 +379,21 @@ impl Store {
         Ok(())
     }
 
+    /// Removes a job and everything recorded about it.
+    ///
+    /// # Errors
+    /// [`Error::NotFound`] when the id doesn't exist.
+    pub async fn delete(&self, id: i64) -> Result<(), Error> {
+        let result = sqlx::query("DELETE FROM jobs WHERE id = ?")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        if result.rows_affected() == 0 {
+            return Err(Error::NotFound(id));
+        }
+        Ok(())
+    }
+
     /// Jobs left `downloading` by a process that stopped go back to the queue.
     ///
     /// # Errors
@@ -453,6 +479,7 @@ async fn backup(pool: &SqlitePool, path: &Path, pending: i64) -> Result<(), Erro
 }
 
 /// Runs queued jobs one at a time.
+#[derive(Clone)]
 pub struct Runner {
     pub store: Store,
     pub pool: Arc<fangst_nntp::Pool>,
@@ -474,7 +501,7 @@ impl Runner {
         Ok(())
     }
 
-    async fn run(&self, job: &Job) -> Result<(), Error> {
+    pub(crate) async fn run(&self, job: &Job) -> Result<(), Error> {
         self.store
             .set_status(job.id, Status::Downloading, None)
             .await?;

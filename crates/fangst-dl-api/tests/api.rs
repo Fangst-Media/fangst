@@ -1,0 +1,326 @@
+use std::sync::Arc;
+use std::time::Duration;
+
+use axum::body::Body;
+use axum::http::{Request, StatusCode};
+use fangst_bench::{Config, Library, MockServer};
+use fangst_dl_api::{ChangeDto, EventDto, JobDto, JobStatus, openapi_json, router};
+use fangst_downloads::{Runner, Service, Store};
+use futures_util::StreamExt;
+use http_body_util::BodyExt;
+use tower::ServiceExt;
+
+const KEY: &str = "test-key-123";
+
+struct Harness {
+    service: Service,
+    _server: MockServer,
+    _dir: tempfile::TempDir,
+    nzb: String,
+}
+
+async fn harness() -> Harness {
+    let dir = tempfile::tempdir().unwrap();
+    let mut library = Library::new();
+    library.add_file("a.bin", &vec![9u8; 30_000], 10_000, "g");
+    let nzb = library.nzb();
+    let server = MockServer::start(library, Config::default()).await.unwrap();
+    let store = Store::open(&dir.path().join("downloads.db")).await.unwrap();
+    let runner = Runner {
+        store,
+        pool: Arc::new(fangst_nntp::Pool::new(fangst_nntp::ServerConfig {
+            host: "127.0.0.1".to_owned(),
+            port: server.addr.port(),
+            tls: None,
+            credentials: None,
+            max_connections: 2,
+            connect_timeout: Duration::from_secs(5),
+            command_timeout: Duration::from_secs(5),
+        })),
+        root: dir.path().join("downloads"),
+        options: fangst_usenet::Options {
+            connections: 2,
+            pipeline_depth: 2,
+            retries: 1,
+        },
+    };
+    Harness {
+        service: Service::new(runner),
+        _server: server,
+        _dir: dir,
+        nzb,
+    }
+}
+
+async fn call(
+    h: &Harness,
+    method: &str,
+    uri: &str,
+    key: Option<&str>,
+    body: Body,
+) -> (StatusCode, Vec<u8>) {
+    let mut request = Request::builder().method(method).uri(uri);
+    if let Some(key) = key {
+        request = request.header("x-api-key", key);
+    }
+    let response = router(h.service.clone(), KEY)
+        .oneshot(request.body(body).unwrap())
+        .await
+        .unwrap();
+    let status = response.status();
+    (
+        status,
+        response
+            .into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes()
+            .to_vec(),
+    )
+}
+
+async fn add(h: &Harness) -> JobDto {
+    let (status, body) = call(
+        h,
+        "POST",
+        "/api/v1/jobs?name=Show&category=tv&priority=5",
+        Some(KEY),
+        Body::from(h.nzb.clone()),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::CREATED,
+        "{}",
+        String::from_utf8_lossy(&body)
+    );
+    serde_json::from_slice(&body).unwrap()
+}
+
+#[tokio::test]
+async fn health_needs_no_key() {
+    let h = harness().await;
+    let (status, body) = call(&h, "GET", "/api/v1/health", None, Body::empty()).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(String::from_utf8_lossy(&body).contains("\"status\":\"ok\""));
+}
+
+#[tokio::test]
+async fn everything_else_needs_the_right_key() {
+    let h = harness().await;
+    for (method, uri) in [
+        ("GET", "/api/v1/jobs"),
+        ("POST", "/api/v1/jobs"),
+        ("GET", "/api/v1/jobs/1"),
+        ("DELETE", "/api/v1/jobs/1"),
+        ("POST", "/api/v1/jobs/1/pause"),
+        ("POST", "/api/v1/jobs/1/resume"),
+        ("GET", "/api/v1/jobs/1/timeline"),
+        ("GET", "/api/v1/events"),
+    ] {
+        for key in [None, Some("wrong"), Some("test-key-12")] {
+            let (status, _) = call(&h, method, uri, key, Body::empty()).await;
+            assert_eq!(
+                status,
+                StatusCode::UNAUTHORIZED,
+                "{method} {uri} with {key:?}"
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn job_lifecycle_through_the_api() {
+    let h = harness().await;
+    let job = add(&h).await;
+    assert_eq!(
+        (job.name.as_str(), job.category.as_deref(), job.priority),
+        ("Show", Some("tv"), 5)
+    );
+    assert_eq!(job.status, JobStatus::Queued);
+
+    let (_, body) = call(&h, "GET", "/api/v1/jobs", Some(KEY), Body::empty()).await;
+    let jobs: Vec<JobDto> = serde_json::from_slice(&body).unwrap();
+    assert_eq!(jobs, std::slice::from_ref(&job));
+
+    let uri = format!("/api/v1/jobs/{}", job.id);
+    let (status, body) = call(
+        &h,
+        "POST",
+        &format!("{uri}/pause"),
+        Some(KEY),
+        Body::empty(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        serde_json::from_slice::<JobDto>(&body).unwrap().status,
+        JobStatus::Paused
+    );
+    let (status, _) = call(
+        &h,
+        "POST",
+        &format!("{uri}/pause"),
+        Some(KEY),
+        Body::empty(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    let (status, _) = call(
+        &h,
+        "POST",
+        &format!("{uri}/resume"),
+        Some(KEY),
+        Body::empty(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (_, body) = call(
+        &h,
+        "GET",
+        &format!("{uri}/timeline"),
+        Some(KEY),
+        Body::empty(),
+    )
+    .await;
+    let events: Vec<EventDto> = serde_json::from_slice(&body).unwrap();
+    let messages: Vec<&str> = events.iter().map(|e| e.message.as_str()).collect();
+    assert_eq!(
+        messages,
+        ["added with 1 files, 30000 bytes", "paused", "queued"]
+    );
+
+    let (status, _) = call(&h, "DELETE", &uri, Some(KEY), Body::empty()).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let (status, _) = call(&h, "GET", &uri, Some(KEY), Body::empty()).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn name_defaults_to_the_nzb_title() {
+    let h = harness().await;
+    let nzb = h.nzb.replacen(
+        "<file ",
+        "<head><meta type=\"title\">From The Title</meta></head>\n  <file ",
+        1,
+    );
+    let (status, body) = call(&h, "POST", "/api/v1/jobs", Some(KEY), Body::from(nzb)).await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(
+        serde_json::from_slice::<JobDto>(&body).unwrap().name,
+        "From The Title"
+    );
+}
+
+#[tokio::test]
+async fn invalid_nzb_is_422() {
+    let h = harness().await;
+    let (status, body) = call(&h, "POST", "/api/v1/jobs", Some(KEY), Body::from("<html/>")).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(String::from_utf8_lossy(&body).contains("invalid NZB"));
+}
+
+#[tokio::test]
+async fn unknown_job_is_404() {
+    let h = harness().await;
+    for (method, uri) in [
+        ("GET", "/api/v1/jobs/99"),
+        ("GET", "/api/v1/jobs/99/timeline"),
+        ("POST", "/api/v1/jobs/99/pause"),
+    ] {
+        let (status, _) = call(&h, method, uri, Some(KEY), Body::empty()).await;
+        assert_eq!(status, StatusCode::NOT_FOUND, "{method} {uri}");
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn queued_job_runs_to_completion() {
+    let h = harness().await;
+    let service = h.service.clone();
+    let worker = tokio::spawn(async move { service.run().await });
+    let job = add(&h).await;
+    let mut status = JobStatus::Queued;
+    for _ in 0..200 {
+        let (_, body) = call(
+            &h,
+            "GET",
+            &format!("/api/v1/jobs/{}", job.id),
+            Some(KEY),
+            Body::empty(),
+        )
+        .await;
+        status = serde_json::from_slice::<JobDto>(&body).unwrap().status;
+        if status == JobStatus::Completed {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    worker.abort();
+    assert_eq!(status, JobStatus::Completed);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn event_stream_reports_changes() {
+    let h = harness().await;
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let app = router(h.service.clone(), KEY);
+    let server = tokio::spawn(async move { axum::serve(listener, app).await });
+
+    let (mut socket, _) =
+        tokio_tungstenite::connect_async(format!("ws://{addr}/api/v1/events?api_key={KEY}"))
+            .await
+            .unwrap();
+    let id = h
+        .service
+        .add_nzb("over the wire", None, 0, h.nzb.as_bytes())
+        .await
+        .unwrap();
+    let message = tokio::time::timeout(Duration::from_secs(5), socket.next())
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    let change: ChangeDto = serde_json::from_str(message.to_text().unwrap()).unwrap();
+    match change {
+        ChangeDto::Updated { job } => {
+            assert_eq!((job.id, job.name.as_str()), (id, "over the wire"));
+        }
+        ChangeDto::Deleted { .. } => panic!("expected an update"),
+    }
+
+    let refused =
+        tokio_tungstenite::connect_async(format!("ws://{addr}/api/v1/events?api_key=nope")).await;
+    assert!(refused.is_err());
+    server.abort();
+}
+
+#[test]
+fn every_route_is_in_the_openapi_document() {
+    let doc: serde_json::Value = serde_json::from_str(&openapi_json()).unwrap();
+    let paths = doc["paths"].as_object().unwrap();
+    for (path, methods) in [
+        ("/api/v1/health", &["get"][..]),
+        ("/api/v1/jobs", &["get", "post"]),
+        ("/api/v1/jobs/{id}", &["get", "delete"]),
+        ("/api/v1/jobs/{id}/pause", &["post"]),
+        ("/api/v1/jobs/{id}/resume", &["post"]),
+        ("/api/v1/jobs/{id}/timeline", &["get"]),
+        ("/api/v1/events", &["get"]),
+    ] {
+        for method in methods {
+            assert!(
+                paths[path][method].is_object(),
+                "{method} {path} missing from OpenAPI"
+            );
+        }
+    }
+    assert_eq!(
+        paths.len(),
+        7,
+        "a route exists in the document but not in this test"
+    );
+    assert!(doc["components"]["securitySchemes"]["api_key"].is_object());
+}

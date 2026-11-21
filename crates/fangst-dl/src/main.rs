@@ -17,19 +17,19 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Run the daemon: the job queue and the HTTP API.
+    Serve(ServeArgs),
     /// Download the files of one NZB from one usenet server, then exit.
     Get(GetArgs),
+    /// Write or check the committed OpenAPI document.
+    Openapi(OpenapiArgs),
 }
 
+/// One usenet server. Config files and several servers arrive with #16 and #31.
 #[derive(clap::Args)]
-struct GetArgs {
-    /// The NZB file to download.
-    nzb: PathBuf,
-    /// Folder the files are written to; created if missing.
-    #[arg(long, short)]
-    out: PathBuf,
+struct UsenetArgs {
     #[arg(long)]
-    host: String,
+    host: Option<String>,
     #[arg(long, default_value_t = 563)]
     port: u16,
     /// Connect without TLS (usually port 119).
@@ -52,6 +52,80 @@ struct GetArgs {
     command_timeout: u64,
 }
 
+impl UsenetArgs {
+    fn pool(&self) -> anyhow::Result<Option<Pool>> {
+        let Some(host) = &self.host else {
+            return Ok(None);
+        };
+        let credentials = match (&self.user, &self.password_env) {
+            (Some(user), Some(var)) => {
+                let password = std::env::var(var)
+                    .with_context(|| format!("environment variable {var} is not set"))?;
+                Some((user.clone(), password))
+            }
+            (Some(_), None) => bail!("--user needs --password-env"),
+            _ => None,
+        };
+        let tls = if self.no_tls {
+            None
+        } else {
+            Some(fangst_nntp::native_tls_config()?)
+        };
+        Ok(Some(Pool::new(ServerConfig {
+            host: host.clone(),
+            port: self.port,
+            tls,
+            credentials,
+            max_connections: self.connections,
+            connect_timeout: Duration::from_secs(self.connect_timeout),
+            command_timeout: Duration::from_secs(self.command_timeout),
+        })))
+    }
+
+    fn options(&self) -> Options {
+        Options {
+            connections: self.connections,
+            pipeline_depth: self.pipeline,
+            retries: 3,
+        }
+    }
+}
+
+#[derive(clap::Args)]
+struct ServeArgs {
+    /// Folder for downloads.db and the downloads themselves.
+    #[arg(long, default_value = "data")]
+    data_dir: PathBuf,
+    /// Address the API listens on. Port 0 picks a free port.
+    #[arg(long, default_value = "127.0.0.1:7740")]
+    listen: String,
+    /// Name of the environment variable holding the API key.
+    #[arg(long, default_value = "FANGST_API_KEY")]
+    api_key_env: String,
+    #[command(flatten)]
+    usenet: UsenetArgs,
+}
+
+#[derive(clap::Args)]
+struct GetArgs {
+    /// The NZB file to download.
+    nzb: PathBuf,
+    /// Folder the files are written to; created if missing.
+    #[arg(long, short)]
+    out: PathBuf,
+    #[command(flatten)]
+    usenet: UsenetArgs,
+}
+
+#[derive(clap::Args)]
+struct OpenapiArgs {
+    /// Path of the committed document.
+    path: PathBuf,
+    /// Fail if the file differs from what the code generates, instead of writing it.
+    #[arg(long)]
+    check: bool,
+}
+
 fn main() -> ExitCode {
     let cli = Cli::parse();
     let runtime = match tokio::runtime::Runtime::new() {
@@ -62,7 +136,9 @@ fn main() -> ExitCode {
         }
     };
     let result = match cli.command {
+        Command::Serve(args) => runtime.block_on(serve(args)),
         Command::Get(args) => runtime.block_on(get(args)),
+        Command::Openapi(args) => openapi(&args),
     };
     match result {
         Ok(code) => code,
@@ -73,39 +149,96 @@ fn main() -> ExitCode {
     }
 }
 
+async fn serve(args: ServeArgs) -> anyhow::Result<ExitCode> {
+    let api_key = std::env::var(&args.api_key_env).with_context(|| {
+        format!(
+            "set the API key in the {} environment variable",
+            args.api_key_env
+        )
+    })?;
+    if api_key.len() < 16 {
+        bail!(
+            "the API key in {} must be at least 16 characters",
+            args.api_key_env
+        );
+    }
+    std::fs::create_dir_all(&args.data_dir)
+        .with_context(|| format!("creating {}", args.data_dir.display()))?;
+    let store = fangst_downloads::Store::open(&args.data_dir.join("downloads.db")).await?;
+    let pool = args.usenet.pool()?;
+    let has_server = pool.is_some();
+    let runner = fangst_downloads::Runner {
+        store,
+        // Without a server the queue still accepts jobs; they wait until one is configured.
+        pool: Arc::new(pool.unwrap_or_else(|| Pool::new(placeholder_server()))),
+        root: args.data_dir.join("downloads"),
+        options: args.usenet.options(),
+    };
+    let service = fangst_downloads::Service::new(runner);
+
+    let listener = tokio::net::TcpListener::bind(&args.listen)
+        .await
+        .with_context(|| format!("listening on {}", args.listen))?;
+    println!("listening on {}", listener.local_addr()?);
+    if !has_server {
+        println!("no usenet server configured; jobs will wait in the queue");
+    }
+
+    let app = fangst_dl_api::router(service.clone(), &api_key);
+    let worker = has_server.then(|| {
+        let service = service.clone();
+        tokio::spawn(async move { service.run().await })
+    });
+    axum::serve(listener, app)
+        .with_graceful_shutdown(async {
+            let _ = tokio::signal::ctrl_c().await;
+        })
+        .await?;
+    if let Some(worker) = worker {
+        worker.abort();
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn placeholder_server() -> ServerConfig {
+    ServerConfig {
+        host: "localhost".to_owned(),
+        port: 0,
+        tls: None,
+        credentials: None,
+        max_connections: 1,
+        connect_timeout: Duration::from_secs(1),
+        command_timeout: Duration::from_secs(1),
+    }
+}
+
+fn openapi(args: &OpenapiArgs) -> anyhow::Result<ExitCode> {
+    let generated = fangst_dl_api::openapi_json();
+    if !args.check {
+        std::fs::write(&args.path, &generated)
+            .with_context(|| format!("writing {}", args.path.display()))?;
+        return Ok(ExitCode::SUCCESS);
+    }
+    let committed = std::fs::read_to_string(&args.path).unwrap_or_default();
+    // Git may check the file out with CRLF on Windows; only the content matters.
+    if committed.replace("\r\n", "\n") == generated {
+        Ok(ExitCode::SUCCESS)
+    } else {
+        eprintln!(
+            "{} is out of date with the API code. Run `just openapi` and commit the result.",
+            args.path.display()
+        );
+        Ok(ExitCode::FAILURE)
+    }
+}
+
 async fn get(args: GetArgs) -> anyhow::Result<ExitCode> {
     let bytes =
         std::fs::read(&args.nzb).with_context(|| format!("reading {}", args.nzb.display()))?;
     let nzb = fangst_nzb::parse(&bytes, &fangst_nzb::Limits::default())
         .with_context(|| format!("parsing {}", args.nzb.display()))?;
-
-    let credentials = match (&args.user, &args.password_env) {
-        (Some(user), Some(var)) => {
-            let password = std::env::var(var)
-                .with_context(|| format!("environment variable {var} is not set"))?;
-            Some((user.clone(), password))
-        }
-        (Some(_), None) => bail!("--user needs --password-env"),
-        _ => None,
-    };
-    let tls = if args.no_tls {
-        None
-    } else {
-        Some(fangst_nntp::native_tls_config()?)
-    };
-    let pool = Arc::new(Pool::new(ServerConfig {
-        host: args.host,
-        port: args.port,
-        tls,
-        credentials,
-        max_connections: args.connections,
-        connect_timeout: Duration::from_secs(args.connect_timeout),
-        command_timeout: Duration::from_secs(args.command_timeout),
-    }));
-    let options = Options {
-        connections: args.connections,
-        pipeline_depth: args.pipeline,
-        retries: 3,
+    let Some(pool) = args.usenet.pool()? else {
+        bail!("--host is required")
     };
     let progress: fangst_usenet::ProgressFn = Arc::new(|p: &Progress| {
         if p.file_finished() {
@@ -119,7 +252,14 @@ async fn get(args: GetArgs) -> anyhow::Result<ExitCode> {
         nzb.total_bytes(),
         args.out.display()
     );
-    let report = fangst_usenet::download(&nzb, &args.out, pool, options, progress).await?;
+    let report = fangst_usenet::download(
+        &nzb,
+        &args.out,
+        Arc::new(pool),
+        args.usenet.options(),
+        progress,
+    )
+    .await?;
 
     for file in report.files.iter().filter(|f| !f.is_complete()) {
         if !file.missing_segments.is_empty() {
