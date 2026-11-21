@@ -1,5 +1,6 @@
 //! Shared plumbing for every Fangst crate above layer 0.
 
+pub mod defaults;
 pub mod path;
 pub mod secret;
 

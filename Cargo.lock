@@ -1068,7 +1068,9 @@ dependencies = [
  "chacha20poly1305",
  "getrandom 0.4.3",
  "hmac",
+ "serde",
  "sha2",
+ "toml",
 ]
 
 [[package]]
@@ -1083,6 +1085,9 @@ dependencies = [
  "fangst-dl-api",
  "fangst-downloads",
  "fangst-nntp",
+ "fangst-notify-discord",
+ "fangst-notify-ntfy",
+ "fangst-notify-webhook",
  "fangst-nzb",
  "fangst-providers",
  "fangst-usenet",
@@ -1119,8 +1124,10 @@ dependencies = [
  "fangst-core",
  "fangst-nntp",
  "fangst-nzb",
+ "fangst-providers",
  "fangst-torrent",
  "fangst-usenet",
+ "fs4",
  "sqlx",
  "tempfile",
  "tokio",
@@ -1136,6 +1143,42 @@ dependencies = [
  "rustls-native-certs",
  "tokio",
  "tokio-rustls",
+]
+
+[[package]]
+name = "fangst-notify-discord"
+version = "0.1.0"
+dependencies = [
+ "fangst-bench",
+ "fangst-providers",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "fangst-notify-ntfy"
+version = "0.1.0"
+dependencies = [
+ "fangst-bench",
+ "fangst-providers",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "fangst-notify-webhook"
+version = "0.1.0"
+dependencies = [
+ "fangst-bench",
+ "fangst-providers",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
@@ -1248,6 +1291,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "afa489199eaffb1211795df1c6236ce1ad0d41a6fa45250add73e3b02420f06e"
 dependencies = [
  "percent-encoding",
+]
+
+[[package]]
+name = "fs4"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e72ed92b67c146290f88e9c89d60ca163ea417a446f61ffd7b72df3e7f1dfd5"
+dependencies = [
+ "rustix",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

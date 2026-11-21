@@ -1,3 +1,13 @@
 # Every tunable value in Fangst lives here, never as a literal in code.
 # TUNING.md at the repo root explains each one for users.
 # Sections are added by the crate that first needs them.
+
+[notify]
+# Seconds one notification may take before it counts as failed.
+timeout_secs = 10
+
+[disk]
+# Free bytes in the downloads folder below which a disk-full notification goes out (5 GiB).
+min_free_bytes = 5368709120
+# Seconds between free-space checks.
+check_interval_secs = 60

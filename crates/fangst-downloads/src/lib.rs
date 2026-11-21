@@ -17,9 +17,11 @@ use sqlx::sqlite::{
 use sqlx::{FromRow, Row};
 
 mod auth;
+mod notify;
 mod service;
 mod torrent;
 pub use auth::{Auth, ENVIRONMENT_KEY, FIRST_USER, MIN_PASSWORD_CHARS, Secrets, User};
+pub use notify::Notifications;
 pub use service::{Change, Service};
 pub use torrent::{TorrentRunner, TorrentSource};
 
