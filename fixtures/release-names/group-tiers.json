@@ -1,0 +1,44 @@
+[
+  {
+    "group": "hallowed",
+    "resolution": "1080p",
+    "source": "bluray",
+    "expected": 1
+  },
+  {
+    "group": "FLUX",
+    "resolution": "1080p",
+    "source": "web_dl",
+    "expected": 1
+  },
+  {
+    "group": "UNKNOWNGROUP",
+    "resolution": "1080p",
+    "source": "bluray",
+    "expected": null
+  },
+  {
+    "group": "HALLOWED",
+    "resolution": "1080p",
+    "source": "bluray",
+    "expected": 1
+  },
+  {
+    "group": "Hallowed",
+    "resolution": "1080p",
+    "source": "bluray",
+    "expected": 1
+  },
+  {
+    "group": "BHDStudio",
+    "resolution": "576p",
+    "source": "any",
+    "expected": 2
+  },
+  {
+    "group": "BMF",
+    "resolution": "1080p",
+    "source": "dvd",
+    "expected": 3
+  }
+]

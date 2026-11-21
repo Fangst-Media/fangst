@@ -1,0 +1,14 @@
+[
+  {
+    "name": "Movie.2024.NF.WEB-DL",
+    "expected": "NF"
+  },
+  {
+    "name": "Movie.2024.Netflix.WEB-DL",
+    "expected": "NF"
+  },
+  {
+    "name": "Movie.2024.Hulu.WEB-DL",
+    "expected": "HULU"
+  }
+]
