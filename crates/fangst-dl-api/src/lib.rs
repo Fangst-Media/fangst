@@ -538,11 +538,17 @@ async fn events(
     ws: WebSocketUpgrade,
     _headers: HeaderMap,
 ) -> Response {
-    ws.on_upgrade(move |socket| stream_changes(socket, state))
+    // Subscribe before answering the handshake: the upgrade callback runs after the client already
+    // sees the socket as open, so a change made in between would otherwise never be sent.
+    let changes = state.service.subscribe();
+    ws.on_upgrade(move |socket| stream_changes(socket, state, changes))
 }
 
-async fn stream_changes(mut socket: WebSocket, state: ApiState) {
-    let mut changes = state.service.subscribe();
+async fn stream_changes(
+    mut socket: WebSocket,
+    state: ApiState,
+    mut changes: tokio::sync::broadcast::Receiver<Change>,
+) {
     loop {
         tokio::select! {
             change = changes.recv() => {

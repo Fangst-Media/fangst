@@ -287,7 +287,12 @@ async fn auth_brute_force_login_is_rate_limited() {
     );
     let blocked = login(&h, "admin", PASSWORD, attacker).await;
     assert_eq!(blocked.status, StatusCode::TOO_MANY_REQUESTS);
-    assert_eq!(blocked.retry_after.as_deref(), Some("60"));
+    // The wait is counted from the failed attempt, so a slow machine can already be a second in.
+    let retry_after: u64 = blocked.retry_after.as_deref().unwrap().parse().unwrap();
+    assert!(
+        (55..=60).contains(&retry_after),
+        "Retry-After {retry_after}"
+    );
     assert!(
         blocked.set_cookie.is_none(),
         "even the right password waits"

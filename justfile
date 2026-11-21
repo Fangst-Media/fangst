@@ -38,6 +38,14 @@ openapi:
 changeset:
     changesetter check --base origin/main
 
+# Usenet benchmark against the mock server; compares with this machine's baseline in bench/
+bench-usenet *ARGS:
+    cargo run --release --quiet -p usenet-bench -- {{ARGS}}
+
+# Record this machine's baseline for the default benchmark scenario
+bench-baseline:
+    cargo run --release --quiet -p usenet-bench -- --save-baseline
+
 # Format all Rust code
 fmt:
     cargo fmt --all
