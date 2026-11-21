@@ -163,3 +163,90 @@ async fn unreachable_server_fails_segments_after_retries() {
     assert_eq!(report.files[0].failed_segments.len(), 3);
     assert_eq!(report.files[0].bytes_written, 0);
 }
+
+#[tokio::test]
+async fn par2_recovery_volumes_can_wait_while_the_rest_downloads() {
+    let a = data(20_000, 7);
+    let b = data(30_000, 13);
+    let c = data(10_000, 17);
+    let mut library = Library::new();
+    library.add_file("show.bin", &a, 7000, "g");
+    library.add_file("show.vol00+01.par2", &b, 7000, "g");
+    library.add_file("show.par2", &c, 7000, "g");
+    let nzb = fangst_nzb::parse(library.nzb().as_bytes(), &fangst_nzb::Limits::default()).unwrap();
+    let server = MockServer::start(library, Config::default()).await.unwrap();
+    let out = tempfile::tempdir().unwrap();
+
+    let report = fangst_usenet::download_selected(
+        &nzb,
+        &HashSet::from([0, 2]),
+        out.path(),
+        vec![fangst_usenet::Server::primary(pool(&server, 2))],
+        OPTIONS,
+        quiet(),
+        fangst_usenet::Resume::default(),
+    )
+    .await
+    .unwrap();
+
+    assert!(report.is_complete(), "{report:?}");
+    let reported: Vec<(usize, &str)> = report
+        .files
+        .iter()
+        .map(|f| (f.index, f.name.as_str()))
+        .collect();
+    assert_eq!(reported, [(0, "show.bin"), (2, "show.par2")]);
+    assert_eq!(std::fs::read(out.path().join("show.bin")).unwrap(), a);
+    assert_eq!(std::fs::read(out.path().join("show.par2")).unwrap(), c);
+    assert!(!out.path().join("show.vol00+01.par2").exists());
+    assert_eq!(server.stats().bodies, 5);
+}
+
+#[tokio::test]
+async fn selected_files_resume_and_report_by_nzb_index() {
+    let a = data(14_000, 7);
+    let b = data(14_000, 13);
+    let mut library = Library::new();
+    library.add_file("first.bin", &a, 7000, "g");
+    library.add_file("second.bin", &b, 7000, "g");
+    let nzb = fangst_nzb::parse(library.nzb().as_bytes(), &fangst_nzb::Limits::default()).unwrap();
+    let server = MockServer::start(library, Config::default()).await.unwrap();
+    let out = tempfile::tempdir().unwrap();
+    let stored = Arc::new(Mutex::new(Vec::new()));
+    let sink = Arc::clone(&stored);
+    let resume = fangst_usenet::Resume {
+        // Segment 1 of file 1 counts as done; with selection only file 1 is downloaded.
+        done: HashSet::from([(1, 1)]),
+        on_stored: Arc::new(move |file, number| sink.lock().unwrap().push((file, number))),
+    };
+
+    let report = fangst_usenet::download_selected(
+        &nzb,
+        &HashSet::from([1]),
+        out.path(),
+        vec![fangst_usenet::Server::primary(pool(&server, 1))],
+        OPTIONS,
+        quiet(),
+        resume,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(*stored.lock().unwrap(), [(1, 2)]);
+    assert_eq!(report.files[0].segments_done, 2);
+    assert_eq!(server.stats().bodies, 1);
+}
+
+#[test]
+fn file_names_match_what_the_download_writes() {
+    let mut library = Library::new();
+    library.add_file("same.bin", b"one", 10, "g");
+    library.add_file("Same.bin", b"two", 10, "g");
+    library.add_file("../escape.par2", b"three", 10, "g");
+    let nzb = fangst_nzb::parse(library.nzb().as_bytes(), &fangst_nzb::Limits::default()).unwrap();
+
+    let names = fangst_usenet::file_names(&nzb);
+
+    assert_eq!(names[..2], ["same.bin", "Same.bin.1"]);
+    assert!(!names[2].contains('/'), "{names:?}");
+}

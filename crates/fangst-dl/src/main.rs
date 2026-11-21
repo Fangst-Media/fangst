@@ -214,6 +214,7 @@ async fn serve(args: ServeArgs) -> anyhow::Result<ExitCode> {
         ))],
         root: args.data_dir.join("downloads"),
         options: args.usenet.options(),
+        post_processors: registry.post_processors.clone(),
     };
     let service = fangst_downloads::Service::new(runner).with_notifications(
         fangst_downloads::Notifications {

@@ -175,6 +175,7 @@ fn service(store: Store, root: &Path, engine: Engine) -> Service {
             pipeline_depth: 1,
             retries: 0,
         },
+        post_processors: Vec::new(),
     };
     Service::new(runner).with_torrents(engine).without_usenet()
 }

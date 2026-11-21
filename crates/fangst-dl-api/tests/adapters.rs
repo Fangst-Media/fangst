@@ -88,6 +88,7 @@ async fn harness(adapters: &[Arc<dyn ApiAdapter>], fetch: FetchLimits) -> Harnes
             }),
         ))],
         root: dir.path().join("downloads"),
+        post_processors: Vec::new(),
         options: fangst_usenet::Options {
             connections: 1,
             pipeline_depth: 1,

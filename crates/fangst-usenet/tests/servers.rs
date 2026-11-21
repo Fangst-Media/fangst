@@ -187,3 +187,40 @@ async fn no_servers_is_an_error() {
     .await;
     assert_eq!(result.err(), Some(fangst_usenet::Error::Servers(0)));
 }
+
+#[tokio::test]
+async fn backfill_fills_gaps_in_selected_files_only() {
+    let skipped = data(30_000);
+    let mut library = Library::new();
+    let held = library.add_file("show.vol00+01.par2", &skipped, 5000, "g");
+    let file = data(40_000);
+    let ids = library.add_file("show.bin", &file, 5000, "g");
+    let nzb = fangst_nzb::parse(library.nzb().as_bytes(), &fangst_nzb::Limits::default()).unwrap();
+    let primary = mock(&library, &[&ids[2], &held[0]]).await;
+    let backfill = mock(&library, &[]).await;
+    let out = tempfile::tempdir().unwrap();
+
+    let report = fangst_usenet::download_selected(
+        &nzb,
+        &HashSet::from([1]),
+        out.path(),
+        vec![
+            server(&primary, "primary", false),
+            server(&backfill, "backfill", true),
+        ],
+        OPTIONS,
+        quiet(),
+        Resume::default(),
+    )
+    .await
+    .unwrap();
+
+    assert!(report.is_complete(), "{report:?}");
+    assert_eq!(report.files.len(), 1);
+    assert_eq!(report.files[0].index, 1);
+    assert_eq!(std::fs::read(out.path().join("show.bin")).unwrap(), file);
+    assert!(!out.path().join("show.vol00+01.par2").exists());
+    // The backfill server is asked only for the one gap in the selected file.
+    assert_eq!(backfill.stats().bodies, 1);
+    assert_eq!(report.servers[1].served, 1);
+}

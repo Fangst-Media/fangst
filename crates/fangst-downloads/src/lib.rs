@@ -18,6 +18,7 @@ use sqlx::{FromRow, Row};
 
 mod auth;
 mod notify;
+mod pipeline;
 mod service;
 mod torrent;
 pub use auth::{Auth, ENVIRONMENT_KEY, FIRST_USER, MIN_PASSWORD_CHARS, Secrets, User};
@@ -541,6 +542,8 @@ pub struct Runner {
     /// Folder each job gets a subfolder in.
     pub root: PathBuf,
     pub options: fangst_usenet::Options,
+    /// Run in order after a download completes and verifies; the first `Fail` fails the job.
+    pub post_processors: Vec<Arc<dyn fangst_providers::PostProcessor>>,
 }
 
 impl Runner {
@@ -586,9 +589,47 @@ impl Runner {
                 )
                 .await?;
         }
+        let names = fangst_usenet::file_names(&nzb);
+        let sets = fangst_postproc_par2::sets(names.iter().map(String::as_str));
+        let held = pipeline::held_volumes(&names, &sets);
+        let first: HashSet<usize> = (0..names.len()).filter(|i| !held.contains(i)).collect();
+        let report = match self.fetch(job.id, &nzb, &out, &first).await? {
+            Ok(report) => report,
+            Err(e) => {
+                return self
+                    .store
+                    .set_status(job.id, Status::Failed, Some(&e.to_string()))
+                    .await;
+            }
+        };
+        let failure = match self
+            .verify_and_repair(job.id, &nzb, &out, &names, &sets, &report)
+            .await?
+        {
+            Some(reason) => Some(reason),
+            None => self.post_process(job, &nzb, &out).await?,
+        };
+        match failure {
+            Some(reason) => {
+                self.store
+                    .set_status(job.id, Status::Failed, Some(&reason))
+                    .await
+            }
+            None => self.store.set_status(job.id, Status::Completed, None).await,
+        }
+    }
+
+    /// Downloads the `selected` files of `nzb`, recording each stored segment and each file's result.
+    async fn fetch(
+        &self,
+        job_id: i64,
+        nzb: &fangst_nzb::Nzb,
+        out: &Path,
+        selected: &HashSet<usize>,
+    ) -> Result<Result<fangst_usenet::Report, fangst_usenet::Error>, Error> {
+        let done = self.store.done_segments(job_id).await?;
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<(usize, u32)>();
         let store = self.store.clone();
-        let job_id = job.id;
         let recorder = tokio::spawn(async move {
             while let Some((file, number)) = rx.recv().await {
                 store.mark_segment_done(job_id, file, number).await?;
@@ -602,9 +643,10 @@ impl Runner {
             }),
         };
         let progress: fangst_usenet::ProgressFn = Arc::new(|_| {});
-        let result = fangst_usenet::download_from(
-            &nzb,
-            &out,
+        let result = fangst_usenet::download_selected(
+            nzb,
+            selected,
+            out,
             self.servers.clone(),
             self.options,
             progress,
@@ -618,35 +660,16 @@ impl Runner {
         if let Ok(report) = &result {
             for file in &report.files {
                 self.store
-                    .add_event(job.id, "file", &describe_file(file))
+                    .add_event(job_id, "file", &describe_file(file))
                     .await?;
             }
             for server in report.servers.iter().filter(|s| s.served + s.missed > 0) {
                 self.store
-                    .add_event(job.id, "server", &describe_server(server))
+                    .add_event(job_id, "server", &describe_server(server))
                     .await?;
             }
         }
-        match result {
-            Ok(report) if report.is_complete() => {
-                self.store.set_status(job.id, Status::Completed, None).await
-            }
-            Ok(report) => {
-                let missing: usize = report.files.iter().map(|f| f.missing_segments.len()).sum();
-                let failed: usize = report.files.iter().map(|f| f.failed_segments.len()).sum();
-                let reason = format!(
-                    "{missing} segments missing on the server, {failed} could not be downloaded"
-                );
-                self.store
-                    .set_status(job.id, Status::Failed, Some(&reason))
-                    .await
-            }
-            Err(e) => {
-                self.store
-                    .set_status(job.id, Status::Failed, Some(&e.to_string()))
-                    .await
-            }
-        }
+        Ok(result)
     }
 }
 

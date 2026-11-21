@@ -15,6 +15,7 @@ workspace = true
 fangst-core = { version = "0.1.0", path = "../fangst-core" }
 fangst-nntp = { version = "0.1.0", path = "../fangst-nntp" }
 fangst-nzb = { version = "0.1.0", path = "../fangst-nzb" }
+fangst-postproc-par2 = { version = "0.1.0", path = "../fangst-postproc-par2" }
 fangst-providers = { version = "0.1.0", path = "../fangst-providers" }
 fangst-torrent = { version = "0.1.0", path = "../fangst-torrent" }
 fangst-usenet = { version = "0.1.0", path = "../fangst-usenet" }

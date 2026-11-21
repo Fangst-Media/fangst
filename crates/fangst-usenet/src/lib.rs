@@ -41,6 +41,8 @@ impl Progress {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileReport {
+    /// Position of the file in the NZB.
+    pub index: usize,
     pub name: String,
     pub path: PathBuf,
     /// Size from the yEnc header, 0 if no segment arrived.
@@ -162,6 +164,8 @@ struct Job {
 const MAX_SERVERS: usize = 64;
 
 struct FileState {
+    /// Position in the NZB; `Job::file` is the position in `Shared::files` instead.
+    index: usize,
     name: String,
     path: PathBuf,
     segments: Vec<fangst_nzb::Segment>,
@@ -253,16 +257,15 @@ pub async fn download_from(
     progress: ProgressFn,
     resume: Resume,
 ) -> Result<Report, Error> {
-    if servers.is_empty() || servers.len() > MAX_SERVERS {
-        return Err(Error::Servers(servers.len()));
-    }
-    tokio::fs::create_dir_all(out_dir)
-        .await
-        .map_err(|e| Error::OutputFolder(e.to_string()))?;
+    let all: HashSet<usize> = (0..nzb.files.len()).collect();
+    download_selected(nzb, &all, out_dir, servers, options, progress, resume).await
+}
 
+/// The name each file of `nzb` is stored under in the output folder, in NZB order.
+#[must_use]
+pub fn file_names(nzb: &Nzb) -> Vec<String> {
     let mut used_names = HashSet::new();
-    let files: Vec<FileState> = nzb
-        .files
+    nzb.files
         .iter()
         .enumerate()
         .map(|(i, file)| {
@@ -270,29 +273,65 @@ pub async fn download_from(
                 .file_name()
                 .and_then(|n| fangst_core::path::safe_file_name(&n))
                 .unwrap_or_else(|| format!("file{}.bin", i + 1));
-            let name = unique_name(&base, &mut used_names);
-            FileState {
-                path: out_dir.join(&name),
-                name,
-                segments: file.segments.clone(),
-                handle: tokio::sync::Mutex::new(None),
-                size: AtomicU64::new(0),
-                written: AtomicU64::new(0),
-                done: AtomicUsize::new(
-                    file.segments
-                        .iter()
-                        .filter(|seg| resume.done.contains(&(i, seg.number)))
-                        .count(),
-                ),
-                resumed: file
-                    .segments
+            unique_name(&base, &mut used_names)
+        })
+        .collect()
+}
+
+/// Like [`download_from`], but only for the files whose NZB index is in `selected`.
+///
+/// Files keep the names [`file_names`] gives them, so a later call for other files of the same
+/// NZB fills the same folder consistently. The report lists only the selected files.
+///
+/// # Errors
+/// When `out_dir` can't be created, or when no servers (or more than 64) are given.
+///
+/// # Panics
+/// If an internal lock was poisoned by a panic in another worker.
+pub async fn download_selected<S: std::hash::BuildHasher>(
+    nzb: &Nzb,
+    selected: &HashSet<usize, S>,
+    out_dir: &Path,
+    servers: Vec<Server>,
+    options: Options,
+    progress: ProgressFn,
+    resume: Resume,
+) -> Result<Report, Error> {
+    if servers.is_empty() || servers.len() > MAX_SERVERS {
+        return Err(Error::Servers(servers.len()));
+    }
+    tokio::fs::create_dir_all(out_dir)
+        .await
+        .map_err(|e| Error::OutputFolder(e.to_string()))?;
+
+    let files: Vec<FileState> = nzb
+        .files
+        .iter()
+        .zip(file_names(nzb))
+        .enumerate()
+        .filter(|(i, _)| selected.contains(i))
+        .map(|(i, (file, name))| FileState {
+            index: i,
+            path: out_dir.join(&name),
+            name,
+            segments: file.segments.clone(),
+            handle: tokio::sync::Mutex::new(None),
+            size: AtomicU64::new(0),
+            written: AtomicU64::new(0),
+            done: AtomicUsize::new(
+                file.segments
                     .iter()
                     .filter(|seg| resume.done.contains(&(i, seg.number)))
                     .count(),
-                stored: AtomicUsize::new(0),
-                missing: Mutex::new(Vec::new()),
-                failed: Mutex::new(Vec::new()),
-            }
+            ),
+            resumed: file
+                .segments
+                .iter()
+                .filter(|seg| resume.done.contains(&(i, seg.number)))
+                .count(),
+            stored: AtomicUsize::new(0),
+            missing: Mutex::new(Vec::new()),
+            failed: Mutex::new(Vec::new()),
         })
         .collect();
 
@@ -305,7 +344,7 @@ pub async fn download_from(
                 .segments
                 .iter()
                 .enumerate()
-                .filter(move |(_, seg)| !done.contains(&(f, seg.number)))
+                .filter(move |(_, seg)| !done.contains(&(state.index, seg.number)))
                 .map(move |(s, _)| Job {
                     file: f,
                     segment: s,
@@ -366,6 +405,7 @@ async fn into_report(shared: Shared) -> Report {
         let mut failed = state.failed.into_inner().expect("lock");
         failed.sort_unstable();
         reports.push(FileReport {
+            index: state.index,
             name: state.name,
             path: state.path,
             size: state.size.into_inner(),
@@ -559,7 +599,7 @@ async fn store(shared: &Shared, job: Job, body: &[u8]) {
                 .written
                 .fetch_add(decoded.data.len() as u64, Ordering::Relaxed);
             state.stored.fetch_add(1, Ordering::Relaxed);
-            (shared.on_stored)(job.file, number);
+            (shared.on_stored)(state.index, number);
         }
         Err(e) => state
             .failed
@@ -574,7 +614,7 @@ fn finish_segment(shared: &Shared, file: usize) {
     let state = &shared.files[file];
     let done = state.done.fetch_add(1, Ordering::Relaxed) + 1;
     (shared.progress)(&Progress {
-        file_index: file,
+        file_index: state.index,
         file_name: state.name.clone(),
         done_segments: done,
         total_segments: state.segments.len(),
