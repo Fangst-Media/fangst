@@ -6,6 +6,7 @@
     "dev": "vite",
     "build": "vite build",
     "generate:api": "openapi-ts",
+    "generate:api-dl": "openapi-ts -f openapi-ts.dl.config.ts",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
     "preview": "vite preview"
