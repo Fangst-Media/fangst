@@ -16,6 +16,8 @@
       "**/target",
       "web/src/api/**",
       "web/src/api-dl/**",
+      "web/test-results/**",
+      "web/playwright-report/**",
       "openapi/**",
       "packages/**"
     ]

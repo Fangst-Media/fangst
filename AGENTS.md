@@ -23,13 +23,14 @@ Commands marked "planned" arrive with the issue named; until then they do not ex
 | --- | --- |
 | First setup | `just setup` |
 | Fast gate (while coding) | `just check`: fmt, clippy, tests, TypeScript typecheck and Biome lint |
-| Full gate (before every commit and merge) | `just check-full`: adds `layercheck`, `cargo deny`, regenerate-and-diff (empty so far), changeset check |
+| Full gate (before every commit and merge) | `just check-full`: adds the web build, `layercheck`, `cargo deny`, regenerate-and-diff, `just web-test`, changeset check |
 | Layer rules only | `just layercheck` (layer map in `layers.toml`) |
 | Run the download daemon | `FANGST_API_KEY=<16+ chars> cargo run -p fangst-dl -- serve --data-dir data --host news.example.com` (API on 127.0.0.1:7740; without `--host` jobs wait in the queue) |
 | Update the OpenAPI document | `just openapi` after changing an API route or type; `openapi/dl.json` is committed and the gate fails when it drifts |
 | Tests | `just test` (`cargo nextest run --workspace`) |
 | Add a changeset | `changesetter add --package fangst-core --bump patch --type fix -m "What changed, for users"` (`--no-bump` for tooling, docs and tests; `--bump minor` for new features). Packages share one version, so any package in the group works |
 | Web app | `just web-dev` (Vite with hot refresh on :5173, proxies `/api` to :5001), `just web-build` (production build into `web/dist`, part of the full gate) |
+| Web tests | `just web-test`: Vitest component tests (`web/src/**/*.test.tsx`, `bun run --cwd web test:watch` while coding), then one Playwright smoke test in Chromium (`web/e2e/`) that builds and starts a real `fangst-dl` and a Vite server on free ports. `just setup` installs Chromium |
 | Old TS stack | `bun run dev` (until milestone 2). Biome skips `packages/` and the generated `web/src/api/`; typecheck still covers them |
 
 CI (`.github/workflows/check.yml`) runs `just check-full` on Linux, macOS and Windows for every push and for pull requests from forks. Run `just check-full` before committing.

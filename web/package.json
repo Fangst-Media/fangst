@@ -7,9 +7,13 @@
     "build": "vite build",
     "generate:api": "openapi-ts",
     "generate:api-dl": "openapi-ts -f openapi-ts.dl.config.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
     "clean": "rm -rf dist",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "e2e:install": "playwright install chromium"
   },
   "dependencies": {
     "@hey-api/client-fetch": "^0.13.1",
@@ -21,14 +25,19 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
+    "@testing-library/jest-dom": "^8.0.0",
+    "@testing-library/react": "^16.3.3",
     "@types/bun": "^1.1.15",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
     "@vitejs/plugin-react": "^6.3.0",
     "autoprefixer": "^10.7.0",
+    "happy-dom": "^21.0.4",
     "postcss": "^8.5.33",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.2",
-    "vite": "^8.3.8"
+    "vite": "^8.3.8",
+    "vitest": "^5.1.1"
   }
 }

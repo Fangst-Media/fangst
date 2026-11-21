@@ -10,12 +10,13 @@ default:
 setup:
     bun install
     cargo fetch
+    bun run --cwd web e2e:install
 
 # Fast gate: run while coding
 check: fmt-check clippy test ts-check
 
 # Full gate: run before every commit and merge
-check-full: check web-build layercheck deny generated changeset
+check-full: check web-build layercheck deny generated web-test changeset
 
 # Layer and layer-0 licence rules from AGENTS.md
 layercheck:
@@ -54,6 +55,11 @@ test:
 # Production build of the web app; catches config and bundling errors the typecheck can't
 web-build:
     bun run --cwd web build
+
+# Component tests, then the browser smoke test against a real fangst-dl and Vite server
+web-test:
+    bun run --cwd web test
+    bun run --cwd web test:e2e
 
 # Run the web app with hot refresh against the old TypeScript API on :5001
 web-dev:
