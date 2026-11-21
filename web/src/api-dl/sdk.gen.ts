@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddJobData, AddJobErrors, AddJobResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, CreateCategoryData, CreateCategoryErrors, CreateCategoryResponses, DeleteJobData, DeleteJobErrors, DeleteJobResponses, EventsData, EventsErrors, GetJobData, GetJobErrors, GetJobResponses, HealthData, HealthResponses, JobTimelineData, JobTimelineErrors, JobTimelineResponses, JobTorrentData, JobTorrentErrors, JobTorrentResponses, ListCategoriesData, ListCategoriesErrors, ListCategoriesResponses, ListJobsData, ListJobsErrors, ListJobsResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutResponses, MeData, MeErrors, MeResponses, PauseJobData, PauseJobErrors, PauseJobResponses, ResumeJobData, ResumeJobErrors, ResumeJobResponses, SetJobCategoryData, SetJobCategoryErrors, SetJobCategoryResponses, TestServerData, TestServerErrors, TestServerResponses } from './types.gen';
+import type { AddJobData, AddJobErrors, AddJobResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, CreateCategoryData, CreateCategoryErrors, CreateCategoryResponses, DeleteJobData, DeleteJobErrors, DeleteJobResponses, EventsData, EventsErrors, GetJobData, GetJobErrors, GetJobResponses, GetSettingsData, GetSettingsErrors, GetSettingsResponses, HealthData, HealthResponses, JobTimelineData, JobTimelineErrors, JobTimelineResponses, JobTorrentData, JobTorrentErrors, JobTorrentResponses, ListCategoriesData, ListCategoriesErrors, ListCategoriesResponses, ListJobsData, ListJobsErrors, ListJobsResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutResponses, MeData, MeErrors, MeResponses, PauseJobData, PauseJobErrors, PauseJobResponses, PutSettingsData, PutSettingsErrors, PutSettingsResponses, ResumeJobData, ResumeJobErrors, ResumeJobResponses, SetJobCategoryData, SetJobCategoryErrors, SetJobCategoryResponses, TestServerData, TestServerErrors, TestServerResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -211,6 +211,33 @@ export const testServer = <ThrowOnError extends boolean = false>(options: Option
             type: 'apiKey'
         }],
     url: '/api/v1/servers/test',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const getSettings = <ThrowOnError extends boolean = false>(options?: Options<GetSettingsData, ThrowOnError>) => (options?.client ?? client).get<GetSettingsResponses, GetSettingsErrors, ThrowOnError>({
+    security: [{ name: 'X-Api-Key', type: 'apiKey' }, {
+            in: 'cookie',
+            name: 'fangst_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/settings',
+    ...options
+});
+
+/**
+ * Replaces every setting. Servers, categories, notifiers and adapters change at once; the response says what waits for a restart. Passwords and tokens left out or `null` stay as stored.
+ */
+export const putSettings = <ThrowOnError extends boolean = false>(options: Options<PutSettingsData, ThrowOnError>) => (options.client ?? client).put<PutSettingsResponses, PutSettingsErrors, ThrowOnError>({
+    security: [{ name: 'X-Api-Key', type: 'apiKey' }, {
+            in: 'cookie',
+            name: 'fangst_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/settings',
     ...options,
     headers: {
         'Content-Type': 'application/json',

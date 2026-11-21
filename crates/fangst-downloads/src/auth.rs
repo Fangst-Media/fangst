@@ -91,6 +91,25 @@ impl Auth {
         Ok(user)
     }
 
+    /// The first user, who owns the daemon and may change its settings. `None` before the first
+    /// start created one.
+    ///
+    /// # Errors
+    /// When the database read fails.
+    pub async fn owner(&self) -> Result<Option<User>, Error> {
+        Ok(
+            sqlx::query_as("SELECT id, username FROM users ORDER BY id LIMIT 1")
+                .fetch_optional(&self.pool)
+                .await?,
+        )
+    }
+
+    /// # Errors
+    /// When the database read fails.
+    pub async fn is_owner(&self, user_id: i64) -> Result<bool, Error> {
+        Ok(self.owner().await?.is_some_and(|owner| owner.id == user_id))
+    }
+
     /// # Errors
     /// When the database read fails.
     pub async fn user_by_name(&self, username: &str) -> Result<Option<User>, Error> {

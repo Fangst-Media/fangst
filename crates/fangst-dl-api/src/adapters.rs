@@ -328,6 +328,9 @@ pub(crate) fn mount(router: Router<ApiState>, adapter: &Arc<dyn ApiAdapter>) -> 
 }
 
 async fn serve(state: ApiState, adapter: Arc<dyn ApiAdapter>, request: Request) -> Response {
+    if !state.enabled_adapters.contains(&adapter.info().id) {
+        return crate::error(StatusCode::NOT_FOUND, "no such route");
+    }
     let mount = adapter.mount_path();
     let (parts, body) = request.into_parts();
     let client = crate::auth::client(

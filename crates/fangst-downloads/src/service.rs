@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use fangst_core::defaults::{Defaults, Progress as ProgressSettings};
-use tokio::sync::{Notify, Semaphore, broadcast};
+use tokio::sync::{Notify, Semaphore, broadcast, watch};
 use tokio::task::AbortHandle;
 
 use crate::notify::{self, Notifications};
@@ -33,13 +33,21 @@ pub struct Service {
     runner: Runner,
     torrents: Option<TorrentRunner>,
     torrent_limit: usize,
-    usenet: bool,
+    /// Servers and options for the next usenet job; settings can replace them while running.
+    usenet: Arc<watch::Sender<Usenet>>,
     wake: Arc<Notify>,
     wake_torrents: Arc<Notify>,
     running: Arc<Mutex<HashMap<i64, AbortHandle>>>,
     changes: broadcast::Sender<Change>,
-    notifications: Arc<Notifications>,
+    notifications: Arc<watch::Sender<Arc<Notifications>>>,
     progress: ProgressSettings,
+}
+
+/// What the usenet lane downloads with. No servers leaves usenet jobs queued.
+#[derive(Clone)]
+struct Usenet {
+    servers: Vec<fangst_usenet::Server>,
+    options: fangst_usenet::Options,
 }
 
 impl Service {
@@ -49,16 +57,20 @@ impl Service {
     pub fn new(runner: Runner) -> Self {
         // Slow subscribers miss old changes rather than blocking the queue; they re-read state.
         let (changes, _) = broadcast::channel(256);
+        let usenet = Usenet {
+            servers: runner.servers.clone(),
+            options: runner.options,
+        };
         Self {
             runner,
             torrents: None,
             torrent_limit: Semaphore::MAX_PERMITS,
-            usenet: true,
+            usenet: Arc::new(watch::Sender::new(usenet)),
             wake: Arc::new(Notify::new()),
             wake_torrents: Arc::new(Notify::new()),
             running: Arc::new(Mutex::new(HashMap::new())),
             changes,
-            notifications: Arc::new(Notifications::none()),
+            notifications: Arc::new(watch::Sender::new(Arc::new(Notifications::none()))),
             progress: Defaults::builtin()
                 .expect("built-in defaults parse")
                 .progress,
@@ -94,16 +106,32 @@ impl Service {
 
     /// Tells `notifications.notifiers` when jobs complete or fail and when disk space runs low.
     #[must_use]
-    pub fn with_notifications(mut self, notifications: Notifications) -> Self {
-        self.notifications = Arc::new(notifications);
+    pub fn with_notifications(self, notifications: Notifications) -> Self {
+        self.set_notifications(notifications);
         self
+    }
+
+    /// Replaces the notifiers; the next event goes to the new ones.
+    pub fn set_notifications(&self, notifications: Notifications) {
+        self.notifications.send_replace(Arc::new(notifications));
+    }
+
+    fn notifications(&self) -> Arc<Notifications> {
+        Arc::clone(&self.notifications.borrow())
     }
 
     /// Leaves usenet jobs waiting in the queue, for when no usenet server is configured.
     #[must_use]
-    pub fn without_usenet(mut self) -> Self {
-        self.usenet = false;
+    pub fn without_usenet(self) -> Self {
+        let options = self.usenet.borrow().options;
+        self.set_usenet(Vec::new(), options);
         self
+    }
+
+    /// Replaces the usenet servers in priority order. A job already downloading keeps the servers
+    /// it started with; the next one uses these. An empty list leaves usenet jobs queued.
+    pub fn set_usenet(&self, servers: Vec<fangst_usenet::Server>, options: fangst_usenet::Options) {
+        self.usenet.send_replace(Usenet { servers, options });
     }
 
     #[must_use]
@@ -316,7 +344,7 @@ impl Service {
         }
         let disk = async {
             notify::watch_disk(
-                Arc::clone(&self.notifications),
+                self.notifications.subscribe(),
                 self.runner.store.clone(),
                 self.runner.root.clone(),
             )
@@ -362,15 +390,23 @@ impl Service {
     }
 
     async fn run_usenet(&self) -> Result<(), Error> {
-        if !self.usenet {
-            return std::future::pending().await;
-        }
+        let mut usenet = self.usenet.subscribe();
         loop {
+            let current = usenet.borrow_and_update().clone();
+            if current.servers.is_empty() {
+                let _ = usenet.changed().await;
+                continue;
+            }
             let Some(job) = self.runner.store.next_queued_of(Kind::Usenet).await? else {
-                let _ = tokio::time::timeout(IDLE_POLL, self.wake.notified()).await;
+                tokio::select! {
+                    _ = tokio::time::timeout(IDLE_POLL, self.wake.notified()) => {}
+                    _ = usenet.changed() => {}
+                }
                 continue;
             };
-            let runner = self.runner.clone();
+            let mut runner = self.runner.clone();
+            runner.servers = current.servers;
+            runner.options = current.options;
             let changes = self.changes.clone();
             let id = job.id;
             let task = tokio::spawn(async move {
@@ -390,7 +426,7 @@ impl Service {
                 Err(e) => return Err(Error::Download(e.to_string())),
             }
             self.changed(id);
-            notify::job_finished(&self.notifications, &self.runner.store, id);
+            notify::job_finished(&self.notifications(), &self.runner.store, id);
         }
     }
 
@@ -444,7 +480,7 @@ impl Service {
                         .await;
                 }
                 service.changed(id);
-                notify::job_finished(&service.notifications, &service.runner.store, id);
+                notify::job_finished(&service.notifications(), &service.runner.store, id);
             });
         }
     }

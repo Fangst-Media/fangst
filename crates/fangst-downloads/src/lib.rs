@@ -8,7 +8,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use sqlx::sqlite::{
@@ -222,6 +222,9 @@ fn now() -> i64 {
 pub struct Store {
     pub(crate) pool: SqlitePool,
     pub(crate) meters: progress::Meters,
+    /// Lowercase category name to the folder its new jobs go in, relative to the job root or
+    /// absolute.
+    category_folders: Arc<RwLock<HashMap<String, PathBuf>>>,
 }
 
 impl Store {
@@ -266,6 +269,7 @@ impl Store {
         Ok(Self {
             pool,
             meters: progress::Meters::default(),
+            category_folders: Arc::default(),
         })
     }
 
@@ -504,7 +508,12 @@ impl Store {
         }
         let folder =
             fangst_core::path::safe_file_name(&job.name).unwrap_or_else(|| "job".to_owned());
-        let path = root.join(format!("{}-{folder}", job.id));
+        let parent = job
+            .category
+            .as_deref()
+            .and_then(|category| self.category_folder(category))
+            .map_or_else(|| root.to_owned(), |folder| root.join(folder));
+        let path = parent.join(format!("{}-{folder}", job.id));
         self.set_output_path(job.id, &path).await?;
         Ok(path)
     }

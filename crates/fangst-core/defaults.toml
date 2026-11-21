@@ -5,6 +5,8 @@
 [notify]
 # Seconds one notification may take before it counts as failed.
 timeout_secs = 10
+# ntfy server notify-ntfy publishes to when its settings name none.
+ntfy_server = "https://ntfy.sh"
 
 [disk]
 # Free bytes in the downloads folder below which a disk-full notification goes out (5 GiB).
@@ -25,6 +27,19 @@ persist_interval_secs = 10
 max_active = 5
 # TCP port peers connect to. Forward it on the router for incoming peers.
 listen_port = 6881
+# Run the torrent engine. Off, torrent jobs can still be added and wait in the queue.
+enabled = true
+# Port told to trackers and the DHT when peers reach this machine on another one; 0 for listen_port.
+announce_port = 0
+# Find peers through the DHT, the tracker-less peer network.
+dht = true
+# Find peers on the local network by multicast.
+local_discovery = true
+# Ask the router to forward listen_port.
+upnp = true
+# Bytes per second across all torrents; 0 for no limit.
+download_limit = 0
+upload_limit = 0
 
 [extract]
 # Delete the archive files of a job once every archive in it extracted.
@@ -33,3 +48,24 @@ delete_archives = true
 [safety]
 # File types that fail a job, inside an archive or lying in the job folder. No dot, any case.
 blocked_extensions = ["exe", "lnk", "scr", "bat", "cmd", "com", "pif", "vbs", "js", "msi", "ps1"]
+
+[usenet]
+# Values for a usenet server that leaves them out.
+port = 563
+tls = true
+# Connections to open to one server; most providers allow between 8 and 50.
+connections = 8
+# Requests each connection keeps in flight.
+pipeline = 8
+# Seconds to wait for DNS, TCP and TLS when opening a connection.
+connect_timeout_secs = 15
+# Seconds to wait for any single reply; large articles on slow links need a generous value.
+command_timeout_secs = 60
+# Times a segment is retried after a connection error before it counts as failed.
+retries = 3
+
+[http]
+# Address the API listens on. Port 0 picks a free port.
+listen = "127.0.0.1:7740"
+# Mark the session cookie Secure; turn on when the API is only reached over HTTPS.
+secure_cookie = false

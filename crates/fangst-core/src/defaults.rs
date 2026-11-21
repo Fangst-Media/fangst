@@ -14,12 +14,16 @@ pub struct Defaults {
     pub torrent: Torrent,
     pub extract: Extract,
     pub safety: Safety,
+    pub usenet: Usenet,
+    pub http: Http,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Notify {
     pub timeout_secs: u64,
+    /// The ntfy server for notify-ntfy when its settings name none.
+    pub ntfy_server: String,
 }
 
 impl Notify {
@@ -70,11 +74,21 @@ impl Progress {
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[allow(clippy::struct_excessive_bools)] // Independent switches, each its own setting.
 pub struct Torrent {
     /// Torrent jobs downloading at once; the rest wait in the queue.
     pub max_active: usize,
     /// TCP port peers connect to.
     pub listen_port: u16,
+    pub enabled: bool,
+    /// 0 means `listen_port`.
+    pub announce_port: u16,
+    pub dht: bool,
+    pub local_discovery: bool,
+    pub upnp: bool,
+    /// Bytes per second; 0 means no limit.
+    pub download_limit: u32,
+    pub upload_limit: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -90,6 +104,38 @@ pub struct Safety {
     pub blocked_extensions: Vec<String>,
 }
 
+/// What a usenet server gets for each setting it leaves out.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Usenet {
+    pub port: u16,
+    pub tls: bool,
+    pub connections: usize,
+    pub pipeline: usize,
+    pub connect_timeout_secs: u64,
+    pub command_timeout_secs: u64,
+    pub retries: u32,
+}
+
+impl Usenet {
+    #[must_use]
+    pub fn connect_timeout(&self) -> Duration {
+        Duration::from_secs(self.connect_timeout_secs)
+    }
+
+    #[must_use]
+    pub fn command_timeout(&self) -> Duration {
+        Duration::from_secs(self.command_timeout_secs)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Http {
+    pub listen: String,
+    pub secure_cookie: bool,
+}
+
 #[derive(Debug)]
 pub struct Error(toml::de::Error);
 
@@ -102,7 +148,8 @@ impl std::fmt::Display for Error {
 impl std::error::Error for Error {}
 
 impl Defaults {
-    /// Parses a defaults file. Config files (#31) will layer on top of the built-in one.
+    /// Parses a defaults file. The config file layers on top of the built-in one; see
+    /// [`crate::config`].
     ///
     /// # Errors
     /// When the text is not valid TOML or a value is missing or of the wrong type.
@@ -123,11 +170,16 @@ impl Defaults {
 mod tests {
     use super::Defaults;
 
-    /// Every section after `[disk]`, which the tests below don't vary.
-    const REST: &str = "[progress]\npublish_interval_ms = 1\nrate_window_secs = 1\npersist_interval_secs = 1\n\
-        [torrent]\nmax_active = 1\nlisten_port = 1\n\
-        [extract]\ndelete_archives = true\n\
-        [safety]\nblocked_extensions = [\"exe\"]\n";
+    /// The built-in file with `edit` applied, as text.
+    fn builtin_with(edit: impl FnOnce(&mut toml::Table)) -> String {
+        let mut table: toml::Table = toml::from_str(crate::DEFAULTS_TOML).unwrap();
+        edit(&mut table);
+        toml::to_string(&table).unwrap()
+    }
+
+    fn section(table: &mut toml::Table, name: &str) -> toml::Table {
+        table.get(name).unwrap().as_table().unwrap().clone()
+    }
 
     #[test]
     fn builtin_defaults_parse() {
@@ -140,6 +192,12 @@ mod tests {
         assert_eq!(defaults.progress.persist_interval_secs, 10);
         assert_eq!(defaults.torrent.max_active, 5);
         assert_eq!(defaults.torrent.listen_port, 6881);
+        assert!(defaults.torrent.enabled && defaults.torrent.dht);
+        assert_eq!(defaults.torrent.download_limit, 0);
+        assert_eq!(defaults.usenet.port, 563);
+        assert_eq!(defaults.usenet.connections, 8);
+        assert_eq!(defaults.http.listen, "127.0.0.1:7740");
+        assert_eq!(defaults.notify.ntfy_server, "https://ntfy.sh");
         assert!(defaults.extract.delete_archives);
         assert_eq!(
             defaults.safety.blocked_extensions,
@@ -151,24 +209,33 @@ mod tests {
 
     #[test]
     fn missing_value_is_an_error() {
-        let text = format!("[notify]\ntimeout_secs = 1\n[disk]\nmin_free_bytes = 1\n{REST}");
+        let text = builtin_with(|t| {
+            let mut disk = section(t, "disk");
+            disk.remove("check_interval_secs");
+            t.insert("disk".into(), disk.into());
+        });
         let err = Defaults::parse(&text).unwrap_err();
         assert!(err.to_string().contains("check_interval_secs"), "{err}");
     }
 
     #[test]
     fn misspelled_key_is_an_error() {
-        let text = format!(
-            "[notify]\ntimeout_sec = 1\n[disk]\nmin_free_bytes = 1\ncheck_interval_secs = 1\n{REST}"
-        );
+        let text = builtin_with(|t| {
+            let mut notify = section(t, "notify");
+            let value = notify.remove("timeout_secs").unwrap();
+            notify.insert("timeout_sec".into(), value);
+            t.insert("notify".into(), notify.into());
+        });
         assert!(Defaults::parse(&text).is_err());
     }
 
     #[test]
     fn unknown_section_is_ignored() {
-        let text = format!(
-            "[later]\nx = 1\n[notify]\ntimeout_secs = 1\n[disk]\nmin_free_bytes = 1\ncheck_interval_secs = 1\n{REST}"
-        );
-        assert_eq!(Defaults::parse(&text).unwrap().notify.timeout_secs, 1);
+        let text = builtin_with(|t| {
+            let mut later = toml::Table::new();
+            later.insert("x".into(), 1.into());
+            t.insert("later".into(), later.into());
+        });
+        assert_eq!(Defaults::parse(&text).unwrap().notify.timeout_secs, 10);
     }
 }

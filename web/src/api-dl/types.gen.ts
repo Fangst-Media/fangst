@@ -38,6 +38,14 @@ export type CategoryChange = {
     category?: string | null;
 };
 
+export type CategorySettings = {
+    /**
+     * Folder for the category's new jobs; relative paths are inside the downloads folder.
+     */
+    folder?: string | null;
+    name: string;
+};
+
 /**
  * A message on the event stream.
  */
@@ -58,6 +66,16 @@ export type ChangeDto = {
     type: 'progress';
 };
 
+export type DiscordSettings = {
+    enabled: boolean;
+    has_webhook_url?: boolean;
+    /**
+     * Write-only, since the URL carries the token that lets anyone post. `""` removes it.
+     */
+    webhook_url?: string | null;
+    webhook_url_env?: string | null;
+};
+
 export type EventDto = {
     /**
      * Unix seconds.
@@ -65,6 +83,17 @@ export type EventDto = {
     at: number;
     kind: string;
     message: string;
+};
+
+export type FolderSettings = {
+    /**
+     * Where jobs download to. Relative paths are inside the data folder. Takes a restart.
+     */
+    downloads: string;
+    /**
+     * The media library the downloads are moved or linked into, if any.
+     */
+    media?: string | null;
 };
 
 export type Health = {
@@ -114,12 +143,97 @@ export type LoginRequest = {
     username: string;
 };
 
+export type NotifierSettings = {
+    discord: DiscordSettings;
+    ntfy: NtfySettings;
+    webhook: WebhookSettings;
+};
+
+export type NtfySettings = {
+    enabled: boolean;
+    has_token?: boolean;
+    /**
+     * `null` for the default server.
+     */
+    server?: string | null;
+    /**
+     * Write-only access token for protected topics. `""` removes it.
+     */
+    token?: string | null;
+    token_env?: string | null;
+    topic?: string | null;
+};
+
 export type PasswordChange = {
     /**
      * Required once the user has a password.
      */
     current_password?: string | null;
     new_password: string;
+};
+
+export type ProviderSettings = {
+    description?: string;
+    enabled: boolean;
+    id: string;
+    /**
+     * `api_adapter` or `post_processor`.
+     */
+    kind: string;
+    /**
+     * Read-only: on whatever the request says, because the daemon or a flag needs it.
+     */
+    required?: boolean;
+};
+
+export type SavedSettings = {
+    /**
+     * What waits for the restart, in words.
+     */
+    restart_reasons: Array<string>;
+    /**
+     * Some changes only take effect after the daemon restarts.
+     */
+    restart_required: boolean;
+    settings: SettingsDto;
+};
+
+export type ServerSettings = {
+    /**
+     * Only asked for segments every primary server is missing.
+     */
+    backfill?: boolean;
+    connections: number;
+    enabled: boolean;
+    /**
+     * Read-only: whether a password is stored or comes from `password_env`.
+     */
+    has_password?: boolean;
+    host: string;
+    /**
+     * Keeps the stored password with the server across renames. `null` for a new server.
+     */
+    id?: string | null;
+    name: string;
+    /**
+     * Write-only. Leave out or `null` to keep the stored password, `""` to remove it.
+     */
+    password?: string | null;
+    /**
+     * Environment variable to read the password from instead.
+     */
+    password_env?: string | null;
+    port: number;
+    /**
+     * Lower is tried first.
+     */
+    priority?: number;
+    /**
+     * Read-only. Servers not from the file can't be changed here and are ignored in requests.
+     */
+    source?: SettingSource;
+    tls: boolean;
+    username?: string | null;
 };
 
 /**
@@ -152,12 +266,58 @@ export type ServerTestResult = {
     ok: boolean;
 };
 
+export type SettingSource = 'file' | 'environment' | 'flags';
+
+/**
+ * Every setting the web UI manages.
+ */
+export type SettingsDto = {
+    categories: Array<CategorySettings>;
+    folders: FolderSettings;
+    /**
+     * Dotted names, such as `torrent.listen_port`, of settings an environment variable or a
+     * command-line flag sets. Ignored in requests; a request that changes one is refused.
+     */
+    locked?: Array<string>;
+    notifiers: NotifierSettings;
+    /**
+     * Adapters and post-processors; notifiers are switched on under `notifiers`.
+     */
+    providers: Array<ProviderSettings>;
+    /**
+     * In the order they are tried; `priority` sorts them first.
+     */
+    servers: Array<ServerSettings>;
+    torrent: TorrentSettings;
+};
+
 export type TorrentFileDto = {
     bytes: number;
     /**
      * Relative to the job folder, with `/` between folders.
      */
     path: string;
+};
+
+/**
+ * The torrent engine. Every change here takes a restart.
+ */
+export type TorrentSettings = {
+    /**
+     * `null` to announce `listen_port`.
+     */
+    announce_port?: number | null;
+    dht: boolean;
+    /**
+     * Bytes per second; `null` for no limit.
+     */
+    download_limit?: number | null;
+    enabled: boolean;
+    listen_port: number;
+    local_discovery: boolean;
+    max_active: number;
+    upload_limit?: number | null;
+    upnp: boolean;
 };
 
 /**
@@ -194,6 +354,20 @@ export type UserDto = {
     has_password: boolean;
     id: number;
     username: string;
+};
+
+export type WebhookSettings = {
+    enabled: boolean;
+    has_token?: boolean;
+    /**
+     * Write-only bearer token. Leave out or `null` to keep it, `""` to remove it.
+     */
+    token?: string | null;
+    token_env?: string | null;
+    /**
+     * `http` or `https`; every event is posted to it as JSON.
+     */
+    url?: string | null;
 };
 
 export type LoginData = {
@@ -593,3 +767,53 @@ export type TestServerResponses = {
 };
 
 export type TestServerResponse = TestServerResponses[keyof TestServerResponses];
+
+export type GetSettingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/settings';
+};
+
+export type GetSettingsErrors = {
+    401: ApiError;
+    /**
+     * The caller is not the owner
+     */
+    403: ApiError;
+};
+
+export type GetSettingsError = GetSettingsErrors[keyof GetSettingsErrors];
+
+export type GetSettingsResponses = {
+    200: SettingsDto;
+};
+
+export type GetSettingsResponse = GetSettingsResponses[keyof GetSettingsResponses];
+
+export type PutSettingsData = {
+    body: SettingsDto;
+    path?: never;
+    query?: never;
+    url: '/api/v1/settings';
+};
+
+export type PutSettingsErrors = {
+    /**
+     * A setting is invalid or set by the environment
+     */
+    400: ApiError;
+    401: ApiError;
+    /**
+     * The caller is not the owner
+     */
+    403: ApiError;
+};
+
+export type PutSettingsError = PutSettingsErrors[keyof PutSettingsErrors];
+
+export type PutSettingsResponses = {
+    200: SavedSettings;
+};
+
+export type PutSettingsResponse = PutSettingsResponses[keyof PutSettingsResponses];

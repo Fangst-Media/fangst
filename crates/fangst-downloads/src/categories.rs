@@ -1,5 +1,8 @@
 //! Categories: free-form labels on jobs, plus the ones created ahead of any job.
 
+use std::collections::HashMap;
+use std::path::PathBuf;
+
 use crate::{Error, Store, now};
 
 /// Category names end up in folder names and other products' APIs; one line of printable text.
@@ -45,6 +48,38 @@ impl Store {
             .execute(&self.pool)
             .await?;
         Ok(())
+    }
+
+    /// Removes a created category. Jobs keep theirs, so a name a job carries stays listed.
+    ///
+    /// # Errors
+    /// When the database write fails.
+    pub async fn delete_category(&self, name: &str) -> Result<(), Error> {
+        sqlx::query("DELETE FROM categories WHERE name = ?")
+            .bind(name.trim())
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// Sets the folder each category's new jobs download into, by category name in any case.
+    /// A relative folder is inside the job root. Jobs that already have a folder keep it.
+    ///
+    /// # Panics
+    /// If a thread panicked while holding the folder map.
+    pub fn set_category_folders(&self, folders: HashMap<String, PathBuf>) {
+        *self.category_folders.write().expect("category folders") = folders
+            .into_iter()
+            .map(|(name, folder)| (name.trim().to_lowercase(), folder))
+            .collect();
+    }
+
+    pub(crate) fn category_folder(&self, category: &str) -> Option<PathBuf> {
+        self.category_folders
+            .read()
+            .expect("category folders")
+            .get(&category.trim().to_lowercase())
+            .cloned()
     }
 
     /// Puts a job in a category, or in none.

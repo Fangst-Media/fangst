@@ -342,6 +342,134 @@ fn unknown_provider_stops_startup_with_the_reason() {
     assert!(String::from_utf8_lossy(&output.stderr).contains("unknown provider `notify-nope`"));
 }
 
+fn body(response: &str) -> &str {
+    response.split_once("\r\n\r\n").map_or("", |(_, body)| body)
+}
+
+// A placeholder, never a real credential.
+const USENET_PASSWORD: &str = "usenet-placeholder-4d1e";
+
+#[test]
+fn settings_change_while_running_and_keep_passwords_out_of_the_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let daemon = start(dir.path());
+    let file = dir.path().join("fangst.toml");
+    assert!(file.exists(), "the first start writes the config file");
+
+    let (status, response) = http(&daemon.addr, "/api/v1/settings", Some(KEY));
+    assert_eq!(status, 200, "{response}");
+    let settings = body(&response).to_owned();
+    assert!(settings.contains(r#""servers":[]"#), "{settings}");
+    assert!(
+        settings.contains(r#""torrent.dht""#),
+        "flags are listed as locked: {settings}"
+    );
+
+    let server = format!(
+        r#""servers":[{{"id":null,"name":"Main","host":"news.example.invalid","port":119,"tls":false,"username":"someone","password":"{USENET_PASSWORD}","connections":4,"priority":0,"backfill":false,"enabled":true}}]"#
+    );
+    let changed = settings.replace(r#""servers":[]"#, &server).replace(
+        r#""categories":[]"#,
+        r#""categories":[{"name":"tv","folder":"TV"}]"#,
+    );
+    let (status, response) = request(&daemon.addr, "PUT", "/api/v1/settings", Some(KEY), &changed);
+    assert_eq!(status, 200, "{response}");
+    let saved = body(&response);
+    assert!(saved.contains(r#""restart_required":false"#), "{saved}");
+    assert!(saved.contains(r#""has_password":true"#), "{saved}");
+    assert!(!saved.contains(USENET_PASSWORD), "{saved}");
+    let written = std::fs::read_to_string(&file).unwrap();
+    assert!(written.contains("news.example.invalid"), "{written}");
+    assert!(!written.contains(USENET_PASSWORD), "{written}");
+    let (_, categories) = http(&daemon.addr, "/api/v1/categories", Some(KEY));
+    assert!(body(&categories).contains("\"tv\""), "{categories}");
+
+    let locked = settings.replace(r#""dht":false"#, r#""dht":true"#);
+    let (status, response) = request(&daemon.addr, "PUT", "/api/v1/settings", Some(KEY), &locked);
+    assert_eq!(status, 400, "{response}");
+    assert!(response.contains("torrent.dht"), "{response}");
+
+    let (_, response) = http(&daemon.addr, "/api/v1/settings", Some(KEY));
+    let restart = body(&response).replace(r#""max_active":5"#, r#""max_active":2"#);
+    let (status, response) = request(&daemon.addr, "PUT", "/api/v1/settings", Some(KEY), &restart);
+    assert_eq!(status, 200, "{response}");
+    assert!(
+        body(&response).contains(r#""restart_required":true"#),
+        "{response}"
+    );
+    drop(daemon);
+
+    let daemon = start(dir.path());
+    let (_, response) = http(&daemon.addr, "/api/v1/settings", Some(KEY));
+    let after = body(&response);
+    assert!(after.contains("news.example.invalid"), "{after}");
+    assert!(after.contains(r#""has_password":true"#), "{after}");
+    assert!(after.contains(r#""max_active":2"#), "{after}");
+}
+
+#[test]
+fn a_password_in_the_config_file_stops_startup_with_where_it_belongs() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("fangst.toml"),
+        format!("[[servers]]\nname = \"Main\"\nhost = \"news.example.invalid\"\npassword = \"{USENET_PASSWORD}\"\n"),
+    )
+    .unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_fangst-dl"))
+        .args([
+            "serve",
+            "--data-dir",
+            dir.path().to_str().unwrap(),
+            "--listen",
+            "127.0.0.1:0",
+            "--no-torrent",
+        ])
+        .env("FANGST_API_KEY", KEY)
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("password_env"), "{stderr}");
+    assert!(!stderr.contains(USENET_PASSWORD), "{stderr}");
+}
+
+#[test]
+fn environment_variables_override_the_config_file() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("fangst.toml"),
+        "[torrent]\nmax_active = 2\n",
+    )
+    .unwrap();
+    let mut child = Command::new(env!("CARGO_BIN_EXE_fangst-dl"))
+        .args(["serve", "--data-dir", dir.path().to_str().unwrap()])
+        .args(LOCAL_TORRENTS)
+        .env("FANGST_API_KEY", KEY)
+        .env("FANGST_HTTP__LISTEN", "127.0.0.1:0")
+        .env("FANGST_TORRENT__MAX_ACTIVE", "3")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut first = String::new();
+    BufReader::new(child.stdout.take().unwrap())
+        .read_line(&mut first)
+        .unwrap();
+    let addr = first
+        .trim()
+        .strip_prefix("listening on ")
+        .unwrap()
+        .to_owned();
+    let (_, response) = http(&addr, "/api/v1/settings", Some(KEY));
+    let _ = child.kill();
+    let _ = child.wait();
+    assert!(body(&response).contains(r#""max_active":3"#), "{response}");
+    assert!(
+        body(&response).contains(r#""torrent.max_active""#),
+        "{response}"
+    );
+}
+
 /// The crate folder at run time. `env!("CARGO_MANIFEST_DIR")` is baked in at compile time, and a
 /// build folder shared between git worktrees can hand back a test binary built in another (perhaps
 /// deleted) worktree; cargo and nextest set the variable correctly for every run.

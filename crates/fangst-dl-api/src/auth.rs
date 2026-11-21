@@ -42,8 +42,8 @@ impl Default for AuthSettings {
 /// The signed-in user, put on the request by [`require_user`].
 #[derive(Clone)]
 pub(crate) struct Caller {
-    user: User,
-    session: Option<String>,
+    pub(crate) user: User,
+    pub(crate) session: Option<String>,
 }
 
 pub(crate) async fn require_user(

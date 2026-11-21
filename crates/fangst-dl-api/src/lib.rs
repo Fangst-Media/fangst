@@ -5,16 +5,23 @@
 //! container health checks work without a secret. The OpenAPI document is generated
 //! from the handlers; `fangst-dl openapi --check` keeps the committed copy in sync.
 
-use std::sync::Arc;
+use std::collections::HashSet;
+use std::sync::{Arc, RwLock};
 
 mod adapters;
 mod auth;
 mod fetch;
 mod limit;
+mod settings;
 
 pub use auth::{AuthSettings, LoginRequest, PasswordChange, UserDto};
 pub use fetch::FetchLimits;
 pub use limit::LoginLimits;
+pub use settings::{
+    CategorySettings, Control, ControlError, ControlFuture, DiscordSettings, FolderSettings,
+    NotifierSettings, NtfySettings, ProviderSettings, SavedSettings, ServerSettings, SettingSource,
+    SettingsDto, TorrentSettings, WebhookSettings,
+};
 
 use axum::Json;
 use axum::Router;
@@ -38,13 +45,51 @@ struct ApiState {
     settings: Arc<AuthSettings>,
     limiter: Arc<limit::Limiter>,
     jobs: adapters::ServiceJobs,
+    enabled_adapters: EnabledAdapters,
+    control: Option<Arc<dyn Control>>,
+}
+
+/// The ids of the adapters that answer. Settings switch adapters on and off while running; a
+/// switched-off adapter's paths answer 404, as if it were not mounted.
+#[derive(Clone, Default)]
+pub struct EnabledAdapters(Arc<RwLock<HashSet<String>>>);
+
+impl EnabledAdapters {
+    #[must_use]
+    pub fn new(ids: impl IntoIterator<Item = String>) -> Self {
+        Self(Arc::new(RwLock::new(ids.into_iter().collect())))
+    }
+
+    /// # Panics
+    /// If a thread panicked while holding the set.
+    pub fn set(&self, ids: impl IntoIterator<Item = String>) {
+        *self.0.write().expect("enabled adapters") = ids.into_iter().collect();
+    }
+
+    /// # Panics
+    /// If a thread panicked while holding the set.
+    #[must_use]
+    pub fn contains(&self, id: &str) -> bool {
+        self.0.read().expect("enabled adapters").contains(id)
+    }
+}
+
+/// Everything [`app`] needs besides the service and the user store.
+pub struct Options {
+    pub auth: AuthSettings,
+    pub fetch: FetchLimits,
+    /// Every adapter compiled in. Each is mounted, and answers while `enabled_adapters` has it.
+    pub adapters: Vec<Arc<dyn fangst_providers::ApiAdapter>>,
+    pub enabled_adapters: EnabledAdapters,
+    /// Settings routes answer 503 without one.
+    pub control: Option<Arc<dyn Control>>,
 }
 
 #[derive(OpenApi)]
 #[openapi(
     info(title = "Fangst download daemon", description = "Native API of fangst-dl."),
-    paths(health, auth::login, auth::logout, auth::me, auth::change_password, list_jobs, add_job, get_job, pause_job, resume_job, delete_job, job_timeline, job_torrent, set_job_category, list_categories, create_category, events, test_server),
-    components(schemas(Health, JobDto, EventDto, ApiError, ChangeDto, JobStatus, JobKind, TorrentStatusDto, TorrentFileDto, CategoryChange, AddJobLink, AddJobUrl, AddJobMagnet, ServerTestRequest, ServerTestResult, UserDto, LoginRequest, PasswordChange)),
+    paths(health, auth::login, auth::logout, auth::me, auth::change_password, list_jobs, add_job, get_job, pause_job, resume_job, delete_job, job_timeline, job_torrent, set_job_category, list_categories, create_category, events, test_server, settings::get_settings, settings::put_settings),
+    components(schemas(Health, JobDto, EventDto, ApiError, ChangeDto, JobStatus, JobKind, TorrentStatusDto, TorrentFileDto, CategoryChange, AddJobLink, AddJobUrl, AddJobMagnet, ServerTestRequest, ServerTestResult, UserDto, LoginRequest, PasswordChange, SettingsDto, FolderSettings, ServerSettings, SettingSource, CategorySettings, NotifierSettings, WebhookSettings, NtfySettings, DiscordSettings, TorrentSettings, ProviderSettings, SavedSettings)),
     modifiers(&ApiKeyScheme),
     security(("api_key" = []), ("session" = []))
 )]
@@ -97,6 +142,28 @@ pub fn router_with_adapters(
     fetch: FetchLimits,
     adapters: &[Arc<dyn fangst_providers::ApiAdapter>],
 ) -> Router {
+    app(
+        service,
+        auth,
+        Options {
+            auth: settings,
+            fetch,
+            adapters: adapters.to_vec(),
+            enabled_adapters: EnabledAdapters::new(adapters.iter().map(|a| a.info().id)),
+            control: None,
+        },
+    )
+}
+
+/// Every route: the native API, the settings routes and each adapter.
+pub fn app(service: Service, auth: Auth, options: Options) -> Router {
+    let Options {
+        auth: settings,
+        fetch,
+        adapters,
+        enabled_adapters,
+        control,
+    } = options;
     let state = ApiState {
         jobs: adapters::ServiceJobs {
             service: service.clone(),
@@ -106,6 +173,8 @@ pub fn router_with_adapters(
         auth,
         limiter: Arc::new(limit::Limiter::new(settings.login)),
         settings: Arc::new(settings),
+        enabled_adapters,
+        control,
     };
     let protected = Router::new()
         .route(
@@ -126,6 +195,10 @@ pub fn router_with_adapters(
         .route("/api/v1/servers/test", post(test_server))
         .route("/api/v1/auth/me", get(auth::me))
         .route("/api/v1/auth/password", put(auth::change_password))
+        .route(
+            "/api/v1/settings",
+            get(settings::get_settings).put(settings::put_settings),
+        )
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             auth::require_user,
@@ -137,7 +210,7 @@ pub fn router_with_adapters(
         // Keeps unknown native paths native when an adapter is mounted at `/api`.
         .route("/api/v1/{*rest}", axum::routing::any(not_found))
         .merge(protected);
-    for adapter in adapters {
+    for adapter in &adapters {
         app = adapters::mount(app, adapter);
     }
     app.with_state(state)

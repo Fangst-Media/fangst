@@ -37,7 +37,7 @@ just setup        # install JS dependencies and fetch crates
 just check-full   # the gate: lint, tests, layer and licence checks, generated files
 just web-dev      # web app with hot refresh
 
-# the download daemon, API on 127.0.0.1:7740
+# the download daemon, API on 127.0.0.1:7740; settings in data/fangst.toml (see TUNING.md)
 FANGST_API_KEY=<16 or more characters> cargo run -p fangst-dl -- serve --data-dir data --host news.example.com
 ```
 

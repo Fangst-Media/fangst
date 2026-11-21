@@ -1,13 +1,17 @@
+use std::collections::HashMap;
 use std::num::NonZeroU32;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
-use std::time::Duration;
 
 use anyhow::{Context, bail};
 use clap::{Parser, Subcommand};
+use fangst_core::config::{self, Layers, Table, Value};
+use fangst_dl_api::SettingSource;
 use fangst_nntp::{Pool, ServerConfig};
-use fangst_usenet::{Options, Progress};
+use fangst_usenet::Progress;
+
+mod settings;
 
 #[derive(Parser)]
 #[command(name = "fangst-dl", version, about = "The Fangst download daemon")]
@@ -43,13 +47,15 @@ struct ResetPasswordArgs {
     password_env: Option<String>,
 }
 
-/// One usenet server. Config files and several servers arrive with #16 and #31.
+/// One usenet server from the command line, tried before the servers in the config file.
+/// Values left out come from `[usenet]` in the defaults.
 #[derive(clap::Args)]
 struct UsenetArgs {
     #[arg(long)]
     host: Option<String>,
-    #[arg(long, default_value_t = 563)]
-    port: u16,
+    /// Defaults to `usenet.port`.
+    #[arg(long)]
+    port: Option<u16>,
     /// Connect without TLS (usually port 119).
     #[arg(long)]
     no_tls: bool,
@@ -58,70 +64,78 @@ struct UsenetArgs {
     /// Name of the environment variable holding the password, so it stays out of shell history.
     #[arg(long, requires = "user")]
     password_env: Option<String>,
-    #[arg(long, default_value_t = 8)]
-    connections: usize,
-    #[arg(long, default_value_t = 8)]
-    pipeline: usize,
+    /// Defaults to `usenet.connections`.
+    #[arg(long)]
+    connections: Option<usize>,
+    /// Requests each connection keeps in flight, for every server. Defaults to `usenet.pipeline`.
+    #[arg(long)]
+    pipeline: Option<usize>,
     /// Seconds to wait for DNS, TCP and TLS when opening a connection.
-    #[arg(long, default_value_t = 15)]
-    connect_timeout: u64,
+    #[arg(long)]
+    connect_timeout: Option<u64>,
     /// Seconds to wait for any single reply; large articles on slow links need a generous value.
-    #[arg(long, default_value_t = 60)]
-    command_timeout: u64,
+    #[arg(long)]
+    command_timeout: Option<u64>,
 }
 
 impl UsenetArgs {
-    fn pool(&self) -> anyhow::Result<Option<Pool>> {
+    fn server(&self) -> anyhow::Result<Option<settings::ExtraServer>> {
         let Some(host) = &self.host else {
             return Ok(None);
         };
-        let credentials = match (&self.user, &self.password_env) {
-            (Some(user), Some(var)) => {
-                let password = std::env::var(var)
-                    .with_context(|| format!("environment variable {var} is not set"))?;
-                Some((user.clone(), password))
-            }
+        let password = match (&self.user, &self.password_env) {
+            (Some(_), Some(var)) => Some(
+                std::env::var(var)
+                    .with_context(|| format!("environment variable {var} is not set"))?,
+            ),
             (Some(_), None) => bail!("--user needs --password-env"),
             _ => None,
         };
-        let tls = if self.no_tls {
-            None
-        } else {
-            Some(fangst_nntp::native_tls_config()?)
-        };
-        Ok(Some(Pool::new(ServerConfig {
+        Ok(Some(settings::ExtraServer {
+            source: SettingSource::Flags,
             host: host.clone(),
             port: self.port,
-            tls,
-            credentials,
-            max_connections: self.connections,
-            connect_timeout: Duration::from_secs(self.connect_timeout),
-            command_timeout: Duration::from_secs(self.command_timeout),
-        })))
+            tls: self.no_tls.then_some(false),
+            username: self.user.clone(),
+            password,
+            connections: self.connections,
+        }))
     }
 
-    fn options(&self) -> Options {
-        Options {
-            connections: self.connections,
-            pipeline_depth: self.pipeline,
-            retries: 3,
+    fn layer(&self, layer: &mut Table) {
+        let to_int = |n: u64| i64::try_from(n).unwrap_or(i64::MAX);
+        for (key, value) in [
+            ("pipeline", self.pipeline.map(|n| to_int(n as u64))),
+            ("connect_timeout_secs", self.connect_timeout.map(to_int)),
+            ("command_timeout_secs", self.command_timeout.map(to_int)),
+        ] {
+            if let Some(value) = value {
+                set(layer, &["usenet", key], value.into());
+            }
         }
     }
 }
 
+fn set(layer: &mut Table, path: &[&str], value: Value) {
+    let path: Vec<String> = path.iter().map(|&k| k.to_owned()).collect();
+    config::insert_path(layer, &path, value);
+}
+
 #[derive(clap::Args)]
 struct ServeArgs {
-    /// Folder for downloads.db and the downloads themselves.
-    #[arg(long, default_value = "data")]
-    data_dir: PathBuf,
-    /// Address the API listens on. Port 0 picks a free port.
-    #[arg(long, default_value = "127.0.0.1:7740")]
-    listen: String,
+    /// Folder for downloads.db, fangst.toml and, unless the settings say otherwise, the downloads.
+    /// Defaults to `FANGST_DATA_DIR`, else `data`.
+    #[arg(long)]
+    data_dir: Option<PathBuf>,
+    /// Address the API listens on; port 0 picks a free port. Defaults to `http.listen`.
+    #[arg(long)]
+    listen: Option<String>,
     /// Name of the environment variable holding the API key. It becomes the first user's key and
     /// replaces the one set at the previous start.
     #[arg(long, default_value = "FANGST_API_KEY")]
     api_key_env: String,
-    /// Turn on an optional provider (post-processor, notifier, API adapter) by its id. Repeatable.
+    /// Turn on an optional provider (post-processor, notifier, API adapter) by its id, on top of
+    /// the ones the settings enable. Repeatable.
     #[arg(long = "enable", value_name = "ID")]
     enabled_providers: Vec<String>,
     /// Mark the session cookie Secure; use when the API is only reached over HTTPS.
@@ -135,7 +149,25 @@ struct ServeArgs {
     notify: NotifyArgs,
 }
 
+impl ServeArgs {
+    /// The flags as the top settings layer.
+    fn layer(&self) -> Table {
+        let mut layer = Table::new();
+        if let Some(listen) = &self.listen {
+            set(&mut layer, &["http", "listen"], listen.clone().into());
+        }
+        if self.secure_cookie {
+            set(&mut layer, &["http", "secure_cookie"], true.into());
+        }
+        self.usenet.layer(&mut layer);
+        self.torrent.layer(&mut layer);
+        self.notify.layer(&mut layer);
+        layer
+    }
+}
+
 /// The torrent engine. On unless `--no-torrent`; its state lives in `<data-dir>/torrent`.
+/// Each flag overrides the matching `[torrent]` setting.
 #[derive(clap::Args)]
 #[allow(clippy::struct_excessive_bools)] // Each is an independent command-line switch.
 struct TorrentArgs {
@@ -143,7 +175,7 @@ struct TorrentArgs {
     #[arg(long)]
     no_torrent: bool,
     /// TCP port peers connect to; 0 picks a free one at every start. Defaults to
-    /// `torrent.listen_port` in the defaults file.
+    /// `torrent.listen_port`.
     #[arg(long, value_name = "PORT")]
     torrent_port: Option<u16>,
     /// Port told to trackers and the DHT when peers reach this machine on another one, such as a
@@ -159,49 +191,47 @@ struct TorrentArgs {
     /// Don't ask the router to forward the torrent port.
     #[arg(long)]
     no_upnp: bool,
-    /// Download limit across all torrents, in bytes per second. Unlimited when left out.
+    /// Download limit across all torrents, in bytes per second.
     #[arg(long, value_name = "BYTES_PER_SEC")]
     torrent_download_limit: Option<NonZeroU32>,
-    /// Upload limit across all torrents, in bytes per second. Unlimited when left out.
+    /// Upload limit across all torrents, in bytes per second.
     #[arg(long, value_name = "BYTES_PER_SEC")]
     torrent_upload_limit: Option<NonZeroU32>,
-    /// Torrent jobs downloading at once. Defaults to `torrent.max_active` in the defaults file.
+    /// Torrent jobs downloading at once. Defaults to `torrent.max_active`.
     #[arg(long, value_name = "N", value_parser = clap::value_parser!(u32).range(1..))]
     max_active_torrents: Option<u32>,
 }
 
 impl TorrentArgs {
-    async fn engine(
-        &self,
-        data_dir: &std::path::Path,
-        defaults: &fangst_core::defaults::Torrent,
-    ) -> anyhow::Result<Option<fangst_torrent::Engine>> {
-        if self.no_torrent {
-            return Ok(None);
+    fn layer(&self, layer: &mut Table) {
+        let mut put = |key: &str, value: Value| set(layer, &["torrent", key], value);
+        for (off, key) in [
+            (self.no_torrent, "enabled"),
+            (self.no_dht, "dht"),
+            (self.no_local_discovery, "local_discovery"),
+            (self.no_upnp, "upnp"),
+        ] {
+            if off {
+                put(key, false.into());
+            }
         }
-        let state_dir = data_dir.join("torrent");
-        std::fs::create_dir_all(&state_dir)
-            .with_context(|| format!("creating {}", state_dir.display()))?;
-        let port = self.torrent_port.unwrap_or(defaults.listen_port);
-        let engine = fangst_torrent::Engine::start(fangst_torrent::Config {
-            listen: (std::net::Ipv4Addr::UNSPECIFIED, port).into(),
-            announce_port: self.torrent_announce_port,
-            dht: !self.no_dht,
-            local_discovery: !self.no_local_discovery,
-            upnp: !self.no_upnp,
-            state_dir: Some(state_dir),
-            download_limit: self.torrent_download_limit,
-            upload_limit: self.torrent_upload_limit,
-        })
-        .await
-        .with_context(|| format!("starting the torrent engine on port {port}"))?;
-        Ok(Some(engine))
-    }
-
-    fn max_active(&self, defaults: &fangst_core::defaults::Torrent) -> usize {
-        self.max_active_torrents
-            .and_then(|n| usize::try_from(n).ok())
-            .unwrap_or(defaults.max_active)
+        for (value, key) in [
+            (self.torrent_port.map(i64::from), "listen_port"),
+            (self.torrent_announce_port.map(i64::from), "announce_port"),
+            (
+                self.torrent_download_limit.map(|n| i64::from(n.get())),
+                "download_limit",
+            ),
+            (
+                self.torrent_upload_limit.map(|n| i64::from(n.get())),
+                "upload_limit",
+            ),
+            (self.max_active_torrents.map(i64::from), "max_active"),
+        ] {
+            if let Some(value) = value {
+                put(key, value.into());
+            }
+        }
     }
 }
 
@@ -249,89 +279,114 @@ fn main() -> ExitCode {
     }
 }
 
-async fn serve(args: ServeArgs) -> anyhow::Result<ExitCode> {
-    let api_key = std::env::var(&args.api_key_env).with_context(|| {
-        format!(
-            "set the API key in the {} environment variable",
-            args.api_key_env
-        )
-    })?;
-    if api_key.len() < 16 {
-        bail!(
-            "the API key in {} must be at least 16 characters",
-            args.api_key_env
-        );
+fn startup(e: fangst_dl_api::ControlError) -> anyhow::Error {
+    match e {
+        fangst_dl_api::ControlError::Invalid(why) | fangst_dl_api::ControlError::Internal(why) => {
+            anyhow::anyhow!(why)
+        }
     }
-    let defaults = fangst_core::defaults::Defaults::builtin()?;
-    let enabled = with_required_providers(&args.enabled_providers);
-    let available = builtin_providers(&args.notify, &enabled, &defaults, |name| {
-        std::env::var(name).ok()
-    })?;
-    let registry = fangst_providers::Registry::build(available, &enabled)?;
-    std::fs::create_dir_all(&args.data_dir)
-        .with_context(|| format!("creating {}", args.data_dir.display()))?;
-    let store = fangst_downloads::Store::open(&args.data_dir.join("downloads.db")).await?;
-    let master_key =
-        fangst_core::secret::MasterKey::load_or_create(&args.data_dir.join("master.key"))?;
-    let auth = fangst_downloads::Auth::new(&store, Arc::new(master_key)).await?;
+}
+
+async fn serve(args: ServeArgs) -> anyhow::Result<ExitCode> {
+    let env: settings::Env = Arc::new(|name| std::env::var(name).ok());
+    let api_key = api_key(&args)?;
+    let (data_dir, layers, config) = load_settings(&args, &env)?;
+    let store = fangst_downloads::Store::open(&data_dir.join("downloads.db")).await?;
+    let master_key = Arc::new(fangst_core::secret::MasterKey::load_or_create(
+        &data_dir.join("master.key"),
+    )?);
+    let auth = fangst_downloads::Auth::new(&store, Arc::clone(&master_key)).await?;
     auth.bootstrap(&api_key).await?;
-    let pool = args.usenet.pool()?;
-    let has_server = pool.is_some();
+    let extra_server = match args.usenet.server()? {
+        Some(server) => Some(server),
+        None => settings::env_server(&*env)?,
+    };
+    let sources = settings::Sources {
+        secrets: fangst_downloads::Secrets::new(&store, master_key),
+        env,
+        extra_server,
+        required: with_required_providers(&args.enabled_providers),
+    };
+
+    let Providers {
+        registry,
+        infos,
+        adapters,
+    } = providers(&config, &sources).await?;
+    let servers = sources
+        .usenet_servers(&config, &HashMap::new())
+        .await
+        .map_err(startup)?;
+    let has_server = !servers.is_empty();
     let runner = fangst_downloads::Runner {
         store,
+        options: settings::usenet_options(&config, &servers),
         // Without a server the queue still accepts jobs; they wait until one is configured.
-        servers: vec![fangst_usenet::Server::primary(Arc::new(
-            pool.unwrap_or_else(|| Pool::new(placeholder_server())),
-        ))],
-        root: args.data_dir.join("downloads"),
-        options: args.usenet.options(),
+        servers,
+        root: config.settings.folders.downloads_path(&data_dir),
         post_processors: registry.post_processors.clone(),
     };
     let mut service = fangst_downloads::Service::new(runner)
-        .with_notifications(fangst_downloads::Notifications {
-            notifiers: registry.notifiers.clone(),
-            timeout: defaults.notify.timeout(),
-            min_free_bytes: defaults.disk.min_free_bytes,
-            disk_check_interval: defaults.disk.check_interval(),
-        })
-        .with_progress(defaults.progress.clone())
-        .with_torrent_limit(args.torrent.max_active(&defaults.torrent));
-    if !has_server {
-        service = service.without_usenet();
-    }
-    let engine = args
-        .torrent
-        .engine(&args.data_dir, &defaults.torrent)
-        .await?;
+        .with_notifications(settings::notifications(&config, registry.notifiers.clone()))
+        .with_progress(config.defaults.progress.clone())
+        .with_torrent_limit(config.defaults.torrent.max_active);
+    let engine = start_torrents(&config, &data_dir).await?;
     if let Some(engine) = &engine {
         service = service.with_torrents(engine.clone());
     }
 
-    let listener = tokio::net::TcpListener::bind(&args.listen)
+    let enabled_adapters =
+        fangst_dl_api::EnabledAdapters::new(registry.adapters.iter().map(|a| a.info().id));
+    let daemon = settings::Daemon::new(settings::DaemonParts {
+        data_dir,
+        layers,
+        sources,
+        service: service.clone(),
+        adapters: enabled_adapters.clone(),
+        providers: infos,
+    })?;
+    daemon
+        .apply_categories(&config, &[])
         .await
-        .with_context(|| format!("listening on {}", args.listen))?;
-    println!("listening on {}", listener.local_addr()?);
-    if !has_server {
-        println!("no usenet server configured; usenet jobs will wait in the queue");
-    }
-    println!("{}", describe_torrents(engine.as_ref()));
-    println!("{}", describe_providers(&registry));
+        .map_err(startup)?;
 
-    let settings = fangst_dl_api::AuthSettings {
-        secure_cookie: args.secure_cookie,
-        ..fangst_dl_api::AuthSettings::default()
-    };
-    let app = fangst_dl_api::router_with_adapters(
+    let listen = &config.defaults.http.listen;
+    let listener = tokio::net::TcpListener::bind(listen)
+        .await
+        .with_context(|| format!("listening on {listen}"))?;
+    announce(
+        listener.local_addr()?,
+        has_server,
+        engine.as_ref(),
+        &registry,
+    );
+
+    let app = fangst_dl_api::app(
         service.clone(),
         auth,
-        settings,
-        fangst_dl_api::FetchLimits::default(),
-        &registry.adapters,
+        fangst_dl_api::Options {
+            auth: fangst_dl_api::AuthSettings {
+                secure_cookie: config.defaults.http.secure_cookie,
+                ..fangst_dl_api::AuthSettings::default()
+            },
+            fetch: fangst_dl_api::FetchLimits::default(),
+            adapters,
+            enabled_adapters,
+            control: Some(Arc::new(daemon)),
+        },
     );
-    let worker = tokio::spawn({
-        let service = service.clone();
-        async move { service.run().await }
-    });
+    run(listener, app, service, engine).await?;
+    Ok(ExitCode::SUCCESS)
+}
+
+/// Serves the API and runs the queue until Ctrl-C.
+async fn run(
+    listener: tokio::net::TcpListener,
+    app: axum::Router,
+    service: fangst_downloads::Service,
+    engine: Option<fangst_torrent::Engine>,
+) -> anyhow::Result<()> {
+    let worker = tokio::spawn(async move { service.run().await });
     // The client address feeds the login rate limit.
     axum::serve(
         listener,
@@ -345,7 +400,107 @@ async fn serve(args: ServeArgs) -> anyhow::Result<ExitCode> {
     if let Some(engine) = engine {
         engine.shutdown().await;
     }
-    Ok(ExitCode::SUCCESS)
+    Ok(())
+}
+
+fn api_key(args: &ServeArgs) -> anyhow::Result<String> {
+    let api_key = std::env::var(&args.api_key_env).with_context(|| {
+        format!(
+            "set the API key in the {} environment variable",
+            args.api_key_env
+        )
+    })?;
+    if api_key.len() < 16 {
+        bail!(
+            "the API key in {} must be at least 16 characters",
+            args.api_key_env
+        );
+    }
+    Ok(api_key)
+}
+
+/// The data folder, with `fangst.toml` written on first start, and the settings layered over it.
+fn load_settings(
+    args: &ServeArgs,
+    env: &settings::Env,
+) -> anyhow::Result<(PathBuf, Layers, config::Config)> {
+    let data_dir = args
+        .data_dir
+        .clone()
+        .or_else(|| env("FANGST_DATA_DIR").map(PathBuf::from))
+        .unwrap_or_else(|| PathBuf::from("data"));
+    std::fs::create_dir_all(&data_dir)
+        .with_context(|| format!("creating {}", data_dir.display()))?;
+    let file_path = data_dir.join(config::FILE_NAME);
+    config::ensure_file(&file_path)?;
+    let file = config::read_file(&file_path)?.unwrap_or_default();
+    let layers = Layers::new(file, config::env_layer(std::env::vars()), args.layer())?;
+    let config = layers.resolve().with_context(|| {
+        format!(
+            "reading the settings in {} and FANGST_* variables",
+            file_path.display()
+        )
+    })?;
+    Ok((data_dir, layers, config))
+}
+
+struct Providers {
+    registry: fangst_providers::Registry,
+    /// Adapters and post-processors, enabled or not.
+    infos: Vec<fangst_providers::ProviderInfo>,
+    /// Every adapter, mounted whether enabled or not so settings can switch them while running.
+    adapters: Vec<Arc<dyn fangst_providers::ApiAdapter>>,
+}
+
+async fn providers(
+    config: &config::Config,
+    sources: &settings::Sources,
+) -> anyhow::Result<Providers> {
+    let enabled = sources.enabled(config);
+    let secrets = sources
+        .notifier_secrets(config, &HashMap::new())
+        .await
+        .map_err(startup)?;
+    let notifiers = settings::build_notifiers(config, &enabled, &secrets)?;
+    let mut available = builtin_providers(&config.defaults);
+    let infos = available
+        .iter()
+        .map(fangst_providers::Provider::info)
+        .collect();
+    let adapters = available
+        .iter()
+        .filter_map(|p| match p {
+            fangst_providers::Provider::ApiAdapter(a) => Some(Arc::clone(a)),
+            _ => None,
+        })
+        .collect();
+    available.extend(
+        notifiers
+            .into_iter()
+            .map(fangst_providers::Provider::Notifier),
+    );
+    Ok(Providers {
+        registry: fangst_providers::Registry::build(available, &enabled)?,
+        infos,
+        adapters,
+    })
+}
+
+async fn start_torrents(
+    config: &config::Config,
+    data_dir: &std::path::Path,
+) -> anyhow::Result<Option<fangst_torrent::Engine>> {
+    let Some(torrent) = settings::torrent_config(config, data_dir) else {
+        return Ok(None);
+    };
+    let port = torrent.listen.port();
+    if let Some(state) = &torrent.state_dir {
+        std::fs::create_dir_all(state).with_context(|| format!("creating {}", state.display()))?;
+    }
+    let engine = fangst_torrent::Engine::start(torrent)
+        .await
+        .with_context(|| format!("starting the torrent engine on port {port}"))?;
+    Ok(Some(engine))
 }
 
 /// The safety check runs for every job, whatever `--enable` says: without it, extraction or a
@@ -366,21 +521,17 @@ fn with_required_providers(enabled: &[String]) -> Vec<String> {
     all
 }
 
-/// Every provider compiled into this binary; `--enable` picks from these. Notifiers are only built
-/// when enabled, since they need their settings.
+/// The adapters and post-processors compiled into this binary; the settings pick from these.
+/// Notifiers are built from their settings once enabled, in [`settings::build_notifiers`].
 fn builtin_providers(
-    notify: &NotifyArgs,
-    enabled: &[String],
     defaults: &fangst_core::defaults::Defaults,
-    env: impl Fn(&str) -> Option<String>,
-) -> anyhow::Result<Vec<fangst_providers::Provider>> {
+) -> Vec<fangst_providers::Provider> {
     let mut providers = vec![
         fangst_providers::Provider::ApiAdapter(Arc::new(fangst_adapter_sabnzbd::Sabnzbd)),
         fangst_providers::Provider::ApiAdapter(Arc::new(fangst_adapter_qbittorrent::Qbittorrent)),
     ];
     providers.extend(post_processors(defaults));
-    providers.extend(notify.providers(enabled, defaults.notify.timeout(), env)?);
-    Ok(providers)
+    providers
 }
 
 /// Post-processors run in this order once enabled: nothing is extracted before the safety check.
@@ -396,8 +547,9 @@ fn post_processors(defaults: &fangst_core::defaults::Defaults) -> [fangst_provid
     ]
 }
 
-/// Notifier settings until the config file arrives (#31). Secrets are read from environment
-/// variables named here, never taken as values, which would leave them in shell history.
+/// Notifier settings from the command line, over `[notifiers]` in the config file. Secrets are
+/// read from environment variables named here, never taken as values, which would leave them in
+/// shell history.
 #[derive(clap::Args)]
 struct NotifyArgs {
     /// URL that notify-webhook posts each event to as JSON.
@@ -406,9 +558,9 @@ struct NotifyArgs {
     /// Name of the environment variable holding a bearer token for the webhook.
     #[arg(long, requires = "webhook_url")]
     webhook_token_env: Option<String>,
-    /// ntfy server that notify-ntfy publishes to.
-    #[arg(long, default_value = "https://ntfy.sh")]
-    ntfy_url: String,
+    /// ntfy server that notify-ntfy publishes to. Defaults to `notify.ntfy_server`.
+    #[arg(long)]
+    ntfy_url: Option<String>,
     /// ntfy topic that notify-ntfy publishes to.
     #[arg(long)]
     ntfy_topic: Option<String>,
@@ -422,63 +574,39 @@ struct NotifyArgs {
 }
 
 impl NotifyArgs {
-    fn providers(
-        &self,
-        enabled: &[String],
-        timeout: Duration,
-        env: impl Fn(&str) -> Option<String>,
-    ) -> anyhow::Result<Vec<fangst_providers::Provider>> {
-        let on = |id: &str| enabled.iter().any(|e| e == id);
-        let var = |name: &str| {
-            env(name).with_context(|| format!("environment variable {name} is not set"))
-        };
-        let mut notifiers: Vec<Arc<dyn fangst_providers::Notifier>> = Vec::new();
-        if on(fangst_notify_webhook::ID) {
-            let url = self
-                .webhook_url
-                .clone()
-                .context("notify-webhook needs --webhook-url")?;
-            let bearer_token = self.webhook_token_env.as_deref().map(var).transpose()?;
-            notifiers.push(Arc::new(fangst_notify_webhook::WebhookNotifier::new(
-                fangst_notify_webhook::Settings {
-                    url,
-                    bearer_token,
-                    timeout,
-                },
-            )?));
+    fn layer(&self, layer: &mut Table) {
+        for (path, value) in [
+            (["webhook", "url"], &self.webhook_url),
+            (["webhook", "token_env"], &self.webhook_token_env),
+            (["ntfy", "server"], &self.ntfy_url),
+            (["ntfy", "topic"], &self.ntfy_topic),
+            (["ntfy", "token_env"], &self.ntfy_token_env),
+            (["discord", "webhook_url_env"], &self.discord_webhook_env),
+        ] {
+            if let Some(value) = value {
+                set(
+                    layer,
+                    &["notifiers", path[0], path[1]],
+                    value.clone().into(),
+                );
+            }
         }
-        if on(fangst_notify_ntfy::ID) {
-            let topic = self
-                .ntfy_topic
-                .clone()
-                .context("notify-ntfy needs --ntfy-topic")?;
-            let token = self.ntfy_token_env.as_deref().map(var).transpose()?;
-            notifiers.push(Arc::new(fangst_notify_ntfy::NtfyNotifier::new(
-                fangst_notify_ntfy::Settings {
-                    server: self.ntfy_url.clone(),
-                    topic,
-                    token,
-                    timeout,
-                },
-            )?));
-        }
-        if on(fangst_notify_discord::ID) {
-            let name = self
-                .discord_webhook_env
-                .as_deref()
-                .context("notify-discord needs --discord-webhook-env")?;
-            notifiers.push(Arc::new(fangst_notify_discord::DiscordNotifier::new(
-                &fangst_notify_discord::Settings {
-                    webhook_url: var(name)?,
-                    timeout,
-                },
-            )?));
-        }
-        Ok(notifiers
-            .into_iter()
-            .map(fangst_providers::Provider::Notifier)
-            .collect())
     }
+}
+
+/// The start-up banner. Tests and the browser smoke test read the first line for the address.
+fn announce(
+    addr: std::net::SocketAddr,
+    has_server: bool,
+    engine: Option<&fangst_torrent::Engine>,
+    registry: &fangst_providers::Registry,
+) {
+    println!("listening on {addr}");
+    if !has_server {
+        println!("no usenet server configured; usenet jobs will wait in the queue");
+    }
+    println!("{}", describe_torrents(engine));
+    println!("{}", describe_providers(registry));
 }
 
 fn describe_torrents(engine: Option<&fangst_torrent::Engine>) -> String {
@@ -545,18 +673,6 @@ async fn reset_password(args: ResetPasswordArgs) -> anyhow::Result<ExitCode> {
     Ok(ExitCode::SUCCESS)
 }
 
-fn placeholder_server() -> ServerConfig {
-    ServerConfig {
-        host: "localhost".to_owned(),
-        port: 0,
-        tls: None,
-        credentials: None,
-        max_connections: 1,
-        connect_timeout: Duration::from_secs(1),
-        command_timeout: Duration::from_secs(1),
-    }
-}
-
 fn openapi(args: &OpenapiArgs) -> anyhow::Result<ExitCode> {
     let generated = fangst_dl_api::openapi_json();
     if !args.check {
@@ -582,8 +698,36 @@ async fn get(args: GetArgs) -> anyhow::Result<ExitCode> {
         std::fs::read(&args.nzb).with_context(|| format!("reading {}", args.nzb.display()))?;
     let nzb = fangst_nzb::parse(&bytes, &fangst_nzb::Limits::default())
         .with_context(|| format!("parsing {}", args.nzb.display()))?;
-    let Some(pool) = args.usenet.pool()? else {
+    let Some(server) = args.usenet.server()? else {
         bail!("--host is required")
+    };
+    let mut layer = Table::new();
+    args.usenet.layer(&mut layer);
+    let defaults = Layers::new(Table::new(), Table::new(), layer)?
+        .resolve()?
+        .defaults
+        .usenet;
+    let tls = if server.tls.unwrap_or(defaults.tls) {
+        Some(fangst_nntp::native_tls_config()?)
+    } else {
+        None
+    };
+    let max_connections = server.connections.unwrap_or(defaults.connections);
+    let pool = Pool::new(ServerConfig {
+        host: server.host,
+        port: server.port.unwrap_or(defaults.port),
+        tls,
+        credentials: server
+            .username
+            .map(|u| (u, server.password.unwrap_or_default())),
+        max_connections,
+        connect_timeout: defaults.connect_timeout(),
+        command_timeout: defaults.command_timeout(),
+    });
+    let options = fangst_usenet::Options {
+        connections: max_connections,
+        pipeline_depth: defaults.pipeline,
+        retries: defaults.retries,
     };
     let progress: fangst_usenet::ProgressFn = Arc::new(|p: &Progress| {
         if p.file_finished() {
@@ -597,14 +741,8 @@ async fn get(args: GetArgs) -> anyhow::Result<ExitCode> {
         nzb.total_bytes(),
         args.out.display()
     );
-    let report = fangst_usenet::download(
-        &nzb,
-        &args.out,
-        Arc::new(pool),
-        args.usenet.options(),
-        progress,
-    )
-    .await?;
+    let report =
+        fangst_usenet::download(&nzb, &args.out, Arc::new(pool), options, progress).await?;
 
     for file in report.files.iter().filter(|f| !f.is_complete()) {
         if !file.missing_segments.is_empty() {
@@ -629,10 +767,13 @@ async fn get(args: GetArgs) -> anyhow::Result<ExitCode> {
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
+    use std::sync::Arc;
 
     use clap::Parser;
+    use fangst_core::config::{Layers, Table};
 
-    use super::{Cli, Command, ServeArgs, builtin_providers};
+    use super::{Cli, Command, ServeArgs, builtin_providers, with_required_providers};
+    use crate::settings;
 
     fn serve_args(flags: &[&str]) -> ServeArgs {
         let args = ["fangst-dl", "serve"].iter().chain(flags);
@@ -642,19 +783,34 @@ mod tests {
         }
     }
 
-    fn provider_ids(flags: &[&str], env: &[(&str, &str)]) -> anyhow::Result<Vec<String>> {
+    /// The providers `serve` would build from these flags and environment variables.
+    async fn provider_ids(flags: &[&str], env: &[(&str, &str)]) -> anyhow::Result<Vec<String>> {
         let args = serve_args(flags);
         let env: HashMap<String, String> = env
             .iter()
             .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
             .collect();
-        let providers = builtin_providers(
-            &args.notify,
-            &args.enabled_providers,
-            &fangst_core::defaults::Defaults::builtin().unwrap(),
-            |name| env.get(name).cloned(),
-        )?;
-        Ok(providers.iter().map(|p| p.info().id).collect())
+        let config = Layers::new(Table::new(), Table::new(), args.layer())?.resolve()?;
+        let dir = tempfile::tempdir()?;
+        let store = fangst_downloads::Store::open(&dir.path().join("downloads.db")).await?;
+        let key = fangst_core::secret::MasterKey::from_bytes(&[3; 32]);
+        let sources = settings::Sources {
+            secrets: fangst_downloads::Secrets::new(&store, Arc::new(key)),
+            env: Arc::new(move |name| env.get(name).cloned()),
+            extra_server: None,
+            required: with_required_providers(&args.enabled_providers),
+        };
+        let secrets = sources
+            .notifier_secrets(&config, &HashMap::new())
+            .await
+            .map_err(super::startup)?;
+        let notifiers = settings::build_notifiers(&config, &sources.enabled(&config), &secrets)?;
+        let mut ids: Vec<String> = builtin_providers(&config.defaults)
+            .iter()
+            .map(|p| p.info().id)
+            .collect();
+        ids.extend(notifiers.iter().map(|n| n.info().id));
+        Ok(ids)
     }
 
     const ALL_SETTINGS: &[&str] = &[
@@ -675,12 +831,12 @@ mod tests {
         ("DISCORD_URL", "https://discord.com/api/webhooks/1/secret"),
     ];
 
-    #[test]
-    fn notifier_settings_alone_build_no_notifier() {
+    #[tokio::test]
+    async fn notifier_settings_alone_build_no_notifier() {
         // Adapters and post-processors need no settings, so they're always compiled in; notifiers
         // only when enabled.
         assert_eq!(
-            provider_ids(ALL_SETTINGS, ALL_ENV).unwrap(),
+            provider_ids(ALL_SETTINGS, ALL_ENV).await.unwrap(),
             [
                 "adapter-sabnzbd",
                 "adapter-qbittorrent",
@@ -690,8 +846,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn each_enabled_notifier_is_built_from_its_settings() {
+    #[tokio::test]
+    async fn each_enabled_notifier_is_built_from_its_settings() {
         let mut flags = ALL_SETTINGS.to_vec();
         flags.extend([
             "--enable",
@@ -702,7 +858,7 @@ mod tests {
             "notify-webhook",
         ]);
         assert_eq!(
-            provider_ids(&flags, ALL_ENV).unwrap(),
+            provider_ids(&flags, ALL_ENV).await.unwrap(),
             [
                 "adapter-sabnzbd",
                 "adapter-qbittorrent",
@@ -714,7 +870,8 @@ mod tests {
             ]
         );
 
-        let ntfy_only = provider_ids(&["--ntfy-topic", "fangst", "--enable", "notify-ntfy"], &[]);
+        let ntfy_only =
+            provider_ids(&["--ntfy-topic", "fangst", "--enable", "notify-ntfy"], &[]).await;
         assert_eq!(
             ntfy_only.unwrap(),
             [
@@ -735,13 +892,7 @@ mod tests {
             "--enable",
             "postproc-safety",
         ]);
-        let available = builtin_providers(
-            &args.notify,
-            &args.enabled_providers,
-            &fangst_core::defaults::Defaults::builtin().unwrap(),
-            |_| None,
-        )
-        .unwrap();
+        let available = builtin_providers(&fangst_core::defaults::Defaults::builtin().unwrap());
         let registry =
             fangst_providers::Registry::build(available, &args.enabled_providers).unwrap();
         let order: Vec<String> = registry
@@ -752,20 +903,20 @@ mod tests {
         assert_eq!(order, ["postproc-safety", "postproc-extract"]);
     }
 
-    #[test]
-    fn enabled_notifier_without_settings_names_the_missing_flag() {
+    #[tokio::test]
+    async fn enabled_notifier_without_settings_names_the_missing_flag() {
         for (id, flag) in [
             ("notify-webhook", "--webhook-url"),
             ("notify-ntfy", "--ntfy-topic"),
             ("notify-discord", "--discord-webhook-env"),
         ] {
-            let err = provider_ids(&["--enable", id], &[]).unwrap_err();
+            let err = provider_ids(&["--enable", id], &[]).await.unwrap_err();
             assert!(err.to_string().contains(flag), "{id}: {err}");
         }
     }
 
-    #[test]
-    fn missing_environment_variable_is_named() {
+    #[tokio::test]
+    async fn missing_environment_variable_is_named() {
         let err = provider_ids(
             &[
                 "--discord-webhook-env",
@@ -775,16 +926,18 @@ mod tests {
             ],
             &[],
         )
+        .await
         .unwrap_err();
         assert!(err.to_string().contains("DISCORD_URL"), "{err}");
     }
 
-    #[test]
-    fn invalid_settings_stop_startup() {
+    #[tokio::test]
+    async fn invalid_settings_stop_startup() {
         let err = provider_ids(
             &["--ntfy-topic", "no spaces", "--enable", "notify-ntfy"],
             &[],
         )
+        .await
         .unwrap_err();
         assert!(err.to_string().contains("topic"), "{err}");
     }
@@ -793,6 +946,35 @@ mod tests {
     fn token_flags_need_their_setting() {
         let args = ["fangst-dl", "serve", "--ntfy-token-env", "NTFY_TOKEN"];
         assert!(Cli::try_parse_from(args).is_err());
+    }
+
+    #[test]
+    fn flags_become_the_top_settings_layer() {
+        let args = serve_args(&[
+            "--no-torrent",
+            "--torrent-port",
+            "7000",
+            "--listen",
+            "0.0.0.0:1",
+            "--pipeline",
+            "3",
+            "--ntfy-topic",
+            "t",
+        ]);
+        let mut file = Table::new();
+        fangst_core::config::insert_path(
+            &mut file,
+            &["torrent".to_owned(), "listen_port".to_owned()],
+            6000.into(),
+        );
+        let layers = Layers::new(file, Table::new(), args.layer()).unwrap();
+        let config = layers.resolve().unwrap();
+        assert!(!config.defaults.torrent.enabled);
+        assert_eq!(config.defaults.torrent.listen_port, 7000);
+        assert_eq!(config.defaults.http.listen, "0.0.0.0:1");
+        assert_eq!(config.defaults.usenet.pipeline, 3);
+        assert_eq!(config.settings.notifiers.ntfy.topic.as_deref(), Some("t"));
+        assert!(layers.locked().contains("torrent.listen_port"));
     }
 }
 

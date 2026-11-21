@@ -18,4 +18,4 @@ getrandom = "0.4.3"
 hmac = "0.13.0"
 serde = { version = "1.0.229", features = ["derive"] }
 sha2 = "0.11.1"
-toml = { version = "0.9.12", default-features = false, features = ["parse", "serde"] }
+toml = { version = "0.9.12", default-features = false, features = ["display", "parse", "serde"] }

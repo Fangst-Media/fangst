@@ -804,6 +804,101 @@
           }
         }
       }
+    },
+    "/api/v1/settings": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "operationId": "get_settings",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is not the owner",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "description": "Replaces every setting. Servers, categories, notifiers and adapters change at once; the response says what waits for a restart. Passwords and tokens left out or `null` stay as stored.",
+        "operationId": "put_settings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedSettings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A setting is invalid or set by the environment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is not the owner",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -866,6 +961,24 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "CategorySettings": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "folder": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Folder for the category's new jobs; relative paths are inside the downloads folder."
+          },
+          "name": {
+            "type": "string"
           }
         }
       },
@@ -949,6 +1062,33 @@
         ],
         "description": "A message on the event stream."
       },
+      "DiscordSettings": {
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "has_webhook_url": {
+            "type": "boolean"
+          },
+          "webhook_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Write-only, since the URL carries the token that lets anyone post. `\"\"` removes it."
+          },
+          "webhook_url_env": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "EventDto": {
         "type": "object",
         "required": [
@@ -967,6 +1107,25 @@
           },
           "message": {
             "type": "string"
+          }
+        }
+      },
+      "FolderSettings": {
+        "type": "object",
+        "required": [
+          "downloads"
+        ],
+        "properties": {
+          "downloads": {
+            "type": "string",
+            "description": "Where jobs download to. Relative paths are inside the data folder. Takes a restart."
+          },
+          "media": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The media library the downloads are moved or linked into, if any."
           }
         }
       },
@@ -1103,6 +1262,65 @@
           }
         }
       },
+      "NotifierSettings": {
+        "type": "object",
+        "required": [
+          "webhook",
+          "ntfy",
+          "discord"
+        ],
+        "properties": {
+          "discord": {
+            "$ref": "#/components/schemas/DiscordSettings"
+          },
+          "ntfy": {
+            "$ref": "#/components/schemas/NtfySettings"
+          },
+          "webhook": {
+            "$ref": "#/components/schemas/WebhookSettings"
+          }
+        }
+      },
+      "NtfySettings": {
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "has_token": {
+            "type": "boolean"
+          },
+          "server": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`null` for the default server."
+          },
+          "token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Write-only access token for protected topics. `\"\"` removes it."
+          },
+          "token_env": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "topic": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "PasswordChange": {
         "type": "object",
         "required": [
@@ -1118,6 +1336,135 @@
           },
           "new_password": {
             "type": "string"
+          }
+        }
+      },
+      "ProviderSettings": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "enabled"
+        ],
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "description": "`api_adapter` or `post_processor`."
+          },
+          "required": {
+            "type": "boolean",
+            "description": "Read-only: on whatever the request says, because the daemon or a flag needs it."
+          }
+        }
+      },
+      "SavedSettings": {
+        "type": "object",
+        "required": [
+          "settings",
+          "restart_required",
+          "restart_reasons"
+        ],
+        "properties": {
+          "restart_reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What waits for the restart, in words."
+          },
+          "restart_required": {
+            "type": "boolean",
+            "description": "Some changes only take effect after the daemon restarts."
+          },
+          "settings": {
+            "$ref": "#/components/schemas/SettingsDto"
+          }
+        }
+      },
+      "ServerSettings": {
+        "type": "object",
+        "required": [
+          "name",
+          "host",
+          "port",
+          "tls",
+          "connections",
+          "enabled"
+        ],
+        "properties": {
+          "backfill": {
+            "type": "boolean",
+            "description": "Only asked for segments every primary server is missing."
+          },
+          "connections": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "has_password": {
+            "type": "boolean",
+            "description": "Read-only: whether a password is stored or comes from `password_env`."
+          },
+          "host": {
+            "type": "string"
+          },
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Keeps the stored password with the server across renames. `null` for a new server."
+          },
+          "name": {
+            "type": "string"
+          },
+          "password": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Write-only. Leave out or `null` to keep the stored password, `\"\"` to remove it."
+          },
+          "password_env": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Environment variable to read the password from instead."
+          },
+          "port": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "priority": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Lower is tried first."
+          },
+          "source": {
+            "$ref": "#/components/schemas/SettingSource",
+            "description": "Read-only. Servers not from the file can't be changed here and are ignored in requests."
+          },
+          "tls": {
+            "type": "boolean"
+          },
+          "username": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -1192,6 +1539,64 @@
           }
         }
       },
+      "SettingSource": {
+        "type": "string",
+        "enum": [
+          "file",
+          "environment",
+          "flags"
+        ]
+      },
+      "SettingsDto": {
+        "type": "object",
+        "description": "Every setting the web UI manages.",
+        "required": [
+          "folders",
+          "servers",
+          "categories",
+          "notifiers",
+          "torrent",
+          "providers"
+        ],
+        "properties": {
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CategorySettings"
+            }
+          },
+          "folders": {
+            "$ref": "#/components/schemas/FolderSettings"
+          },
+          "locked": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Dotted names, such as `torrent.listen_port`, of settings an environment variable or a\ncommand-line flag sets. Ignored in requests; a request that changes one is refused."
+          },
+          "notifiers": {
+            "$ref": "#/components/schemas/NotifierSettings"
+          },
+          "providers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProviderSettings"
+            },
+            "description": "Adapters and post-processors; notifiers are switched on under `notifiers`."
+          },
+          "servers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ServerSettings"
+            },
+            "description": "In the order they are tried; `priority` sorts them first."
+          },
+          "torrent": {
+            "$ref": "#/components/schemas/TorrentSettings"
+          }
+        }
+      },
       "TorrentFileDto": {
         "type": "object",
         "required": [
@@ -1207,6 +1612,67 @@
           "path": {
             "type": "string",
             "description": "Relative to the job folder, with `/` between folders."
+          }
+        }
+      },
+      "TorrentSettings": {
+        "type": "object",
+        "description": "The torrent engine. Every change here takes a restart.",
+        "required": [
+          "enabled",
+          "listen_port",
+          "dht",
+          "local_discovery",
+          "upnp",
+          "max_active"
+        ],
+        "properties": {
+          "announce_port": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "`null` to announce `listen_port`.",
+            "minimum": 0
+          },
+          "dht": {
+            "type": "boolean"
+          },
+          "download_limit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Bytes per second; `null` for no limit.",
+            "minimum": 0
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "listen_port": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "local_discovery": {
+            "type": "boolean"
+          },
+          "max_active": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "upload_limit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          },
+          "upnp": {
+            "type": "boolean"
           }
         }
       },
@@ -1276,6 +1742,40 @@
           },
           "username": {
             "type": "string"
+          }
+        }
+      },
+      "WebhookSettings": {
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "has_token": {
+            "type": "boolean"
+          },
+          "token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Write-only bearer token. Leave out or `null` to keep it, `\"\"` to remove it."
+          },
+          "token_env": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`http` or `https`; every event is posted to it as JSON."
           }
         }
       }

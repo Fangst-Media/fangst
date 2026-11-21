@@ -90,24 +90,37 @@ fn send(notifications: &Notifications, store: &Store, job: Option<i64>, event: &
 }
 
 /// Checks free space in `root` forever, announcing each drop below the threshold once.
-pub(crate) async fn watch_disk(notifications: Arc<Notifications>, store: Store, root: PathBuf) {
-    if notifications.notifiers.is_empty() {
-        return std::future::pending().await;
-    }
+/// Follows `notifications` as settings replace them, and waits while there are no notifiers.
+pub(crate) async fn watch_disk(
+    mut notifications: tokio::sync::watch::Receiver<Arc<Notifications>>,
+    store: Store,
+    root: PathBuf,
+) {
     let mut crossing = Crossing::default();
     loop {
+        let current = Arc::clone(&notifications.borrow_and_update());
+        if current.notifiers.is_empty() {
+            if notifications.changed().await.is_err() {
+                return std::future::pending().await;
+            }
+            continue;
+        }
+        let notifications_now = current;
         let measured = root.clone();
         let free = tokio::task::spawn_blocking(move || free_space(&measured)).await;
         if let Ok(Some(free)) = free
-            && crossing.observe(free, notifications.min_free_bytes)
+            && crossing.observe(free, notifications_now.min_free_bytes)
         {
             let event = NotificationEvent::DiskFull {
                 path: root.clone(),
                 free_bytes: free,
             };
-            send(&notifications, &store, None, &event);
+            send(&notifications_now, &store, None, &event);
         }
-        tokio::time::sleep(notifications.disk_check_interval).await;
+        tokio::select! {
+            () = tokio::time::sleep(notifications_now.disk_check_interval) => {}
+            _ = notifications.changed() => {}
+        }
     }
 }
 

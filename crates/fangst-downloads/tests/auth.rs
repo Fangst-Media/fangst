@@ -273,3 +273,15 @@ async fn auth_password_checks_past_the_limit_are_refused_not_queued() {
         "slots come back once checks finish"
     );
 }
+
+#[tokio::test]
+async fn only_the_first_user_is_the_owner() {
+    let s = setup().await;
+    let auth = Auth::new(&s.store, s.key.clone()).await.unwrap();
+    assert_eq!(auth.owner().await.unwrap(), None);
+    let admin = auth.bootstrap("first-environment-key").await.unwrap();
+    let other = auth.create_user("someone", None).await.unwrap();
+    assert_eq!(auth.owner().await.unwrap(), Some(admin.clone()));
+    assert!(auth.is_owner(admin.id).await.unwrap());
+    assert!(!auth.is_owner(other.id).await.unwrap());
+}
