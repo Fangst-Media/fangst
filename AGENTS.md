@@ -25,6 +25,8 @@ Commands marked "planned" arrive with the issue named; until then they do not ex
 | Fast gate (while coding) | `just check`: fmt, clippy, tests, TypeScript typecheck and Biome lint |
 | Full gate (before every commit and merge) | `just check-full`: adds `layercheck`, `cargo deny`, regenerate-and-diff (empty so far), changeset check |
 | Layer rules only | `just layercheck` (layer map in `layers.toml`) |
+| Run the download daemon | `FANGST_API_KEY=<16+ chars> cargo run -p fangst-dl -- serve --data-dir data --host news.example.com` (API on 127.0.0.1:7740; without `--host` jobs wait in the queue) |
+| Update the OpenAPI document | `just openapi` after changing an API route or type; `openapi/dl.json` is committed and the gate fails when it drifts |
 | Tests | `just test` (`cargo nextest run --workspace`) |
 | Add a changeset | `changesetter add --package fangst-core --bump patch --type fix -m "What changed, for users"` (`--no-bump` for tooling, docs and tests; `--bump minor` for new features). Packages share one version, so any package in the group works |
 | Web app | `just web-dev` (Vite with hot refresh on :5173, proxies `/api` to :5001), `just web-build` (production build into `web/dist`, part of the full gate) |
@@ -48,7 +50,7 @@ CI (`.github/workflows/check.yml`) runs `just check-full` on Linux, macOS and Wi
 2. **Native API first, adapters at the edge.** Fangst's own API is designed for Fangst. qBittorrent, SABnzbd and Sonarr/Radarr compatibility live in `fangst-adapter-*` crates that only translate onto the public operations of one service. An adapter holds no business logic and no state beyond ID mapping. If an adapter needs something the native API can't express, fix the service so the native API gains it too.
 3. **Providers for every extension point.** Traits live in `fangst-providers`; each built-in implementation is its own crate. Provider traits take and return plain serde data, never Rust handles or callbacks, so a WebAssembly component can implement them later.
 4. **Separate storage.** Each service owns its own database file. No service reads another service's tables.
-5. **Removable parts.** Every optional provider and adapter can be switched off in config. `just check-full` starts each binary with all of them off and fails if it doesn't come up healthy (added with the first long-running binary, #14).
+5. **Removable parts.** Every optional provider and adapter can be switched off in config. The full gate boots each binary with all of them off and fails if it doesn't come up healthy (`crates/fangst-dl/tests/serve.rs`).
 6. **No magic numbers.** Tunables (connections, timeouts, backoff, seeding defaults) live in one defaults file, `crates/fangst-core/defaults.toml`, documented in `TUNING.md` at the repo root.
 7. **Untrusted input at the edge.** NZB files, torrent metadata, adapter request parameters and file paths are validated where they enter. Paths stay inside configured roots; `..` and links that point outside are refused. Extraction never writes outside the job folder and blocks executables.
 

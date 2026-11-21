@@ -1,0 +1,2 @@
+# Product names that are words in docs, not code identifiers. ".." keeps clippy's built-in list.
+doc-valid-idents = ["OpenAPI", "WebSocket", "SABnzbd", "qBittorrent", ".."]
