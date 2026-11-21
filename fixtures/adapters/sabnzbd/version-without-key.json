@@ -1,0 +1,14 @@
+{
+  "source": "derived",
+  "client": "holyarrs",
+  "note": "HolyArrs' health check sends no key; SABnzbd answers version without one.",
+  "request": {
+    "method": "GET",
+    "query": [["mode", "version"], ["output", "json"]]
+  },
+  "response": {
+    "status": 200,
+    "content_type": "json",
+    "body": { "version": "4.5.5" }
+  }
+}

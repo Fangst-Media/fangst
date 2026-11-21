@@ -1,0 +1,29 @@
+{
+  "source": "derived",
+  "client": "sonarr",
+  "note": "Sonarr POSTs one multipart part named `name` with the release title as file name; cat and priority ride in the query, -100 meaning the category default. It reads nzo_ids[0].",
+  "request": {
+    "method": "POST",
+    "query": [
+      ["mode", "addfile"],
+      ["cat", "tv"],
+      ["priority", "-100"],
+      ["apikey", "fixture-api-key-0000"],
+      ["output", "json"]
+    ],
+    "headers": [["content-type", "multipart/form-data; boundary=\"sonarr-boundary-1\""]],
+    "body": "--sonarr-boundary-1\r\nContent-Disposition: form-data; name=\"name\"; filename=\"TV.Show.S04E13.720p.HDTV.x264.nzb\"\r\nContent-Type: application/x-nzb\r\n\r\n<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<nzb xmlns=\"http://www.newzbin.com/DTD/2003/nzb\"></nzb>\r\n--sonarr-boundary-1--\r\n"
+  },
+  "response": {
+    "status": 200,
+    "content_type": "json",
+    "body": { "status": true, "nzo_ids": ["SABnzbd_nzo_6"] }
+  },
+  "exact": ["/status", "/nzo_ids/0"],
+  "added": {
+    "name": "TV.Show.S04E13.720p.HDTV.x264",
+    "category": "tv",
+    "priority": 0,
+    "status": "queued"
+  }
+}

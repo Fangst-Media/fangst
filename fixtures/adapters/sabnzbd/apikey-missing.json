@@ -1,0 +1,14 @@
+{
+  "source": "derived",
+  "client": "sonarr",
+  "note": "SABnzbd 3.7+ answers 403 with bare text whatever output asks for (interface.py check_apikey).",
+  "request": {
+    "method": "GET",
+    "query": [["mode", "queue"], ["start", "0"], ["limit", "0"], ["output", "json"]]
+  },
+  "response": {
+    "status": 403,
+    "content_type": "text",
+    "body": "API Key Required"
+  }
+}

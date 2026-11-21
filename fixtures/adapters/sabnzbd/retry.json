@@ -1,0 +1,21 @@
+{
+  "source": "derived",
+  "client": "holyarrs",
+  "note": "Retry a failed job. SABnzbd gives the retried job a new nzo_id; Fangst resumes it in place, so the id stays.",
+  "request": {
+    "method": "GET",
+    "query": [
+      ["apikey", "fixture-api-key-0000"],
+      ["mode", "retry"],
+      ["output", "json"],
+      ["value", "SABnzbd_nzo_5"]
+    ]
+  },
+  "response": {
+    "status": 200,
+    "content_type": "json",
+    "body": { "status": true, "nzo_id": "SABnzbd_nzo_5" }
+  },
+  "exact": ["/status", "/nzo_id"],
+  "statuses": { "5": "queued" }
+}

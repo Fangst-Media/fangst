@@ -1049,6 +1049,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "fangst-adapter-sabnzbd"
+version = "0.1.0"
+dependencies = [
+ "fangst-providers",
+ "form_urlencoded",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "fangst-bench"
 version = "0.1.0"
 dependencies = [
@@ -1080,6 +1091,7 @@ dependencies = [
  "anyhow",
  "axum",
  "clap",
+ "fangst-adapter-sabnzbd",
  "fangst-bench",
  "fangst-core",
  "fangst-dl-api",
@@ -1104,9 +1116,12 @@ dependencies = [
  "fangst-core",
  "fangst-downloads",
  "fangst-nntp",
+ "fangst-providers",
  "fangst-usenet",
+ "form_urlencoded",
  "futures-util",
  "http-body-util",
+ "reqwest",
  "serde",
  "serde_json",
  "tempfile",

@@ -1,0 +1,34 @@
+{
+  "source": "derived",
+  "client": "holyarrs",
+  "note": "HolyArrs reads only the categories section, for name and dir.",
+  "request": {
+    "method": "GET",
+    "query": [
+      ["apikey", "fixture-api-key-0000"],
+      ["mode", "get_config"],
+      ["output", "json"],
+      ["section", "categories"]
+    ]
+  },
+  "response": {
+    "status": 200,
+    "content_type": "json",
+    "body": {
+      "config": {
+        "categories": [
+          {
+            "name": "*",
+            "order": 0,
+            "pp": "3",
+            "script": "None",
+            "dir": "",
+            "newzbin": "",
+            "priority": 0
+          }
+        ]
+      }
+    }
+  },
+  "exact": ["/config/categories/0/name"]
+}

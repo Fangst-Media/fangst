@@ -1,0 +1,15 @@
+{
+  "source": "derived",
+  "client": "holyarrs",
+  "note": "Modes Fangst does not implement answer like an unknown mode in SABnzbd, after the key check.",
+  "request": {
+    "method": "GET",
+    "query": [["apikey", "fixture-api-key-0000"], ["mode", "server_stats"], ["output", "json"]]
+  },
+  "response": {
+    "status": 200,
+    "content_type": "json",
+    "body": { "status": false, "error": "not implemented" }
+  },
+  "exact": ["/status", "/error"]
+}

@@ -1,0 +1,14 @@
+{
+  "source": "derived",
+  "client": "sonarr",
+  "note": "Sonarr's second test step, get_config, with a wrong key.",
+  "request": {
+    "method": "GET",
+    "query": [["mode", "get_config"], ["apikey", "not-the-key"], ["output", "json"]]
+  },
+  "response": {
+    "status": 403,
+    "content_type": "text",
+    "body": "API Key Incorrect"
+  }
+}

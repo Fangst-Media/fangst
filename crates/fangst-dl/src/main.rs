@@ -237,7 +237,13 @@ async fn serve(args: ServeArgs) -> anyhow::Result<ExitCode> {
         secure_cookie: args.secure_cookie,
         ..fangst_dl_api::AuthSettings::default()
     };
-    let app = fangst_dl_api::router(service.clone(), auth, settings);
+    let app = fangst_dl_api::router_with_adapters(
+        service.clone(),
+        auth,
+        settings,
+        fangst_dl_api::FetchLimits::default(),
+        &registry.adapters,
+    );
     let worker = has_server.then(|| {
         let service = service.clone();
         tokio::spawn(async move { service.run().await })
@@ -265,7 +271,11 @@ fn builtin_providers(
     timeout: Duration,
     env: impl Fn(&str) -> Option<String>,
 ) -> anyhow::Result<Vec<fangst_providers::Provider>> {
-    notify.providers(enabled, timeout, env)
+    let mut providers = vec![fangst_providers::Provider::ApiAdapter(Arc::new(
+        fangst_adapter_sabnzbd::Sabnzbd,
+    ))];
+    providers.extend(notify.providers(enabled, timeout, env)?);
+    Ok(providers)
 }
 
 /// Notifier settings until the config file arrives (#31). Secrets are read from environment
@@ -541,8 +551,12 @@ mod tests {
     ];
 
     #[test]
-    fn settings_alone_build_nothing() {
-        assert!(provider_ids(ALL_SETTINGS, ALL_ENV).unwrap().is_empty());
+    fn notifier_settings_alone_build_no_notifier() {
+        // The SABnzbd adapter needs no settings, so it's always compiled in; notifiers only when enabled.
+        assert_eq!(
+            provider_ids(ALL_SETTINGS, ALL_ENV).unwrap(),
+            ["adapter-sabnzbd"]
+        );
     }
 
     #[test]
@@ -558,11 +572,16 @@ mod tests {
         ]);
         assert_eq!(
             provider_ids(&flags, ALL_ENV).unwrap(),
-            ["notify-webhook", "notify-ntfy", "notify-discord"]
+            [
+                "adapter-sabnzbd",
+                "notify-webhook",
+                "notify-ntfy",
+                "notify-discord"
+            ]
         );
 
         let ntfy_only = provider_ids(&["--ntfy-topic", "fangst", "--enable", "notify-ntfy"], &[]);
-        assert_eq!(ntfy_only.unwrap(), ["notify-ntfy"]);
+        assert_eq!(ntfy_only.unwrap(), ["adapter-sabnzbd", "notify-ntfy"]);
     }
 
     #[test]

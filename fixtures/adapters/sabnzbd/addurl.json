@@ -1,0 +1,28 @@
+{
+  "source": "derived",
+  "client": "holyarrs",
+  "note": "HolyArrs uses addurl when it has no NZB bytes: GET with the URL in `name`. Only HolyArrs calls this mode.",
+  "request": {
+    "method": "GET",
+    "query": [
+      ["apikey", "fixture-api-key-0000"],
+      ["cat", "tv"],
+      ["mode", "addurl"],
+      ["name", "http://indexer.lan:9696/api?t=get&id=abc"],
+      ["nzbname", "TV.Show.S04E14.720p.HDTV.x264"],
+      ["output", "json"]
+    ]
+  },
+  "response": {
+    "status": 200,
+    "content_type": "json",
+    "body": { "status": true, "nzo_ids": ["SABnzbd_nzo_6"] }
+  },
+  "exact": ["/status", "/nzo_ids/0"],
+  "added": {
+    "name": "TV.Show.S04E14.720p.HDTV.x264",
+    "category": "tv",
+    "priority": 0,
+    "status": "queued"
+  }
+}

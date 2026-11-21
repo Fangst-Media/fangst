@@ -4,6 +4,16 @@ export type ClientOptions = {
     baseUrl: `${string}://${string}` | (string & {});
 };
 
+/**
+ * An NZB for the daemon to download itself.
+ */
+export type AddJobUrl = {
+    /**
+     * `http` or `https`; redirects are followed only to `http` and `https`.
+     */
+    url: string;
+};
+
 export type ApiError = {
     error: string;
 };
@@ -238,9 +248,9 @@ export type ListJobsResponse = ListJobsResponses[keyof ListJobsResponses];
 
 export type AddJobData = {
     /**
-     * The NZB file
+     * The NZB file, or JSON naming a URL to fetch it from. Without `name` the job is named after the NZB's title, then the file name in the URL.
      */
-    body: Array<number>;
+    body: AddJobUrl;
     path?: never;
     query?: {
         /**
@@ -257,8 +267,19 @@ export type AddJobData = {
 };
 
 export type AddJobErrors = {
+    /**
+     * The URL is invalid or not http(s)
+     */
+    400: ApiError;
     401: ApiError;
+    /**
+     * Not a valid NZB, or the fetched NZB is too large
+     */
     422: ApiError;
+    /**
+     * The URL could not be fetched
+     */
+    502: ApiError;
 };
 
 export type AddJobError = AddJobErrors[keyof AddJobErrors];

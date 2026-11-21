@@ -1,0 +1,22 @@
+{
+  "source": "derived",
+  "client": "sonarr",
+  "note": "SABnzbd's answer when addfile carries no upload in `name` or `nzbfile`.",
+  "request": {
+    "method": "POST",
+    "query": [
+      ["mode", "addfile"],
+      ["cat", "tv"],
+      ["apikey", "fixture-api-key-0000"],
+      ["output", "json"]
+    ],
+    "headers": [["content-type", "multipart/form-data; boundary=b"]],
+    "body": "--b\r\nContent-Disposition: form-data; name=\"other\"; filename=\"x.nzb\"\r\n\r\n<nzb></nzb>\r\n--b--\r\n"
+  },
+  "response": {
+    "status": 200,
+    "content_type": "json",
+    "body": { "status": false, "error": "expects one parameter" }
+  },
+  "exact": ["/status", "/error"]
+}

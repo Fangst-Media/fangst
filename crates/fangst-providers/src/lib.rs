@@ -179,10 +179,14 @@ impl HttpResponse {
 /// Job operations an adapter translates onto. Implemented by the download service.
 pub trait Jobs: Send + Sync {
     fn add_nzb(&self, request: AddNzb) -> BoxFuture<Result<JobSummary, ProviderError>>;
+    /// Fetches an NZB over HTTP(S) and queues it.
+    fn add_nzb_url(&self, request: AddNzbUrl) -> BoxFuture<Result<JobSummary, ProviderError>>;
     fn list(&self) -> BoxFuture<Result<Vec<JobSummary>, ProviderError>>;
     fn pause(&self, job_id: i64) -> BoxFuture<Result<JobSummary, ProviderError>>;
     fn resume(&self, job_id: i64) -> BoxFuture<Result<JobSummary, ProviderError>>;
     fn delete(&self, job_id: i64, delete_files: bool) -> BoxFuture<Result<(), ProviderError>>;
+    /// The absolute folder job folders are created in; protocols report it as their output folder.
+    fn download_root(&self) -> PathBuf;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -194,12 +198,24 @@ pub struct AddNzb {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AddNzbUrl {
+    /// `http` or `https` only.
+    pub url: String,
+    /// Defaults to the NZB's title, then to the file name in the URL.
+    pub name: Option<String>,
+    pub category: Option<String>,
+    pub priority: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct JobSummary {
     pub id: i64,
     /// `usenet` or `torrent`.
     pub kind: String,
     pub name: String,
     pub category: Option<String>,
+    /// Higher runs first.
+    pub priority: i64,
     /// `queued`, `downloading`, `paused`, `completed` or `failed`.
     pub status: String,
     pub error: Option<String>,
@@ -209,12 +225,28 @@ pub struct JobSummary {
     pub finished_at: Option<i64>,
 }
 
+/// What a request to an adapter carries to prove who sent it, read from wherever the protocol
+/// puts it. The daemon checks an API key against the same user keys as its own API.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", content = "value", rename_all = "snake_case")]
+pub enum Credential {
+    /// The protocol answers this request without a credential, such as a version probe.
+    NotNeeded,
+    ApiKey(String),
+    Missing,
+}
+
 /// Speaks another product's API (qBittorrent, SABnzbd, Sonarr) by translating onto [`Jobs`].
 /// Adapters hold no business logic and no state beyond ID mapping.
 pub trait ApiAdapter: Send + Sync {
     fn info(&self) -> ProviderInfo;
     /// Where the adapter's routes live, e.g. `/api` for SABnzbd. Starts with `/`, no trailing `/`.
+    /// The daemon routes the path itself and everything below it, except its own `/api/v1`.
     fn mount_path(&self) -> String;
+    /// Looked at before [`ApiAdapter::handle`]; only requests that pass reach it.
+    fn credential(&self, request: &HttpRequest) -> Credential;
+    /// The protocol's own answer to a request whose key is missing (`missing`) or wrong.
+    fn rejected(&self, request: &HttpRequest, missing: bool) -> HttpResponse;
     fn handle(
         &self,
         request: HttpRequest,

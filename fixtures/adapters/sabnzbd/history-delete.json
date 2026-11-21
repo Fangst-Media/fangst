@@ -1,0 +1,24 @@
+{
+  "source": "derived",
+  "client": "sonarr",
+  "note": "Sonarr removes a finished job from history with archive=1 (0 for failed ones). Fangst keeps no archive, so both remove the job.",
+  "request": {
+    "method": "GET",
+    "query": [
+      ["mode", "history"],
+      ["name", "delete"],
+      ["del_files", "0"],
+      ["value", "SABnzbd_nzo_4"],
+      ["archive", "1"],
+      ["apikey", "fixture-api-key-0000"],
+      ["output", "json"]
+    ]
+  },
+  "response": {
+    "status": 200,
+    "content_type": "json",
+    "body": { "status": true }
+  },
+  "exact": ["/status"],
+  "gone": [4]
+}

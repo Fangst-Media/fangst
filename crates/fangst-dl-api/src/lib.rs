@@ -7,10 +7,13 @@
 
 use std::sync::Arc;
 
+mod adapters;
 mod auth;
+mod fetch;
 mod limit;
 
 pub use auth::{AuthSettings, LoginRequest, PasswordChange, UserDto};
+pub use fetch::FetchLimits;
 pub use limit::LoginLimits;
 
 use axum::Json;
@@ -34,13 +37,14 @@ struct ApiState {
     auth: Auth,
     settings: Arc<AuthSettings>,
     limiter: Arc<limit::Limiter>,
+    jobs: adapters::ServiceJobs,
 }
 
 #[derive(OpenApi)]
 #[openapi(
     info(title = "Fangst download daemon", description = "Native API of fangst-dl."),
     paths(health, auth::login, auth::logout, auth::me, auth::change_password, list_jobs, add_job, get_job, pause_job, resume_job, delete_job, job_timeline, events, test_server),
-    components(schemas(Health, JobDto, EventDto, ApiError, ChangeDto, JobStatus, JobKind, ServerTestRequest, ServerTestResult, UserDto, LoginRequest, PasswordChange)),
+    components(schemas(Health, JobDto, EventDto, ApiError, ChangeDto, JobStatus, JobKind, AddJobUrl, ServerTestRequest, ServerTestResult, UserDto, LoginRequest, PasswordChange)),
     modifiers(&ApiKeyScheme),
     security(("api_key" = []), ("session" = []))
 )]
@@ -81,7 +85,23 @@ pub fn openapi_json() -> String {
 /// Serve it with `into_make_service_with_connect_info::<SocketAddr>()`; without the client address
 /// every caller shares one login rate limit.
 pub fn router(service: Service, auth: Auth, settings: AuthSettings) -> Router {
+    router_with_adapters(service, auth, settings, FetchLimits::default(), &[])
+}
+
+/// [`router`] plus each enabled API adapter at its mount path. Adapter requests authenticate
+/// with the adapter's own credential, checked against the same user API keys.
+pub fn router_with_adapters(
+    service: Service,
+    auth: Auth,
+    settings: AuthSettings,
+    fetch: FetchLimits,
+    adapters: &[Arc<dyn fangst_providers::ApiAdapter>],
+) -> Router {
     let state = ApiState {
+        jobs: adapters::ServiceJobs {
+            service: service.clone(),
+            fetcher: fetch::Fetcher::new(fetch),
+        },
         service,
         auth,
         limiter: Arc::new(limit::Limiter::new(settings.login)),
@@ -106,12 +126,21 @@ pub fn router(service: Service, auth: Auth, settings: AuthSettings) -> Router {
             state.clone(),
             auth::require_user,
         ));
-    Router::new()
+    let mut app = Router::new()
         .route("/api/v1/health", get(health))
         .route("/api/v1/auth/login", post(auth::login))
         .route("/api/v1/auth/logout", post(auth::logout))
-        .merge(protected)
-        .with_state(state)
+        // Keeps unknown native paths native when an adapter is mounted at `/api`.
+        .route("/api/v1/{*rest}", axum::routing::any(not_found))
+        .merge(protected);
+    for adapter in adapters {
+        app = adapters::mount(app, adapter);
+    }
+    app.with_state(state)
+}
+
+async fn not_found() -> Response {
+    error(StatusCode::NOT_FOUND, "no such route")
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
@@ -289,29 +318,62 @@ struct AddJobQuery {
     priority: Option<i64>,
 }
 
+/// An NZB for the daemon to download itself.
+#[derive(Deserialize, Serialize, ToSchema)]
+pub struct AddJobUrl {
+    /// `http` or `https`; redirects are followed only to `http` and `https`.
+    pub url: String,
+}
+
 #[utoipa::path(
     post,
     path = "/api/v1/jobs",
     params(AddJobQuery),
-    request_body(content = Vec<u8>, content_type = "application/x-nzb", description = "The NZB file"),
-    responses((status = 201, body = JobDto), (status = 422, body = ApiError), (status = 401, body = ApiError))
+    request_body(
+        description = "The NZB file, or JSON naming a URL to fetch it from. Without `name` the job is named after the NZB's title, then the file name in the URL.",
+        content(
+            (AddJobUrl = "application/json"),
+            (Vec<u8> = "application/x-nzb")
+        )
+    ),
+    responses(
+        (status = 201, body = JobDto),
+        (status = 400, body = ApiError, description = "The URL is invalid or not http(s)"),
+        (status = 401, body = ApiError),
+        (status = 422, body = ApiError, description = "Not a valid NZB, or the fetched NZB is too large"),
+        (status = 502, body = ApiError, description = "The URL could not be fetched")
+    )
 )]
 async fn add_job(
     State(state): State<ApiState>,
     Query(query): Query<AddJobQuery>,
+    headers: HeaderMap,
     body: axum::body::Bytes,
 ) -> Response {
+    let is_json = headers
+        .get(axum::http::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|v| v.trim_start().starts_with("application/json"));
+    let (nzb, file_name) = if is_json {
+        match fetch_for_job(&state, &body).await {
+            Ok(fetched) => (fetched.bytes, fetched.file_name),
+            Err(response) => return *response,
+        }
+    } else {
+        (body.to_vec(), None)
+    };
     let name = query
         .name
-        .clone()
-        .unwrap_or_else(|| fangst_nzb_title(&body).unwrap_or_else(|| "Untitled".to_owned()));
+        .or_else(|| fangst_nzb_title(&nzb))
+        .or(file_name)
+        .unwrap_or_else(|| "Untitled".to_owned());
     let added = state
         .service
         .add_nzb(
             &name,
             query.category.as_deref(),
             query.priority.unwrap_or(0),
-            &body,
+            &nzb,
         )
         .await;
     match added {
@@ -323,7 +385,24 @@ async fn add_job(
     }
 }
 
-fn fangst_nzb_title(body: &[u8]) -> Option<String> {
+async fn fetch_for_job(state: &ApiState, body: &[u8]) -> Result<fetch::Fetched, Box<Response>> {
+    let request: AddJobUrl = serde_json::from_slice(body).map_err(|e| {
+        Box::new(error(
+            StatusCode::BAD_REQUEST,
+            format!("invalid JSON body: {e}"),
+        ))
+    })?;
+    state.jobs.fetcher.fetch(&request.url).await.map_err(|e| {
+        let status = match e {
+            fetch::FetchError::InvalidUrl(_) => StatusCode::BAD_REQUEST,
+            fetch::FetchError::TooLarge(_) => StatusCode::UNPROCESSABLE_ENTITY,
+            fetch::FetchError::Status(_) | fetch::FetchError::Network(_) => StatusCode::BAD_GATEWAY,
+        };
+        Box::new(error(status, e.to_string()))
+    })
+}
+
+pub(crate) fn fangst_nzb_title(body: &[u8]) -> Option<String> {
     let text = String::from_utf8_lossy(body);
     let start = text.find("type=\"title\">")? + "type=\"title\">".len();
     let end = text[start..].find("</meta>")?;

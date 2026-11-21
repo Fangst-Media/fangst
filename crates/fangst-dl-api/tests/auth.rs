@@ -58,6 +58,8 @@ async fn harness_with_hash_slots(slots: usize) -> Harness {
     let settings = AuthSettings {
         login: LoginLimits {
             free_attempts: 3,
+            // Long enough that a slow CI runner never sees the wait run out between two requests.
+            base_delay: std::time::Duration::from_mins(1),
             ..LoginLimits::default()
         },
         ..AuthSettings::default()
@@ -284,7 +286,7 @@ async fn auth_brute_force_login_is_rate_limited() {
     );
     let blocked = login(&h, "admin", PASSWORD, attacker).await;
     assert_eq!(blocked.status, StatusCode::TOO_MANY_REQUESTS);
-    assert_eq!(blocked.retry_after.as_deref(), Some("1"));
+    assert_eq!(blocked.retry_after.as_deref(), Some("60"));
     assert!(
         blocked.set_cookie.is_none(),
         "even the right password waits"

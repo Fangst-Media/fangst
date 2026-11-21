@@ -1,0 +1,15 @@
+{
+  "source": "derived",
+  "client": "holyarrs",
+  "note": "HolyArrs checks the category exists before every add. `*` is the default category and comes first; the rest are SABnzbd's defaults plus every category in use.",
+  "request": {
+    "method": "GET",
+    "query": [["apikey", "fixture-api-key-0000"], ["mode", "get_cats"], ["output", "json"]]
+  },
+  "response": {
+    "status": 200,
+    "content_type": "json",
+    "body": { "categories": ["*", "audio", "movies", "software", "tv"] }
+  },
+  "exact": ["/categories"]
+}
