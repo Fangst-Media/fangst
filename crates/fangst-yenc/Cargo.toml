@@ -1,0 +1,16 @@
+[package]
+name = "fangst-yenc"
+description = "yEnc decoding and encoding with header, part and CRC32 validation."
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license = "MIT OR Apache-2.0"
+repository.workspace = true
+publish.workspace = true
+keywords = ["yenc", "usenet", "nntp"]
+
+[dev-dependencies]
+proptest = "1"
+
+[lints]
+workspace = true
