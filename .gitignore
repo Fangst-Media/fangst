@@ -57,3 +57,6 @@ dev-data/
 
 # Agent worktrees
 .claude/worktrees/
+
+# Per-machine benchmark baselines
+/bench/

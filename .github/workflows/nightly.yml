@@ -1,0 +1,26 @@
+name: nightly
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    name: usenet benchmark
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      # Hosted runners vary too much for a pass/fail baseline; the numbers are kept to spot trends.
+      - name: Benchmark
+        run: cargo run --release -p usenet-bench -- --size-mib 256 --out bench-results.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bench-results-${{ github.run_number }}
+          path: bench-results.json
+          retention-days: 90
