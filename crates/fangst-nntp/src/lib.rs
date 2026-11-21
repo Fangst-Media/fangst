@@ -108,6 +108,122 @@ impl Error {
     pub fn connection_usable(&self) -> bool {
         matches!(self, Self::NoSuchArticle | Self::Protocol { .. })
     }
+
+    /// A stable, machine-readable name for the cause, for APIs and UIs.
+    #[must_use]
+    pub fn cause(&self) -> &'static str {
+        match self {
+            Self::Dns(_) => "dns",
+            Self::Refused => "refused",
+            Self::Timeout => "timeout",
+            Self::Tls(_) => "tls",
+            Self::Io(_) => "network",
+            Self::NoSuchArticle => "no_such_article",
+            Self::AuthFailed(_) => "auth_failed",
+            Self::AuthRequired => "auth_required",
+            Self::Unavailable { .. } => "unavailable",
+            Self::Protocol { .. } => "protocol",
+        }
+    }
+}
+
+/// What [`check_server`] found.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ServerCheck {
+    /// How many of the configured connections the server accepted at once.
+    pub connections_accepted: usize,
+    pub connections_requested: usize,
+}
+
+/// Errors from [`check_server`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CheckError {
+    /// The first connection failed; nothing else was tried.
+    Connect(Error),
+    /// Some connections worked, but the server refused the rest: the account allows fewer
+    /// connections than configured.
+    ConnectionLimit { accepted: usize, requested: usize },
+}
+
+impl CheckError {
+    #[must_use]
+    pub fn cause(&self) -> &'static str {
+        match self {
+            Self::Connect(e) => e.cause(),
+            Self::ConnectionLimit { .. } => "connection_limit",
+        }
+    }
+}
+
+impl fmt::Display for CheckError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Connect(e) => e.fmt(f),
+            Self::ConnectionLimit {
+                accepted,
+                requested,
+            } => write!(
+                f,
+                "the server accepted {accepted} of {requested} connections; lower the connection count to {accepted} or check your plan"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for CheckError {}
+
+/// Opens every configured connection at once, logs in on each, and closes them again.
+///
+/// Opening them all at once is the point: a provider that allows 20 connections but is configured
+/// with 30 only shows the problem under load, as failed downloads that look like network trouble.
+///
+/// # Errors
+/// [`CheckError::Connect`] with the exact cause when the first connection fails, or
+/// [`CheckError::ConnectionLimit`] when the server turns some connections away.
+pub async fn check_server(config: &ServerConfig) -> Result<ServerCheck, CheckError> {
+    let first = Connection::connect(config)
+        .await
+        .map_err(CheckError::Connect)?;
+    let requested = config.max_connections.max(1);
+    let mut others = tokio::task::JoinSet::new();
+    for _ in 1..requested {
+        let config = config.clone();
+        others.spawn(async move { Connection::connect(&config).await });
+    }
+    let mut open = vec![first];
+    let mut refused = 0;
+    while let Some(result) = others.join_next().await {
+        match result {
+            Ok(Ok(conn)) => open.push(conn),
+            Ok(Err(Error::Unavailable { .. })) => refused += 1,
+            Ok(Err(e)) => {
+                for conn in open {
+                    conn.quit().await;
+                }
+                return Err(CheckError::Connect(e));
+            }
+            Err(e) => {
+                for conn in open {
+                    conn.quit().await;
+                }
+                return Err(CheckError::Connect(Error::Io(e.to_string())));
+            }
+        }
+    }
+    let accepted = open.len();
+    for conn in open {
+        conn.quit().await;
+    }
+    if refused > 0 {
+        return Err(CheckError::ConnectionLimit {
+            accepted,
+            requested,
+        });
+    }
+    Ok(ServerCheck {
+        connections_accepted: accepted,
+        connections_requested: requested,
+    })
 }
 
 impl fmt::Display for Error {

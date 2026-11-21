@@ -381,6 +381,52 @@
           }
         }
       }
+    },
+    "/api/v1/servers/test": {
+      "post": {
+        "tags": [],
+        "description": "Connects with every requested connection at once and logs in. A failed test is still a 200; read `ok` and `cause`.",
+        "operationId": "test_server",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServerTestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServerTestResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -556,6 +602,77 @@
           "completed",
           "failed"
         ]
+      },
+      "ServerTestRequest": {
+        "type": "object",
+        "description": "A usenet server to try. Nothing is saved.",
+        "required": [
+          "host",
+          "port"
+        ],
+        "properties": {
+          "connections": {
+            "type": "integer",
+            "description": "How many connections to open at once; use the count you plan to configure.",
+            "minimum": 0
+          },
+          "host": {
+            "type": "string"
+          },
+          "password": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "port": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "tls": {
+            "type": "boolean"
+          },
+          "username": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ServerTestResult": {
+        "type": "object",
+        "required": [
+          "ok",
+          "message",
+          "connections_accepted",
+          "connections_requested"
+        ],
+        "properties": {
+          "cause": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Stable name of what went wrong: `dns`, `refused`, `timeout`, `tls`, `network`,\n`auth_failed`, `auth_required`, `unavailable`, `protocol` or `connection_limit`."
+          },
+          "connections_accepted": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "connections_requested": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "message": {
+            "type": "string",
+            "description": "What happened, in words a user can act on. Never contains the password."
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        }
       }
     },
     "securitySchemes": {

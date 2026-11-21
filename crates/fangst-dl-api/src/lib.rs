@@ -30,8 +30,8 @@ struct ApiState {
 #[derive(OpenApi)]
 #[openapi(
     info(title = "Fangst download daemon", description = "Native API of fangst-dl."),
-    paths(health, list_jobs, add_job, get_job, pause_job, resume_job, delete_job, job_timeline, events),
-    components(schemas(Health, JobDto, EventDto, ApiError, ChangeDto, JobStatus, JobKind)),
+    paths(health, list_jobs, add_job, get_job, pause_job, resume_job, delete_job, job_timeline, events, test_server),
+    components(schemas(Health, JobDto, EventDto, ApiError, ChangeDto, JobStatus, JobKind, ServerTestRequest, ServerTestResult)),
     modifiers(&ApiKeyScheme),
     security(("api_key" = []))
 )]
@@ -81,6 +81,7 @@ pub fn router(service: Service, api_key: &str) -> Router {
         .route("/api/v1/jobs/{id}/resume", post(resume_job))
         .route("/api/v1/jobs/{id}/timeline", get(job_timeline))
         .route("/api/v1/events", get(events))
+        .route("/api/v1/servers/test", post(test_server))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             require_api_key,
@@ -425,4 +426,103 @@ async fn stream_changes(mut socket: WebSocket, state: ApiState) {
             }
         }
     }
+}
+
+/// A usenet server to try. Nothing is saved.
+#[derive(Deserialize, Serialize, ToSchema)]
+pub struct ServerTestRequest {
+    pub host: String,
+    pub port: u16,
+    #[serde(default = "default_true")]
+    pub tls: bool,
+    pub username: Option<String>,
+    pub password: Option<String>,
+    /// How many connections to open at once; use the count you plan to configure.
+    #[serde(default = "default_one")]
+    pub connections: usize,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_one() -> usize {
+    1
+}
+
+#[derive(Deserialize, Serialize, ToSchema, Debug, PartialEq, Eq)]
+pub struct ServerTestResult {
+    pub ok: bool,
+    /// Stable name of what went wrong: `dns`, `refused`, `timeout`, `tls`, `network`,
+    /// `auth_failed`, `auth_required`, `unavailable`, `protocol` or `connection_limit`.
+    pub cause: Option<String>,
+    /// What happened, in words a user can act on. Never contains the password.
+    pub message: String,
+    pub connections_accepted: usize,
+    pub connections_requested: usize,
+}
+
+/// Opening a connection includes DNS, TCP and the TLS handshake; a healthy provider answers well within this.
+const TEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// Upper bound on connections a test may open, so the endpoint can't be used to flood a server.
+const MAX_TEST_CONNECTIONS: usize = 100;
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/servers/test",
+    request_body = ServerTestRequest,
+    description = "Connects with every requested connection at once and logs in. A failed test is still a 200; read `ok` and `cause`.",
+    responses((status = 200, body = ServerTestResult), (status = 400, body = ApiError), (status = 401, body = ApiError))
+)]
+async fn test_server(Json(request): Json<ServerTestRequest>) -> Response {
+    if request.connections == 0 || request.connections > MAX_TEST_CONNECTIONS {
+        return error(
+            StatusCode::BAD_REQUEST,
+            format!("connections must be between 1 and {MAX_TEST_CONNECTIONS}"),
+        );
+    }
+    let tls = if request.tls {
+        match fangst_nntp::native_tls_config() {
+            Ok(tls) => Some(tls),
+            Err(e) => return error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+        }
+    } else {
+        None
+    };
+    let credentials = request
+        .username
+        .map(|user| (user, request.password.unwrap_or_default()));
+    let config = fangst_nntp::ServerConfig {
+        host: request.host,
+        port: request.port,
+        tls,
+        credentials,
+        max_connections: request.connections,
+        connect_timeout: TEST_TIMEOUT,
+        command_timeout: TEST_TIMEOUT,
+    };
+    let result = match fangst_nntp::check_server(&config).await {
+        Ok(check) => ServerTestResult {
+            ok: true,
+            cause: None,
+            message: format!(
+                "connected and logged in with {} connections",
+                check.connections_accepted
+            ),
+            connections_accepted: check.connections_accepted,
+            connections_requested: check.connections_requested,
+        },
+        Err(e) => ServerTestResult {
+            ok: false,
+            cause: Some(e.cause().to_owned()),
+            message: e.to_string(),
+            connections_accepted: match e {
+                fangst_nntp::CheckError::ConnectionLimit { accepted, .. } => accepted,
+                fangst_nntp::CheckError::Connect(_) => 0,
+            },
+            connections_requested: config.max_connections,
+        },
+    };
+    Json(result).into_response()
 }

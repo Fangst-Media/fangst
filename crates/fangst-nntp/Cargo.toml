@@ -15,7 +15,7 @@ workspace = true
 [dependencies]
 rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12"] }
 rustls-native-certs = "0.8.5"
-tokio = { version = "1.54.1", features = ["net", "io-util", "time", "sync"] }
+tokio = { version = "1.54.1", features = ["net", "io-util", "time", "sync", "rt"] }
 tokio-rustls = { version = "0.26.6", default-features = false, features = ["ring", "tls12"] }
 
 [dev-dependencies]
