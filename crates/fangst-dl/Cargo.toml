@@ -19,6 +19,7 @@ fangst-dl-api = { version = "0.1.0", path = "../fangst-dl-api" }
 fangst-downloads = { version = "0.1.0", path = "../fangst-downloads" }
 fangst-nntp = { version = "0.1.0", path = "../fangst-nntp" }
 fangst-nzb = { version = "0.1.0", path = "../fangst-nzb" }
+fangst-providers = { version = "0.1.0", path = "../fangst-providers" }
 fangst-usenet = { version = "0.1.0", path = "../fangst-usenet" }
 tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros", "net", "signal"] }
 

@@ -102,6 +102,9 @@ struct ServeArgs {
     /// Name of the environment variable holding the API key.
     #[arg(long, default_value = "FANGST_API_KEY")]
     api_key_env: String,
+    /// Turn on an optional provider (post-processor, notifier, API adapter) by its id. Repeatable.
+    #[arg(long = "enable", value_name = "ID")]
+    enabled_providers: Vec<String>,
     #[command(flatten)]
     usenet: UsenetArgs,
 }
@@ -162,6 +165,7 @@ async fn serve(args: ServeArgs) -> anyhow::Result<ExitCode> {
             args.api_key_env
         );
     }
+    let registry = fangst_providers::Registry::build(builtin_providers(), &args.enabled_providers)?;
     std::fs::create_dir_all(&args.data_dir)
         .with_context(|| format!("creating {}", args.data_dir.display()))?;
     let store = fangst_downloads::Store::open(&args.data_dir.join("downloads.db")).await?;
@@ -183,6 +187,7 @@ async fn serve(args: ServeArgs) -> anyhow::Result<ExitCode> {
     if !has_server {
         println!("no usenet server configured; jobs will wait in the queue");
     }
+    println!("{}", describe_providers(&registry));
 
     let app = fangst_dl_api::router(service.clone(), &api_key);
     let worker = has_server.then(|| {
@@ -198,6 +203,28 @@ async fn serve(args: ServeArgs) -> anyhow::Result<ExitCode> {
         worker.abort();
     }
     Ok(ExitCode::SUCCESS)
+}
+
+/// Every provider compiled into this binary; `--enable` picks from these.
+fn builtin_providers() -> Vec<fangst_providers::Provider> {
+    Vec::new()
+}
+
+fn describe_providers(registry: &fangst_providers::Registry) -> String {
+    let enabled: Vec<&str> = registry
+        .listing()
+        .iter()
+        .filter(|(_, on)| *on)
+        .map(|(info, _)| info.id.as_str())
+        .collect();
+    if enabled.is_empty() {
+        format!(
+            "providers: none enabled ({} available)",
+            registry.listing().len()
+        )
+    } else {
+        format!("providers: {}", enabled.join(", "))
+    }
 }
 
 fn placeholder_server() -> ServerConfig {
