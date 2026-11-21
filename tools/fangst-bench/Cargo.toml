@@ -1,0 +1,22 @@
+[package]
+name = "fangst-bench"
+description = "Mock NNTP server and load generator for Fangst's usenet tests and benchmarks."
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+fangst-yenc = { path = "../../crates/fangst-yenc" }
+rcgen = "0.14.10"
+rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12"] }
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "net", "io-util", "time", "sync", "macros"] }
+tokio-rustls = { version = "0.26.6", default-features = false, features = ["ring", "tls12"] }
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+fangst-nzb = { path = "../../crates/fangst-nzb" }
