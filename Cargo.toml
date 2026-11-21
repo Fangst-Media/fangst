@@ -1,0 +1,18 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.95"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Fangst-Media/fangst"
+publish = false
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+# Crates are internal until they are published; documenting every error variant up front is noise.
+missing_errors_doc = "allow"

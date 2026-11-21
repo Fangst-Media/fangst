@@ -3,6 +3,7 @@ node_modules
 .bun-cache
 
 # Build outputs
+/target
 dist
 build
 .next

@@ -1,0 +1,3 @@
+# Every tunable value in Fangst lives here, never as a literal in code.
+# TUNING.md at the repo root explains each one for users.
+# Sections are added by the crate that first needs them.
