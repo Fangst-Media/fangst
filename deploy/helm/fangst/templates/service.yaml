@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "fangst.fullname" . }}
+  labels:
+    {{- include "fangst.labels" . | nindent 4 }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "fangst.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+{{- if .Values.torrent.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "fangst.fullname" . }}-torrent
+  labels:
+    {{- include "fangst.labels" . | nindent 4 }}
+  {{- with .Values.torrent.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.torrent.service.type }}
+  {{- if ne .Values.torrent.service.type "ClusterIP" }}
+  externalTrafficPolicy: {{ .Values.torrent.service.externalTrafficPolicy }}
+  {{- end }}
+  selector:
+    {{- include "fangst.selectorLabels" . | nindent 4 }}
+  ports:
+    {{- range list "TCP" "UDP" }}
+    - name: torrent-{{ lower . }}
+      port: {{ $.Values.torrent.port }}
+      targetPort: torrent-{{ lower . }}
+      protocol: {{ . }}
+      {{- with include "fangst.torrentNodePort" $ }}
+      nodePort: {{ . }}
+      {{- end }}
+    {{- end }}
+{{- end }}

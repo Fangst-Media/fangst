@@ -1,0 +1,166 @@
+{{- $downloads := .Values.persistence.downloads }}
+{{- $media := .Values.persistence.media }}
+{{- if and $downloads.existingClaim $downloads.hostPath }}
+{{- fail "persistence.downloads: set existingClaim or hostPath, not both" }}
+{{- end }}
+{{- if and $media.existingClaim $media.hostPath }}
+{{- fail "persistence.media: set existingClaim or hostPath, not both" }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "fangst.fullname" . }}
+  labels:
+    {{- include "fangst.labels" . | nindent 4 }}
+spec:
+  # One daemon owns the database and the torrent state; a second pod, even briefly during a
+  # rolling update, would open the same files.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "fangst.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "fangst.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        # Restarts the pod when the chart-made key changes, since the daemon reads it only at start.
+        {{- if .Values.apiKey.value }}
+        checksum/api-key: {{ .Values.apiKey.value | sha256sum }}
+        {{- end }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: fangst-dl
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          # Flags only: the image's entrypoint adds `serve --data-dir /data --listen 0.0.0.0:7740`.
+          args:
+            {{- if .Values.torrent.enabled }}
+            - --torrent-port
+            - {{ .Values.torrent.port | quote }}
+            {{- with include "fangst.torrentNodePort" . }}
+            - --torrent-announce-port
+            - {{ . | quote }}
+            {{- end }}
+            {{- else }}
+            - --no-torrent
+            {{- end }}
+            {{- range .Values.extraArgs }}
+            - {{ . | quote }}
+            {{- end }}
+          env:
+            - name: FANGST_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "fangst.apiKeySecret" . }}
+                  key: {{ .Values.apiKey.secretKey }}
+            - name: TZ
+              value: {{ .Values.timezone | quote }}
+            {{- with .Values.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.envFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: 7740
+              protocol: TCP
+            {{- if .Values.torrent.enabled }}
+            - name: torrent-tcp
+              containerPort: {{ .Values.torrent.port }}
+              protocol: TCP
+            - name: torrent-udp
+              containerPort: {{ .Values.torrent.port }}
+              protocol: UDP
+            {{- end }}
+          startupProbe:
+            httpGet:
+              path: /api/v1/health
+              port: http
+            {{- toYaml .Values.probes.startup | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: http
+            {{- toYaml .Values.probes.liveness | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: http
+            {{- toYaml .Values.probes.readiness | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: downloads
+              mountPath: /downloads
+              {{- with $downloads.subPath }}
+              subPath: {{ . }}
+              {{- end }}
+            {{- if or $media.existingClaim $media.hostPath }}
+            - name: media
+              mountPath: {{ $media.mountPath }}
+              {{- with $media.subPath }}
+              subPath: {{ . }}
+              {{- end }}
+            {{- end }}
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "fangst.dataClaim" . }}
+        - name: downloads
+          {{- if $downloads.existingClaim }}
+          persistentVolumeClaim:
+            claimName: {{ $downloads.existingClaim }}
+          {{- else if $downloads.hostPath }}
+          hostPath:
+            path: {{ $downloads.hostPath }}
+            type: Directory
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        {{- if $media.existingClaim }}
+        - name: media
+          persistentVolumeClaim:
+            claimName: {{ $media.existingClaim }}
+        {{- else if $media.hostPath }}
+        - name: media
+          hostPath:
+            path: {{ $media.hostPath }}
+            type: Directory
+        {{- end }}
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

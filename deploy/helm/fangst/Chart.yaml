@@ -1,0 +1,14 @@
+apiVersion: v2
+name: fangst
+description: The Fangst download daemon (fangst-dl) for torrent and usenet
+type: application
+# The release workflow sets both from the git tag; these are only for local installs.
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/Fangst-Media/fangst
+sources:
+  - https://github.com/Fangst-Media/fangst
+keywords:
+  - torrent
+  - usenet
+  - downloader

@@ -1,0 +1,121 @@
+name: deploy
+
+# Builds the image and installs the chart on pull requests that can change either. Publishing
+# happens in release.yml on tags.
+on:
+  pull_request:
+    paths:
+      - "crates/**"
+      - "tools/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "deploy/**"
+      - ".dockerignore"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  HELM_VERSION: v4.3.2
+  # Throwaway key for the smoke tests; nothing outside the runner sees it.
+  FANGST_API_KEY: ci-smoke-key-0123456789
+
+jobs:
+  chart:
+    name: helm lint and template
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: azure/setup-helm@v5
+        with:
+          version: ${{ env.HELM_VERSION }}
+      - name: Lint
+        run: helm lint deploy/helm/fangst --strict --set apiKey.value="$FANGST_API_KEY"
+      - name: Render the default and a full set of values
+        run: |
+          helm template smoke deploy/helm/fangst --set apiKey.value="$FANGST_API_KEY" > /dev/null
+          helm template smoke deploy/helm/fangst \
+            --set apiKey.existingSecret=fangst-key \
+            --set persistence.data.existingClaim=fangst-data \
+            --set persistence.downloads.hostPath=/srv/downloads \
+            --set persistence.media.existingClaim=media \
+            --set torrent.service.type=NodePort \
+            --set torrent.service.nodePort=31881 \
+            --set "extraArgs={--enable,qbittorrent}" > /dev/null
+          helm template smoke deploy/helm/fangst --set apiKey.value="$FANGST_API_KEY" --set torrent.enabled=false > /dev/null
+      - name: Refuse a missing API key
+        run: "! helm template smoke deploy/helm/fangst"
+
+  image:
+    name: image build and smoke tests (amd64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      # The image can't read rust-toolchain.toml, so its builder tag is pinned separately.
+      - name: Builder uses the pinned Rust toolchain
+        run: |
+          channel=$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml)
+          grep -q "^FROM rust:$channel-" deploy/docker/Dockerfile \
+            || { echo "deploy/docker/Dockerfile does not build with Rust $channel"; exit 1; }
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: deploy/docker/Dockerfile
+          platforms: linux/amd64
+          load: true
+          tags: fangst-dl:ci
+          cache-from: type=gha,scope=fangst-dl-amd64
+          cache-to: type=gha,scope=fangst-dl-amd64,mode=max
+
+      - name: Container becomes healthy
+        run: |
+          docker run -d --name fangst-dl -e FANGST_API_KEY -e PUID=1234 -e PGID=1234 -p 7740:7740 fangst-dl:ci
+          for _ in $(seq 1 30); do
+            status=$(docker inspect -f '{{.State.Health.Status}}' fangst-dl)
+            [ "$status" = healthy ] && break
+            sleep 2
+          done
+          docker logs fangst-dl
+          [ "$status" = healthy ] || { echo "container is $status"; exit 1; }
+          curl -fsS http://127.0.0.1:7740/api/v1/health
+          docker exec fangst-dl sh -c 'grep -q "^Uid:[[:space:]]*1234[[:space:]]" /proc/1/status' \
+            || { echo "daemon is not running as PUID"; exit 1; }
+
+      - uses: azure/setup-helm@v5
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - uses: helm/kind-action@v1
+        with:
+          cluster_name: fangst
+
+      - name: Chart installs and becomes ready on kind
+        run: |
+          kind load docker-image fangst-dl:ci --name fangst
+          helm install fangst deploy/helm/fangst --wait --timeout 3m \
+            --set image.repository=fangst-dl \
+            --set image.tag=ci \
+            --set image.pullPolicy=Never \
+            --set apiKey.value="$FANGST_API_KEY"
+          kubectl port-forward svc/fangst 7741:7740 &
+          for _ in $(seq 1 15); do curl -fsS http://127.0.0.1:7741/api/v1/health && exit 0; sleep 1; done
+          exit 1
+
+      - name: Show the pod on failure
+        if: failure()
+        run: |
+          kubectl describe pods || true
+          kubectl logs deploy/fangst || true

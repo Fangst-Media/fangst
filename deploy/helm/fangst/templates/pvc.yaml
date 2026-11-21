@@ -1,0 +1,23 @@
+{{- if not .Values.persistence.data.existingClaim }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "fangst.dataClaim" . }}
+  labels:
+    {{- include "fangst.labels" . | nindent 4 }}
+  annotations:
+    # The database outlives the release; delete the claim by hand to start over.
+    helm.sh/resource-policy: keep
+    {{- with .Values.persistence.data.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  accessModes:
+    - {{ .Values.persistence.data.accessMode }}
+  {{- with .Values.persistence.data.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.data.size }}
+{{- end }}

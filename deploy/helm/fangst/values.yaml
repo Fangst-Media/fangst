@@ -1,0 +1,116 @@
+image:
+  repository: ghcr.io/fangst-media/fangst-dl
+  # Empty uses the chart's appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# The first user's API key, at least 16 characters. Either name an existing Secret or give the
+# value and the chart creates one; installing with neither fails.
+apiKey:
+  existingSecret: ""
+  secretKey: api-key
+  value: ""
+
+# Time zone for the daemon, as a tz database name.
+timezone: Etc/UTC
+
+# Extra environment variables, for example the secrets named by --password-env or --*-token-env.
+env: []
+#  - name: NEWS_PASSWORD
+#    valueFrom:
+#      secretKeyRef:
+#        name: usenet
+#        key: password
+envFrom: []
+
+# Extra fangst-dl serve flags, added after the ones the chart sets.
+extraArgs: []
+#  - --host
+#  - news.example.com
+#  - --enable
+#  - qbittorrent
+
+service:
+  type: ClusterIP
+  port: 7740
+  annotations: {}
+
+torrent:
+  enabled: true
+  # Port the engine listens on inside the pod.
+  port: 6881
+  service:
+    # Peers must reach this port from outside the cluster for incoming connections: use
+    # LoadBalancer, or NodePort with nodePort set (the chart then announces the node port).
+    type: ClusterIP
+    nodePort: null
+    annotations: {}
+    # Keeps the client address for peers, and on NodePort sends traffic only to the node that runs
+    # the pod. Ignored for ClusterIP.
+    externalTrafficPolicy: Local
+
+persistence:
+  # Database, master key and torrent state.
+  data:
+    existingClaim: ""
+    storageClass: ""
+    accessMode: ReadWriteOnce
+    size: 1Gi
+    annotations: {}
+  # Downloaded files. Use an existing claim or a host path; with neither the files live in an
+  # emptyDir and are lost when the pod goes.
+  downloads:
+    existingClaim: ""
+    hostPath: ""
+    subPath: ""
+  # Media library, mounted at mountPath for tools that import into it. Off unless set.
+  media:
+    existingClaim: ""
+    hostPath: ""
+    subPath: ""
+    mountPath: /media
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 1Gi
+
+probes:
+  startup:
+    periodSeconds: 2
+    failureThreshold: 60
+  liveness:
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readiness:
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+podAnnotations: {}
+podLabels: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
