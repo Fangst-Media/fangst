@@ -15,6 +15,7 @@
       "**/.cache",
       "**/target",
       "web/src/api/**",
+      "web/src/api-dl/**",
       "openapi/**",
       "packages/**"
     ]

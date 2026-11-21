@@ -7,6 +7,7 @@ const adminTabs = [
   { label: 'Activity', href: '/admin/activity' },
   { label: 'Indexers', href: '/admin/indexers' },
   { label: 'Downloaders', href: '/admin/downloaders' },
+  { label: 'Queue', href: '/downloads' },
   { label: 'Settings', href: '/admin/settings' },
 ]
 

@@ -12,6 +12,7 @@ import {
 } from '@tanstack/react-router'
 import { AdminLayout } from './components/AdminLayout'
 import { Layout } from './components/Layout'
+import { DownloadsLayout } from './components/downloads/DownloadsLayout'
 import { AuthProvider, useAuth } from './lib/auth'
 import { ConnectionProvider } from './lib/connection'
 import Activity from './routes/activity'
@@ -21,6 +22,8 @@ import Calendar from './routes/calendar'
 import CollectionPage from './routes/collection'
 import Dashboard from './routes/dashboard'
 import Downloaders from './routes/downloaders'
+import JobDetail from './routes/downloads/job-detail'
+import Queue from './routes/downloads/queue'
 import Home from './routes/home'
 import Indexers from './routes/indexers'
 import Library from './routes/library'
@@ -39,6 +42,20 @@ const queryClient = new QueryClient()
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
+})
+
+// The old TypeScript API's health check and login only gate the old pages; the download
+// daemon pages talk to a different service and must work without it.
+const legacyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  id: 'legacy',
+  component: () => (
+    <ConnectionProvider>
+      <AuthProvider>
+        <Outlet />
+      </AuthProvider>
+    </ConnectionProvider>
+  ),
 })
 
 function IndexRedirect() {
@@ -123,19 +140,19 @@ function LoginPage() {
 // --- Core routes ---
 
 const indexRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => legacyRoute,
   path: '/',
   component: IndexRedirect,
 })
 
 const loginRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => legacyRoute,
   path: '/login',
   component: LoginPage,
 })
 
 const moviesRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => legacyRoute,
   path: '/movies',
   component: () => (
     <ProtectedRoute>
@@ -145,7 +162,7 @@ const moviesRoute = createRoute({
 })
 
 const tvShowsRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => legacyRoute,
   path: '/tv',
   component: () => (
     <ProtectedRoute>
@@ -155,7 +172,7 @@ const tvShowsRoute = createRoute({
 })
 
 const movieDetailRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => legacyRoute,
   path: '/movie/$tmdbId',
   component: function MovieDetailPage() {
     const { tmdbId } = movieDetailRoute.useParams()
@@ -168,7 +185,7 @@ const movieDetailRoute = createRoute({
 })
 
 const booksRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => legacyRoute,
   path: '/books',
   component: () => (
     <ProtectedRoute>
@@ -178,7 +195,7 @@ const booksRoute = createRoute({
 })
 
 const bookDetailRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => legacyRoute,
   path: '/book/$openLibraryId',
   component: function BookDetailPage() {
     const { openLibraryId } = bookDetailRoute.useParams()
@@ -191,7 +208,7 @@ const bookDetailRoute = createRoute({
 })
 
 const searchRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => legacyRoute,
   path: '/search',
   component: () => (
     <ProtectedRoute>
@@ -203,7 +220,7 @@ const searchRoute = createRoute({
 // --- User routes ---
 
 const myRequestsRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => legacyRoute,
   path: '/my-requests',
   component: () => (
     <ProtectedRoute>
@@ -213,7 +230,7 @@ const myRequestsRoute = createRoute({
 })
 
 const calendarRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => legacyRoute,
   path: '/calendar',
   component: () => (
     <ProtectedRoute>
@@ -225,7 +242,7 @@ const calendarRoute = createRoute({
 // --- Library routes ---
 
 const libraryRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => legacyRoute,
   path: '/library',
   component: () => (
     <ProtectedRoute>
@@ -235,7 +252,7 @@ const libraryRoute = createRoute({
 })
 
 const mediaDetailsRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => legacyRoute,
   path: '/library/$slug',
   component: function MediaDetailsPage() {
     const { slug } = mediaDetailsRoute.useParams()
@@ -248,7 +265,7 @@ const mediaDetailsRoute = createRoute({
 })
 
 const tvSeriesRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => legacyRoute,
   path: '/library/tv/$tmdbId',
   component: function TvSeriesRoutePage() {
     const { tmdbId } = tvSeriesRoute.useParams()
@@ -261,7 +278,7 @@ const tvSeriesRoute = createRoute({
 })
 
 const seasonRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => legacyRoute,
   path: '/library/tv/$tmdbId/season/$seasonNumber',
   component: function SeasonRoutePage() {
     const { tmdbId, seasonNumber } = seasonRoute.useParams()
@@ -274,7 +291,7 @@ const seasonRoute = createRoute({
 })
 
 const collectionRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => legacyRoute,
   path: '/library/collection/$collectionId',
   component: function CollectionRoutePage() {
     const { collectionId } = collectionRoute.useParams()
@@ -289,7 +306,7 @@ const collectionRoute = createRoute({
 // --- Admin routes ---
 
 const adminDashboardRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => legacyRoute,
   path: '/admin',
   component: () => (
     <AdminRoute>
@@ -299,7 +316,7 @@ const adminDashboardRoute = createRoute({
 })
 
 const adminRequestsRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => legacyRoute,
   path: '/admin/requests',
   component: () => (
     <AdminRoute>
@@ -309,7 +326,7 @@ const adminRequestsRoute = createRoute({
 })
 
 const adminActivityRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => legacyRoute,
   path: '/admin/activity',
   component: () => (
     <AdminRoute>
@@ -319,7 +336,7 @@ const adminActivityRoute = createRoute({
 })
 
 const adminIndexersRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => legacyRoute,
   path: '/admin/indexers',
   component: () => (
     <AdminRoute>
@@ -329,7 +346,7 @@ const adminIndexersRoute = createRoute({
 })
 
 const adminDownloadersRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => legacyRoute,
   path: '/admin/downloaders',
   component: () => (
     <AdminRoute>
@@ -339,7 +356,7 @@ const adminDownloadersRoute = createRoute({
 })
 
 const adminSettingsRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => legacyRoute,
   path: '/admin/settings',
   component: () => (
     <AdminRoute>
@@ -348,9 +365,39 @@ const adminSettingsRoute = createRoute({
   ),
 })
 
+// --- Download daemon routes ---
+
+const downloadsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/downloads',
+  component: () => (
+    <DownloadsLayout>
+      <Queue />
+    </DownloadsLayout>
+  ),
+})
+
+const jobDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/downloads/$jobId',
+  component: function JobDetailPage() {
+    const { jobId } = jobDetailRoute.useParams()
+    const id = Number(jobId)
+    return (
+      <DownloadsLayout>
+        {Number.isSafeInteger(id) && id > 0 ? (
+          <JobDetail jobId={id} />
+        ) : (
+          <p className="text-muted">"{jobId}" is not a job ID.</p>
+        )}
+      </DownloadsLayout>
+    )
+  },
+})
+
 // --- Router ---
 
-const routeTree = rootRoute.addChildren([
+const legacyTree = legacyRoute.addChildren([
   indexRoute,
   loginRoute,
   moviesRoute,
@@ -374,6 +421,8 @@ const routeTree = rootRoute.addChildren([
   adminSettingsRoute,
 ])
 
+const routeTree = rootRoute.addChildren([legacyTree, downloadsRoute, jobDetailRoute])
+
 const router = createRouter({
   routeTree,
   defaultPreload: 'intent',
@@ -388,11 +437,7 @@ declare module '@tanstack/react-router' {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <ConnectionProvider>
-        <AuthProvider>
-          <RouterProvider router={router} />
-        </AuthProvider>
-      </ConnectionProvider>
+      <RouterProvider router={router} />
     </QueryClientProvider>
   </StrictMode>
 )
