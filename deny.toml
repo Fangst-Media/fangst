@@ -6,6 +6,11 @@ all-features = true
 
 [advisories]
 yanked = "deny"
+ignore = [
+    # ringbuf 0.4 double free in Consumer::skip, only when an element's Drop panics. It comes in
+    # through librqbit-utp, which stores u8 (no Drop), so it can't trigger here. Remove with #89.
+    { id = "RUSTSEC-2026-0293", reason = "librqbit-utp only stores u8, which has no Drop; tracked in #89" },
+]
 
 [licenses]
 confidence-threshold = 0.9
@@ -19,6 +24,8 @@ allow = [
     "BSD-3-Clause",
     "BSL-1.0",
     "CC0-1.0",
+    # Permissive data licence of the CA root bundle (webpki-root-certs, via librqbit's HTTPS trackers).
+    "CDLA-Permissive-2.0",
     "ISC",
     "MIT",
     "MPL-2.0",
