@@ -50,6 +50,9 @@ pub struct FileReport {
     pub missing_segments: Vec<u32>,
     /// Segments that arrived damaged or could not be fetched, with the reason.
     pub failed_segments: Vec<(u32, String)>,
+    /// Segments stored, including those stored by an earlier run that this one resumed.
+    pub segments_done: usize,
+    pub segments_total: usize,
 }
 
 impl FileReport {
@@ -57,7 +60,7 @@ impl FileReport {
     pub fn is_complete(&self) -> bool {
         self.missing_segments.is_empty()
             && self.failed_segments.is_empty()
-            && self.bytes_written == self.size
+            && self.segments_done == self.segments_total
     }
 }
 
@@ -90,6 +93,24 @@ impl std::error::Error for Error {}
 
 pub type ProgressFn = Arc<dyn Fn(&Progress) + Send + Sync>;
 
+/// What an earlier run already stored, and where to report segments as they are stored.
+#[derive(Clone)]
+pub struct Resume {
+    /// `(file index in the NZB, segment number)` pairs that are already on disk.
+    pub done: HashSet<(usize, u32)>,
+    /// Called once a segment's data is written, so the caller can persist it.
+    pub on_stored: Arc<dyn Fn(usize, u32) + Send + Sync>,
+}
+
+impl Default for Resume {
+    fn default() -> Self {
+        Self {
+            done: HashSet::new(),
+            on_stored: Arc::new(|_, _| {}),
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 struct Job {
     file: usize,
@@ -105,6 +126,8 @@ struct FileState {
     size: AtomicU64,
     written: AtomicU64,
     done: AtomicUsize,
+    resumed: usize,
+    stored: AtomicUsize,
     missing: Mutex<Vec<u32>>,
     failed: Mutex<Vec<(u32, String)>>,
 }
@@ -115,6 +138,7 @@ struct Shared {
     pool: Arc<Pool>,
     options: Options,
     progress: ProgressFn,
+    on_stored: Arc<dyn Fn(usize, u32) + Send + Sync>,
 }
 
 /// Downloads every file in `nzb` into `out_dir` and reports what arrived.
@@ -130,6 +154,24 @@ pub async fn download(
     pool: Arc<Pool>,
     options: Options,
     progress: ProgressFn,
+) -> Result<Report, Error> {
+    download_resumable(nzb, out_dir, pool, options, progress, Resume::default()).await
+}
+
+/// Like [`download`], but skips segments `resume` says are done and reports each stored segment.
+///
+/// # Errors
+/// Only when `out_dir` can't be created.
+///
+/// # Panics
+/// If an internal lock was poisoned by a panic in another worker.
+pub async fn download_resumable(
+    nzb: &Nzb,
+    out_dir: &Path,
+    pool: Arc<Pool>,
+    options: Options,
+    progress: ProgressFn,
+    resume: Resume,
 ) -> Result<Report, Error> {
     tokio::fs::create_dir_all(out_dir)
         .await
@@ -153,7 +195,18 @@ pub async fn download(
                 handle: tokio::sync::Mutex::new(None),
                 size: AtomicU64::new(0),
                 written: AtomicU64::new(0),
-                done: AtomicUsize::new(0),
+                done: AtomicUsize::new(
+                    file.segments
+                        .iter()
+                        .filter(|seg| resume.done.contains(&(i, seg.number)))
+                        .count(),
+                ),
+                resumed: file
+                    .segments
+                    .iter()
+                    .filter(|seg| resume.done.contains(&(i, seg.number)))
+                    .count(),
+                stored: AtomicUsize::new(0),
                 missing: Mutex::new(Vec::new()),
                 failed: Mutex::new(Vec::new()),
             }
@@ -164,11 +217,17 @@ pub async fn download(
         .iter()
         .enumerate()
         .flat_map(|(f, state)| {
-            (0..state.segments.len()).map(move |s| Job {
-                file: f,
-                segment: s,
-                attempts: 0,
-            })
+            let done = &resume.done;
+            state
+                .segments
+                .iter()
+                .enumerate()
+                .filter(move |(_, seg)| !done.contains(&(f, seg.number)))
+                .map(move |(s, _)| Job {
+                    file: f,
+                    segment: s,
+                    attempts: 0,
+                })
         })
         .collect();
     let shared = Arc::new(Shared {
@@ -177,6 +236,7 @@ pub async fn download(
         pool,
         options,
         progress,
+        on_stored: resume.on_stored,
     });
 
     let mut workers = tokio::task::JoinSet::new();
@@ -202,6 +262,8 @@ pub async fn download(
             bytes_written: state.written.into_inner(),
             missing_segments: missing,
             failed_segments: failed,
+            segments_done: state.resumed + state.stored.into_inner(),
+            segments_total: state.segments.len(),
         });
     }
     Ok(Report { files: reports })
@@ -297,25 +359,32 @@ async fn store(shared: &Shared, job: Job, body: &[u8]) {
     let write = async {
         let mut handle = state.handle.lock().await;
         if handle.is_none() {
+            // No truncate: a resumed job keeps the parts an earlier run already wrote.
             let file = tokio::fs::OpenOptions::new()
                 .create(true)
+                .truncate(false)
                 .write(true)
-                .truncate(true)
                 .open(&state.path)
                 .await?;
-            file.set_len(decoded.header.size).await?;
+            if file.metadata().await?.len() != decoded.header.size {
+                file.set_len(decoded.header.size).await?;
+            }
             state.size.store(decoded.header.size, Ordering::Relaxed);
             *handle = Some(file);
         }
         let file = handle.as_mut().expect("opened above");
         file.seek(std::io::SeekFrom::Start(offset)).await?;
-        file.write_all(&decoded.data).await
+        file.write_all(&decoded.data).await?;
+        // The caller records the segment as done next, so it must already be on disk.
+        file.flush().await
     };
     match write.await {
         Ok(()) => {
             state
                 .written
                 .fetch_add(decoded.data.len() as u64, Ordering::Relaxed);
+            state.stored.fetch_add(1, Ordering::Relaxed);
+            (shared.on_stored)(job.file, number);
         }
         Err(e) => state
             .failed
