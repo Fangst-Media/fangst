@@ -57,6 +57,19 @@ export type JobKind = 'usenet' | 'torrent';
 
 export type JobStatus = 'queued' | 'downloading' | 'paused' | 'completed' | 'failed';
 
+export type LoginRequest = {
+    password: string;
+    username: string;
+};
+
+export type PasswordChange = {
+    /**
+     * Required once the user has a password.
+     */
+    current_password?: string | null;
+    new_password: string;
+};
+
 /**
  * A usenet server to try. Nothing is saved.
  */
@@ -86,6 +99,97 @@ export type ServerTestResult = {
     message: string;
     ok: boolean;
 };
+
+export type UserDto = {
+    /**
+     * False for a user who can only sign in with an API key so far.
+     */
+    has_password: boolean;
+    id: number;
+    username: string;
+};
+
+export type LoginData = {
+    body: LoginRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/login';
+};
+
+export type LoginErrors = {
+    401: ApiError;
+    429: ApiError;
+    /**
+     * Too many password checks at once; retry after `Retry-After`
+     */
+    503: ApiError;
+};
+
+export type LoginError = LoginErrors[keyof LoginErrors];
+
+export type LoginResponses = {
+    200: UserDto;
+};
+
+export type LoginResponse = LoginResponses[keyof LoginResponses];
+
+export type LogoutData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/logout';
+};
+
+export type LogoutResponses = {
+    204: void;
+};
+
+export type LogoutResponse = LogoutResponses[keyof LogoutResponses];
+
+export type MeData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/me';
+};
+
+export type MeErrors = {
+    401: ApiError;
+};
+
+export type MeError = MeErrors[keyof MeErrors];
+
+export type MeResponses = {
+    200: UserDto;
+};
+
+export type MeResponse = MeResponses[keyof MeResponses];
+
+export type ChangePasswordData = {
+    body: PasswordChange;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/password';
+};
+
+export type ChangePasswordErrors = {
+    400: ApiError;
+    401: ApiError;
+    /**
+     * The current password is wrong
+     */
+    403: ApiError;
+    429: ApiError;
+    503: ApiError;
+};
+
+export type ChangePasswordError = ChangePasswordErrors[keyof ChangePasswordErrors];
+
+export type ChangePasswordResponses = {
+    204: void;
+};
+
+export type ChangePasswordResponse = ChangePasswordResponses[keyof ChangePasswordResponses];
 
 export type EventsData = {
     body?: never;

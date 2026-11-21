@@ -4,8 +4,9 @@ use std::time::Duration;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use fangst_bench::{Config, Library, MockServer};
-use fangst_dl_api::{ChangeDto, EventDto, JobDto, JobStatus, openapi_json, router};
-use fangst_downloads::{Runner, Service, Store};
+use fangst_core::secret::MasterKey;
+use fangst_dl_api::{AuthSettings, ChangeDto, EventDto, JobDto, JobStatus, openapi_json, router};
+use fangst_downloads::{Auth, Runner, Service, Store};
 use futures_util::StreamExt;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
@@ -14,6 +15,7 @@ const KEY: &str = "test-key-123";
 
 struct Harness {
     service: Service,
+    auth: Auth,
     _server: MockServer,
     _dir: tempfile::TempDir,
     nzb: String,
@@ -26,6 +28,13 @@ async fn harness() -> Harness {
     let nzb = library.nzb();
     let server = MockServer::start(library, Config::default()).await.unwrap();
     let store = Store::open(&dir.path().join("downloads.db")).await.unwrap();
+    let auth = Auth::new(
+        &store,
+        Arc::new(MasterKey::load_or_create(&dir.path().join("master.key")).unwrap()),
+    )
+    .await
+    .unwrap();
+    auth.bootstrap(KEY).await.unwrap();
     let runner = Runner {
         store,
         pool: Arc::new(fangst_nntp::Pool::new(fangst_nntp::ServerConfig {
@@ -46,10 +55,15 @@ async fn harness() -> Harness {
     };
     Harness {
         service: Service::new(runner),
+        auth,
         _server: server,
         _dir: dir,
         nzb,
     }
+}
+
+fn app(h: &Harness) -> axum::Router {
+    router(h.service.clone(), h.auth.clone(), AuthSettings::default())
 }
 
 async fn call(
@@ -63,10 +77,7 @@ async fn call(
     if let Some(key) = key {
         request = request.header("x-api-key", key);
     }
-    let response = router(h.service.clone(), KEY)
-        .oneshot(request.body(body).unwrap())
-        .await
-        .unwrap();
+    let response = app(h).oneshot(request.body(body).unwrap()).await.unwrap();
     let status = response.status();
     (
         status,
@@ -267,7 +278,7 @@ async fn event_stream_reports_changes() {
     let h = harness().await;
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
-    let app = router(h.service.clone(), KEY);
+    let app = app(&h);
     let server = tokio::spawn(async move { axum::serve(listener, app).await });
 
     let (mut socket, _) =
@@ -311,6 +322,10 @@ fn every_route_is_in_the_openapi_document() {
         ("/api/v1/jobs/{id}/timeline", &["get"]),
         ("/api/v1/events", &["get"]),
         ("/api/v1/servers/test", &["post"]),
+        ("/api/v1/auth/login", &["post"]),
+        ("/api/v1/auth/logout", &["post"]),
+        ("/api/v1/auth/me", &["get"]),
+        ("/api/v1/auth/password", &["put"]),
     ] {
         for method in methods {
             assert!(
@@ -321,10 +336,11 @@ fn every_route_is_in_the_openapi_document() {
     }
     assert_eq!(
         paths.len(),
-        8,
+        12,
         "a route exists in the document but not in this test"
     );
     assert!(doc["components"]["securitySchemes"]["api_key"].is_object());
+    assert!(doc["components"]["securitySchemes"]["session"].is_object());
 }
 
 async fn test_server_call(h: &Harness, body: serde_json::Value) -> (StatusCode, serde_json::Value) {
@@ -335,10 +351,7 @@ async fn test_server_call(h: &Harness, body: serde_json::Value) -> (StatusCode, 
         .header("content-type", "application/json")
         .body(Body::from(body.to_string()))
         .unwrap();
-    let response = router(h.service.clone(), KEY)
-        .oneshot(request)
-        .await
-        .unwrap();
+    let response = app(h).oneshot(request).await.unwrap();
     let status = response.status();
     let bytes = response.into_body().collect().await.unwrap().to_bytes();
     (status, serde_json::from_slice(&bytes).unwrap())
@@ -399,10 +412,8 @@ async fn event_stream_key_is_url_decoded() {
         .uri("/api/v1/events?api_key=plus%2Bslash%2Fequals%3D0123456789")
         .body(Body::empty())
         .unwrap();
-    let response = router(h.service.clone(), key)
-        .oneshot(request)
-        .await
-        .unwrap();
+    h.auth.bootstrap(key).await.unwrap();
+    let response = app(&h).oneshot(request).await.unwrap();
     // Past the key check the handler wants a WebSocket upgrade, which this plain request isn't.
     assert_ne!(response.status(), StatusCode::UNAUTHORIZED);
 }
