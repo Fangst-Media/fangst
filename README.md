@@ -48,7 +48,11 @@ bun run dev
 
 ## Contributing
 
-Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) before submitting a PR.
+Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) before submitting a PR. Coding agents and people working with them start at [AGENTS.md](AGENTS.md). By opening a pull request you agree to the [contributor licence agreement](CLA.md).
+
+## Licence
+
+The application is under the [GNU Affero General Public License v3.0 or later](LICENSE). Low-level reusable crates (NNTP, yEnc, NZB, release-name parsing, provider traits) are under MIT OR Apache-2.0 so other projects can use them. The name and logo are not covered by the code licences; see [TRADEMARKS.md](TRADEMARKS.md).
 
 ## Alternatives
 
