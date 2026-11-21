@@ -390,3 +390,38 @@ async fn server_test_reports_success_and_causes() {
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
+
+#[tokio::test]
+async fn event_stream_key_is_url_decoded() {
+    let h = harness().await;
+    let key = "plus+slash/equals=0123456789";
+    let request = Request::builder()
+        .uri("/api/v1/events?api_key=plus%2Bslash%2Fequals%3D0123456789")
+        .body(Body::empty())
+        .unwrap();
+    let response = router(h.service.clone(), key)
+        .oneshot(request)
+        .await
+        .unwrap();
+    // Past the key check the handler wants a WebSocket upgrade, which this plain request isn't.
+    assert_ne!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[test]
+fn query_parameters_are_documented_as_query() {
+    let doc: serde_json::Value = serde_json::from_str(&openapi_json()).unwrap();
+    for (path, method, name) in [
+        ("/api/v1/jobs", "post", "name"),
+        ("/api/v1/jobs", "post", "category"),
+        ("/api/v1/jobs", "post", "priority"),
+        ("/api/v1/jobs/{id}", "delete", "delete_files"),
+    ] {
+        let params = doc["paths"][path][method]["parameters"].as_array().unwrap();
+        let param = params
+            .iter()
+            .find(|p| p["name"] == name)
+            .unwrap_or_else(|| panic!("{name} missing"));
+        assert_eq!(param["in"], "query", "{method} {path} {name}");
+        assert_ne!(param["required"], true, "{name} is optional");
+    }
+}

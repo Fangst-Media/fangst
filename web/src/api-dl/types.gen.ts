@@ -57,6 +57,36 @@ export type JobKind = 'usenet' | 'torrent';
 
 export type JobStatus = 'queued' | 'downloading' | 'paused' | 'completed' | 'failed';
 
+/**
+ * A usenet server to try. Nothing is saved.
+ */
+export type ServerTestRequest = {
+    /**
+     * How many connections to open at once; use the count you plan to configure.
+     */
+    connections?: number;
+    host: string;
+    password?: string | null;
+    port: number;
+    tls?: boolean;
+    username?: string | null;
+};
+
+export type ServerTestResult = {
+    /**
+     * Stable name of what went wrong: `dns`, `refused`, `timeout`, `tls`, `network`,
+     * `auth_failed`, `auth_required`, `unavailable`, `protocol` or `connection_limit`.
+     */
+    cause?: string | null;
+    connections_accepted: number;
+    connections_requested: number;
+    /**
+     * What happened, in words a user can act on. Never contains the password.
+     */
+    message: string;
+    ok: boolean;
+};
+
 export type EventsData = {
     body?: never;
     path?: never;
@@ -107,18 +137,18 @@ export type AddJobData = {
      * The NZB file
      */
     body: Array<number>;
-    path: {
+    path?: never;
+    query?: {
         /**
          * Shown in the queue; defaults to the NZB's title.
          */
-        name: string | null;
-        category: string | null;
+        name?: string;
+        category?: string;
         /**
          * Higher runs first.
          */
-        priority: number | null;
+        priority?: number;
     };
-    query?: never;
     url: '/api/v1/jobs';
 };
 
@@ -139,12 +169,13 @@ export type DeleteJobData = {
     body?: never;
     path: {
         id: number;
+    };
+    query?: {
         /**
          * Also remove the job's folder and everything downloaded into it.
          */
-        delete_files: boolean | null;
+        delete_files?: boolean;
     };
-    query?: never;
     url: '/api/v1/jobs/{id}';
 };
 
@@ -245,3 +276,23 @@ export type JobTimelineResponses = {
 };
 
 export type JobTimelineResponse = JobTimelineResponses[keyof JobTimelineResponses];
+
+export type TestServerData = {
+    body: ServerTestRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/servers/test';
+};
+
+export type TestServerErrors = {
+    400: ApiError;
+    401: ApiError;
+};
+
+export type TestServerError = TestServerErrors[keyof TestServerErrors];
+
+export type TestServerResponses = {
+    200: ServerTestResult;
+};
+
+export type TestServerResponse = TestServerResponses[keyof TestServerResponses];

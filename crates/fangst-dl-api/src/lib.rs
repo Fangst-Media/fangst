@@ -96,12 +96,17 @@ async fn require_api_key(State(state): State<ApiState>, request: Request, next: 
     let header = request
         .headers()
         .get("x-api-key")
-        .and_then(|v| v.to_str().ok());
-    // Browsers can't set headers on a WebSocket handshake, so the event stream also takes a query key.
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_owned);
+    // Browsers can't set headers on a WebSocket handshake, so the event stream also takes a query
+    // key. It arrives URL-encoded; keys with `+`, `/` or `=` only match after decoding.
     let query = (request.uri().path() == "/api/v1/events")
-        .then(|| request.uri().query())
-        .flatten()
-        .and_then(|q| q.split('&').find_map(|pair| pair.strip_prefix("api_key=")));
+        .then(|| {
+            Query::<std::collections::HashMap<String, String>>::try_from_uri(request.uri())
+                .ok()
+                .and_then(|Query(mut params)| params.remove("api_key"))
+        })
+        .flatten();
     match header.or(query) {
         Some(key) if constant_time_eq(key.as_bytes(), state.api_key.as_bytes()) => {
             next.run(request).await
@@ -252,6 +257,7 @@ async fn list_jobs(State(state): State<ApiState>) -> Response {
 }
 
 #[derive(Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 struct AddJobQuery {
     /// Shown in the queue; defaults to the NZB's title.
     name: Option<String>,
@@ -342,6 +348,7 @@ async fn resume_job(State(state): State<ApiState>, Path(id): Path<i64>) -> Respo
 }
 
 #[derive(Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 struct DeleteQuery {
     /// Also remove the job's folder and everything downloaded into it.
     delete_files: Option<bool>,
