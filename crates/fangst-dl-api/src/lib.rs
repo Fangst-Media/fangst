@@ -1,20 +1,27 @@
 //! The native HTTP API of the download daemon.
 //!
-//! Everything lives under `/api/v1` and needs the `X-Api-Key` header, except `/api/v1/health` so
-//! monitoring and container health checks work without a secret. The OpenAPI document is generated
+//! Everything lives under `/api/v1` and needs the `X-Api-Key` header or a session cookie from
+//! `/api/v1/auth/login`, except health, login and logout. Health stays open so monitoring and
+//! container health checks work without a secret. The OpenAPI document is generated
 //! from the handlers; `fangst-dl openapi --check` keeps the committed copy in sync.
 
 use std::sync::Arc;
 
+mod auth;
+mod limit;
+
+pub use auth::{AuthSettings, LoginRequest, PasswordChange, UserDto};
+pub use limit::LoginLimits;
+
 use axum::Json;
 use axum::Router;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
-use axum::extract::{DefaultBodyLimit, Path, Query, Request, State};
+use axum::extract::{DefaultBodyLimit, Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
-use axum::middleware::{self, Next};
+use axum::middleware;
 use axum::response::{IntoResponse, Response};
-use axum::routing::{get, post};
-use fangst_downloads::{Change, Error as QueueError, Event, Job, Service};
+use axum::routing::{get, post, put};
+use fangst_downloads::{Auth, Change, Error as QueueError, Event, Job, Service};
 use serde::{Deserialize, Serialize};
 use utoipa::{OpenApi, ToSchema};
 
@@ -24,16 +31,18 @@ const MAX_NZB_BYTES: usize = 64 * 1024 * 1024;
 #[derive(Clone)]
 struct ApiState {
     service: Service,
-    api_key: Arc<str>,
+    auth: Auth,
+    settings: Arc<AuthSettings>,
+    limiter: Arc<limit::Limiter>,
 }
 
 #[derive(OpenApi)]
 #[openapi(
     info(title = "Fangst download daemon", description = "Native API of fangst-dl."),
-    paths(health, list_jobs, add_job, get_job, pause_job, resume_job, delete_job, job_timeline, events, test_server),
-    components(schemas(Health, JobDto, EventDto, ApiError, ChangeDto, JobStatus, JobKind, ServerTestRequest, ServerTestResult)),
+    paths(health, auth::login, auth::logout, auth::me, auth::change_password, list_jobs, add_job, get_job, pause_job, resume_job, delete_job, job_timeline, events, test_server),
+    components(schemas(Health, JobDto, EventDto, ApiError, ChangeDto, JobStatus, JobKind, ServerTestRequest, ServerTestResult, UserDto, LoginRequest, PasswordChange)),
     modifiers(&ApiKeyScheme),
-    security(("api_key" = []))
+    security(("api_key" = []), ("session" = []))
 )]
 struct ApiDoc;
 
@@ -46,6 +55,10 @@ impl utoipa::Modify for ApiKeyScheme {
         components.add_security_scheme(
             "api_key",
             SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("X-Api-Key"))),
+        );
+        components.add_security_scheme(
+            "session",
+            SecurityScheme::ApiKey(ApiKey::Cookie(ApiKeyValue::new(auth::SESSION_COOKIE))),
         );
     }
 }
@@ -63,11 +76,16 @@ pub fn openapi_json() -> String {
     json
 }
 
-/// All routes, with the API key check in front of everything but health.
-pub fn router(service: Service, api_key: &str) -> Router {
+/// All routes, with the caller check in front of everything but health, login and logout.
+///
+/// Serve it with `into_make_service_with_connect_info::<SocketAddr>()`; without the client address
+/// every caller shares one login rate limit.
+pub fn router(service: Service, auth: Auth, settings: AuthSettings) -> Router {
     let state = ApiState {
         service,
-        api_key: Arc::from(api_key),
+        auth,
+        limiter: Arc::new(limit::Limiter::new(settings.login)),
+        settings: Arc::new(settings),
     };
     let protected = Router::new()
         .route(
@@ -82,44 +100,18 @@ pub fn router(service: Service, api_key: &str) -> Router {
         .route("/api/v1/jobs/{id}/timeline", get(job_timeline))
         .route("/api/v1/events", get(events))
         .route("/api/v1/servers/test", post(test_server))
+        .route("/api/v1/auth/me", get(auth::me))
+        .route("/api/v1/auth/password", put(auth::change_password))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
-            require_api_key,
+            auth::require_user,
         ));
     Router::new()
         .route("/api/v1/health", get(health))
+        .route("/api/v1/auth/login", post(auth::login))
+        .route("/api/v1/auth/logout", post(auth::logout))
         .merge(protected)
         .with_state(state)
-}
-
-async fn require_api_key(State(state): State<ApiState>, request: Request, next: Next) -> Response {
-    let header = request
-        .headers()
-        .get("x-api-key")
-        .and_then(|v| v.to_str().ok())
-        .map(str::to_owned);
-    // Browsers can't set headers on a WebSocket handshake, so the event stream also takes a query
-    // key. It arrives URL-encoded; keys with `+`, `/` or `=` only match after decoding.
-    let query = (request.uri().path() == "/api/v1/events")
-        .then(|| {
-            Query::<std::collections::HashMap<String, String>>::try_from_uri(request.uri())
-                .ok()
-                .and_then(|Query(mut params)| params.remove("api_key"))
-        })
-        .flatten();
-    match header.or(query) {
-        Some(key) if constant_time_eq(key.as_bytes(), state.api_key.as_bytes()) => {
-            next.run(request).await
-        }
-        _ => error(
-            StatusCode::UNAUTHORIZED,
-            "missing or wrong X-Api-Key header",
-        ),
-    }
-}
-
-fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
-    a.len() == b.len() && a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
@@ -127,7 +119,7 @@ pub struct ApiError {
     pub error: String,
 }
 
-fn error(status: StatusCode, message: impl Into<String>) -> Response {
+pub(crate) fn error(status: StatusCode, message: impl Into<String>) -> Response {
     (
         status,
         Json(ApiError {
@@ -146,8 +138,35 @@ fn queue_error(e: &QueueError) -> Response {
         QueueError::InvalidState { .. } | QueueError::DuplicateTorrent(_) => {
             error(StatusCode::CONFLICT, e.to_string())
         }
-        _ => error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+        QueueError::Invalid(_) => error(StatusCode::BAD_REQUEST, e.to_string()),
+        QueueError::Busy => busy(),
+        // Says which folder could not be removed and why, which the caller can act on.
+        QueueError::Download(_) => error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+        _ => internal(e),
     }
+}
+
+/// Database and file errors name paths, tables and library internals; callers, some of them not
+/// signed in, get a fixed message and the detail goes to the daemon's log.
+pub(crate) fn internal(e: &QueueError) -> Response {
+    eprintln!("error: {e}");
+    error(
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "internal error; the daemon's log has the details",
+    )
+}
+
+/// Every password-hashing slot is taken. One second is about how long a check takes.
+pub(crate) fn busy() -> Response {
+    let mut response = error(
+        StatusCode::SERVICE_UNAVAILABLE,
+        QueueError::Busy.to_string(),
+    );
+    response.headers_mut().insert(
+        axum::http::header::RETRY_AFTER,
+        axum::http::HeaderValue::from_static("1"),
+    );
+    response
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]

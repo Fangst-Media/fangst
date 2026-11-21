@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddJobData, AddJobErrors, AddJobResponses, DeleteJobData, DeleteJobErrors, DeleteJobResponses, EventsData, EventsErrors, GetJobData, GetJobErrors, GetJobResponses, HealthData, HealthResponses, JobTimelineData, JobTimelineErrors, JobTimelineResponses, ListJobsData, ListJobsErrors, ListJobsResponses, PauseJobData, PauseJobErrors, PauseJobResponses, ResumeJobData, ResumeJobErrors, ResumeJobResponses, TestServerData, TestServerErrors, TestServerResponses } from './types.gen';
+import type { AddJobData, AddJobErrors, AddJobResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, DeleteJobData, DeleteJobErrors, DeleteJobResponses, EventsData, EventsErrors, GetJobData, GetJobErrors, GetJobResponses, HealthData, HealthResponses, JobTimelineData, JobTimelineErrors, JobTimelineResponses, ListJobsData, ListJobsErrors, ListJobsResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutResponses, MeData, MeErrors, MeResponses, PauseJobData, PauseJobErrors, PauseJobResponses, ResumeJobData, ResumeJobErrors, ResumeJobResponses, TestServerData, TestServerErrors, TestServerResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -19,10 +19,58 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
 };
 
 /**
+ * Sets an HttpOnly session cookie. Repeated failures from one address are slowed down with 429 and `Retry-After`.
+ */
+export const login = <ThrowOnError extends boolean = false>(options: Options<LoginData, ThrowOnError>) => (options.client ?? client).post<LoginResponses, LoginErrors, ThrowOnError>({
+    url: '/api/v1/auth/login',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Ends the session in the cookie, if any, and clears the cookie.
+ */
+export const logout = <ThrowOnError extends boolean = false>(options?: Options<LogoutData, ThrowOnError>) => (options?.client ?? client).post<LogoutResponses, unknown, ThrowOnError>({ url: '/api/v1/auth/logout', ...options });
+
+export const me = <ThrowOnError extends boolean = false>(options?: Options<MeData, ThrowOnError>) => (options?.client ?? client).get<MeResponses, MeErrors, ThrowOnError>({
+    security: [{ name: 'X-Api-Key', type: 'apiKey' }, {
+            in: 'cookie',
+            name: 'fangst_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/auth/me',
+    ...options
+});
+
+/**
+ * Sets the caller's password and ends their other sessions. A caller signed in with a session gets a fresh session cookie.
+ */
+export const changePassword = <ThrowOnError extends boolean = false>(options: Options<ChangePasswordData, ThrowOnError>) => (options.client ?? client).put<ChangePasswordResponses, ChangePasswordErrors, ThrowOnError>({
+    security: [{ name: 'X-Api-Key', type: 'apiKey' }, {
+            in: 'cookie',
+            name: 'fangst_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/auth/password',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
  * WebSocket. Each message is a `ChangeDto` as JSON. Browsers pass the key as `?api_key=`.
  */
 export const events = <ThrowOnError extends boolean = false>(options?: Options<EventsData, ThrowOnError>) => (options?.client ?? client).get<unknown, EventsErrors, ThrowOnError>({
-    security: [{ name: 'X-Api-Key', type: 'apiKey' }],
+    security: [{ name: 'X-Api-Key', type: 'apiKey' }, {
+            in: 'cookie',
+            name: 'fangst_session',
+            type: 'apiKey'
+        }],
     url: '/api/v1/events',
     ...options
 });
@@ -30,13 +78,21 @@ export const events = <ThrowOnError extends boolean = false>(options?: Options<E
 export const health = <ThrowOnError extends boolean = false>(options?: Options<HealthData, ThrowOnError>) => (options?.client ?? client).get<HealthResponses, unknown, ThrowOnError>({ url: '/api/v1/health', ...options });
 
 export const listJobs = <ThrowOnError extends boolean = false>(options?: Options<ListJobsData, ThrowOnError>) => (options?.client ?? client).get<ListJobsResponses, ListJobsErrors, ThrowOnError>({
-    security: [{ name: 'X-Api-Key', type: 'apiKey' }],
+    security: [{ name: 'X-Api-Key', type: 'apiKey' }, {
+            in: 'cookie',
+            name: 'fangst_session',
+            type: 'apiKey'
+        }],
     url: '/api/v1/jobs',
     ...options
 });
 
 export const addJob = <ThrowOnError extends boolean = false>(options: Options<AddJobData, ThrowOnError>) => (options.client ?? client).post<AddJobResponses, AddJobErrors, ThrowOnError>({
-    security: [{ name: 'X-Api-Key', type: 'apiKey' }],
+    security: [{ name: 'X-Api-Key', type: 'apiKey' }, {
+            in: 'cookie',
+            name: 'fangst_session',
+            type: 'apiKey'
+        }],
     url: '/api/v1/jobs',
     ...options,
     headers: {
@@ -46,31 +102,51 @@ export const addJob = <ThrowOnError extends boolean = false>(options: Options<Ad
 });
 
 export const deleteJob = <ThrowOnError extends boolean = false>(options: Options<DeleteJobData, ThrowOnError>) => (options.client ?? client).delete<DeleteJobResponses, DeleteJobErrors, ThrowOnError>({
-    security: [{ name: 'X-Api-Key', type: 'apiKey' }],
+    security: [{ name: 'X-Api-Key', type: 'apiKey' }, {
+            in: 'cookie',
+            name: 'fangst_session',
+            type: 'apiKey'
+        }],
     url: '/api/v1/jobs/{id}',
     ...options
 });
 
 export const getJob = <ThrowOnError extends boolean = false>(options: Options<GetJobData, ThrowOnError>) => (options.client ?? client).get<GetJobResponses, GetJobErrors, ThrowOnError>({
-    security: [{ name: 'X-Api-Key', type: 'apiKey' }],
+    security: [{ name: 'X-Api-Key', type: 'apiKey' }, {
+            in: 'cookie',
+            name: 'fangst_session',
+            type: 'apiKey'
+        }],
     url: '/api/v1/jobs/{id}',
     ...options
 });
 
 export const pauseJob = <ThrowOnError extends boolean = false>(options: Options<PauseJobData, ThrowOnError>) => (options.client ?? client).post<PauseJobResponses, PauseJobErrors, ThrowOnError>({
-    security: [{ name: 'X-Api-Key', type: 'apiKey' }],
+    security: [{ name: 'X-Api-Key', type: 'apiKey' }, {
+            in: 'cookie',
+            name: 'fangst_session',
+            type: 'apiKey'
+        }],
     url: '/api/v1/jobs/{id}/pause',
     ...options
 });
 
 export const resumeJob = <ThrowOnError extends boolean = false>(options: Options<ResumeJobData, ThrowOnError>) => (options.client ?? client).post<ResumeJobResponses, ResumeJobErrors, ThrowOnError>({
-    security: [{ name: 'X-Api-Key', type: 'apiKey' }],
+    security: [{ name: 'X-Api-Key', type: 'apiKey' }, {
+            in: 'cookie',
+            name: 'fangst_session',
+            type: 'apiKey'
+        }],
     url: '/api/v1/jobs/{id}/resume',
     ...options
 });
 
 export const jobTimeline = <ThrowOnError extends boolean = false>(options: Options<JobTimelineData, ThrowOnError>) => (options.client ?? client).get<JobTimelineResponses, JobTimelineErrors, ThrowOnError>({
-    security: [{ name: 'X-Api-Key', type: 'apiKey' }],
+    security: [{ name: 'X-Api-Key', type: 'apiKey' }, {
+            in: 'cookie',
+            name: 'fangst_session',
+            type: 'apiKey'
+        }],
     url: '/api/v1/jobs/{id}/timeline',
     ...options
 });
@@ -79,7 +155,11 @@ export const jobTimeline = <ThrowOnError extends boolean = false>(options: Optio
  * Connects with every requested connection at once and logs in. A failed test is still a 200; read `ok` and `cause`.
  */
 export const testServer = <ThrowOnError extends boolean = false>(options: Options<TestServerData, ThrowOnError>) => (options.client ?? client).post<TestServerResponses, TestServerErrors, ThrowOnError>({
-    security: [{ name: 'X-Api-Key', type: 'apiKey' }],
+    security: [{ name: 'X-Api-Key', type: 'apiKey' }, {
+            in: 'cookie',
+            name: 'fangst_session',
+            type: 'apiKey'
+        }],
     url: '/api/v1/servers/test',
     ...options,
     headers: {

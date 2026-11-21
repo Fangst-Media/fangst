@@ -22,6 +22,7 @@ utoipa = "6.0.0"
 
 [dev-dependencies]
 fangst-bench = { path = "../../tools/fangst-bench" }
+fangst-core = { path = "../fangst-core" }
 fangst-nntp = { path = "../fangst-nntp" }
 fangst-usenet = { path = "../fangst-usenet" }
 futures-util = "0.3.34"

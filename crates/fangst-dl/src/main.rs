@@ -23,6 +23,23 @@ enum Command {
     Get(GetArgs),
     /// Write or check the committed OpenAPI document.
     Openapi(OpenapiArgs),
+    /// Set a user's password from this machine, for a lost password or the first one. The user is
+    /// signed out everywhere. Safe to run while the daemon is running.
+    ResetPassword(ResetPasswordArgs),
+}
+
+#[derive(clap::Args)]
+struct ResetPasswordArgs {
+    /// The daemon's data folder, holding downloads.db and master.key.
+    #[arg(long, default_value = "data")]
+    data_dir: PathBuf,
+    #[arg(long, default_value = fangst_downloads::FIRST_USER)]
+    user: String,
+    /// Name of the environment variable holding the new password. Without it the password is read
+    /// from the first line of standard input. It is never taken as an argument, which would leave
+    /// it in shell history and process listings.
+    #[arg(long)]
+    password_env: Option<String>,
 }
 
 /// One usenet server. Config files and several servers arrive with #16 and #31.
@@ -99,12 +116,16 @@ struct ServeArgs {
     /// Address the API listens on. Port 0 picks a free port.
     #[arg(long, default_value = "127.0.0.1:7740")]
     listen: String,
-    /// Name of the environment variable holding the API key.
+    /// Name of the environment variable holding the API key. It becomes the first user's key and
+    /// replaces the one set at the previous start.
     #[arg(long, default_value = "FANGST_API_KEY")]
     api_key_env: String,
     /// Turn on an optional provider (post-processor, notifier, API adapter) by its id. Repeatable.
     #[arg(long = "enable", value_name = "ID")]
     enabled_providers: Vec<String>,
+    /// Mark the session cookie Secure; use when the API is only reached over HTTPS.
+    #[arg(long)]
+    secure_cookie: bool,
     #[command(flatten)]
     usenet: UsenetArgs,
 }
@@ -142,6 +163,7 @@ fn main() -> ExitCode {
         Command::Serve(args) => runtime.block_on(serve(args)),
         Command::Get(args) => runtime.block_on(get(args)),
         Command::Openapi(args) => openapi(&args),
+        Command::ResetPassword(args) => runtime.block_on(reset_password(args)),
     };
     match result {
         Ok(code) => code,
@@ -169,6 +191,10 @@ async fn serve(args: ServeArgs) -> anyhow::Result<ExitCode> {
     std::fs::create_dir_all(&args.data_dir)
         .with_context(|| format!("creating {}", args.data_dir.display()))?;
     let store = fangst_downloads::Store::open(&args.data_dir.join("downloads.db")).await?;
+    let master_key =
+        fangst_core::secret::MasterKey::load_or_create(&args.data_dir.join("master.key"))?;
+    let auth = fangst_downloads::Auth::new(&store, Arc::new(master_key)).await?;
+    auth.bootstrap(&api_key).await?;
     let pool = args.usenet.pool()?;
     let has_server = pool.is_some();
     let runner = fangst_downloads::Runner {
@@ -189,16 +215,24 @@ async fn serve(args: ServeArgs) -> anyhow::Result<ExitCode> {
     }
     println!("{}", describe_providers(&registry));
 
-    let app = fangst_dl_api::router(service.clone(), &api_key);
+    let settings = fangst_dl_api::AuthSettings {
+        secure_cookie: args.secure_cookie,
+        ..fangst_dl_api::AuthSettings::default()
+    };
+    let app = fangst_dl_api::router(service.clone(), auth, settings);
     let worker = has_server.then(|| {
         let service = service.clone();
         tokio::spawn(async move { service.run().await })
     });
-    axum::serve(listener, app)
-        .with_graceful_shutdown(async {
-            let _ = tokio::signal::ctrl_c().await;
-        })
-        .await?;
+    // The client address feeds the login rate limit.
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .with_graceful_shutdown(async {
+        let _ = tokio::signal::ctrl_c().await;
+    })
+    .await?;
     if let Some(worker) = worker {
         worker.abort();
     }
@@ -225,6 +259,45 @@ fn describe_providers(registry: &fangst_providers::Registry) -> String {
     } else {
         format!("providers: {}", enabled.join(", "))
     }
+}
+
+async fn reset_password(args: ResetPasswordArgs) -> anyhow::Result<ExitCode> {
+    let db = args.data_dir.join("downloads.db");
+    let key = args.data_dir.join("master.key");
+    // Creating either file here would start an empty install, or a new master key that can't
+    // read the stored secrets, in what is most likely a mistyped folder.
+    if !db.exists() || !key.exists() {
+        bail!(
+            "{} has no downloads.db and master.key; point --data-dir at the daemon's data folder",
+            args.data_dir.display()
+        );
+    }
+    let password = if let Some(var) = &args.password_env {
+        std::env::var(var).with_context(|| format!("environment variable {var} is not set"))?
+    } else {
+        use std::io::{BufRead, IsTerminal};
+        if std::io::stdin().is_terminal() {
+            eprint!("new password for {} (shown as you type): ", args.user);
+        }
+        let mut line = String::new();
+        std::io::stdin()
+            .lock()
+            .read_line(&mut line)
+            .context("reading the password from standard input")?;
+        line.trim_end_matches(['\r', '\n']).to_owned()
+    };
+    let store = fangst_downloads::Store::open(&db).await?;
+    let master_key = fangst_core::secret::MasterKey::load_or_create(&key)?;
+    let auth = fangst_downloads::Auth::new(&store, Arc::new(master_key)).await?;
+    let Some(user) = auth.user_by_name(&args.user).await? else {
+        bail!("there is no user named {}", args.user);
+    };
+    auth.set_password(user.id, &password).await?;
+    println!(
+        "password for {} set; their sessions have ended",
+        user.username
+    );
+    Ok(ExitCode::SUCCESS)
 }
 
 fn placeholder_server() -> ServerConfig {

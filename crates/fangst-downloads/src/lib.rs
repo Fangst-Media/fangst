@@ -16,8 +16,10 @@ use sqlx::sqlite::{
 };
 use sqlx::{FromRow, Row};
 
+mod auth;
 mod service;
 mod torrent;
+pub use auth::{Auth, ENVIRONMENT_KEY, FIRST_USER, MIN_PASSWORD_CHARS, Secrets, User};
 pub use service::{Change, Service};
 pub use torrent::{TorrentRunner, TorrentSource};
 
@@ -143,6 +145,11 @@ pub enum Error {
         status: Status,
         action: &'static str,
     },
+    /// Input a caller can fix, in words they can act on.
+    Invalid(String),
+    Secret(fangst_core::secret::Error),
+    /// Every password-hashing slot is in use; try again shortly.
+    Busy,
 }
 
 impl fmt::Display for Error {
@@ -159,11 +166,20 @@ impl fmt::Display for Error {
             Self::InvalidState { id, status, action } => {
                 write!(f, "job {id} is {} and can't be {action}d", status.as_str())
             }
+            Self::Invalid(e) => f.write_str(e),
+            Self::Secret(e) => e.fmt(f),
+            Self::Busy => f.write_str("too many password checks at once; try again in a moment"),
         }
     }
 }
 
 impl std::error::Error for Error {}
+
+impl From<fangst_core::secret::Error> for Error {
+    fn from(e: fangst_core::secret::Error) -> Self {
+        Self::Secret(e)
+    }
+}
 
 impl From<sqlx::Error> for Error {
     fn from(e: sqlx::Error) -> Self {
@@ -186,7 +202,7 @@ fn now() -> i64 {
 
 #[derive(Clone)]
 pub struct Store {
-    pool: SqlitePool,
+    pub(crate) pool: SqlitePool,
 }
 
 impl Store {

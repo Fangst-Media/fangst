@@ -231,7 +231,7 @@ async fn existing_database_is_backed_up_before_migrating() {
 
     Store::open(&db).await.unwrap();
 
-    let backup = dir.path().join("downloads.db.before-3.bak");
+    let backup = dir.path().join(newest_migration_backup());
     assert!(backup.exists(), "expected {}", backup.display());
     Store::open(&db).await.unwrap();
     assert!(
@@ -254,5 +254,19 @@ async fn existing_database_is_backed_up_before_migrating() {
 async fn fresh_database_needs_no_backup() {
     let dir = tempfile::tempdir().unwrap();
     Store::open(&dir.path().join("downloads.db")).await.unwrap();
-    assert!(!dir.path().join("downloads.db.before-3.bak").exists());
+    assert!(!dir.path().join(newest_migration_backup()).exists());
+}
+
+/// The backup is named after the newest pending migration, which changes with every new one.
+fn newest_migration_backup() -> String {
+    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/migrations");
+    let newest = std::fs::read_dir(dir)
+        .unwrap()
+        .filter_map(|entry| {
+            let name = entry.unwrap().file_name().to_string_lossy().into_owned();
+            name.split_once('_')?.0.parse::<i64>().ok()
+        })
+        .max()
+        .unwrap();
+    format!("downloads.db.before-{newest}.bak")
 }

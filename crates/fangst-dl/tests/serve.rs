@@ -72,6 +72,114 @@ fn boots_with_nothing_optional_and_answers_health() {
         200
     );
     assert!(dir.path().join("downloads.db").exists());
+    assert_eq!(
+        std::fs::read(dir.path().join("master.key")).unwrap().len(),
+        32,
+        "the master key is created on first start"
+    );
+}
+
+// A placeholder, never a real credential.
+const NEW_PASSWORD: &str = "placeholder-password";
+
+fn login(addr: &str, password: &str) -> u16 {
+    let body = format!(r#"{{"username":"admin","password":"{password}"}}"#);
+    let mut stream = TcpStream::connect(addr).unwrap();
+    write!(
+        stream,
+        "POST /api/v1/auth/login HTTP/1.1\r\nHost: {addr}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+    )
+    .unwrap();
+    let mut response = String::new();
+    stream.read_to_string(&mut response).unwrap();
+    response.split_whitespace().nth(1).unwrap().parse().unwrap()
+}
+
+fn reset_password(data_dir: &std::path::Path, user: &str) -> Command {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_fangst-dl"));
+    command.args([
+        "reset-password",
+        "--data-dir",
+        data_dir.to_str().unwrap(),
+        "--user",
+        user,
+    ]);
+    command
+}
+
+#[test]
+fn reset_password_from_the_environment_or_stdin_lets_the_user_log_in() {
+    let dir = tempfile::tempdir().unwrap();
+    drop(start(dir.path()));
+
+    let output = reset_password(dir.path(), "admin")
+        .args(["--password-env", "FANGST_TEST_NEW_PASSWORD"])
+        .env("FANGST_TEST_NEW_PASSWORD", NEW_PASSWORD)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(!String::from_utf8_lossy(&output.stdout).contains(NEW_PASSWORD));
+    let daemon = start(dir.path());
+    assert_eq!(login(&daemon.addr, NEW_PASSWORD), 200);
+    drop(daemon);
+
+    let mut child = reset_password(dir.path(), "ADMIN")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(b"another-placeholder\r\n")
+        .unwrap();
+    let output = child.wait_with_output().unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let daemon = start(dir.path());
+    assert_eq!(login(&daemon.addr, "another-placeholder"), 200);
+    assert_eq!(login(&daemon.addr, NEW_PASSWORD), 401);
+}
+
+#[test]
+fn reset_password_refuses_unknown_users_wrong_folders_and_argv_passwords() {
+    let dir = tempfile::tempdir().unwrap();
+    let output = reset_password(dir.path(), "admin")
+        .args(["--password-env", "FANGST_TEST_NEW_PASSWORD"])
+        .env("FANGST_TEST_NEW_PASSWORD", NEW_PASSWORD)
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("--data-dir"));
+    assert!(
+        !dir.path().join("downloads.db").exists(),
+        "a wrong folder is not turned into a new install"
+    );
+
+    drop(start(dir.path()));
+    let output = reset_password(dir.path(), "nobody")
+        .args(["--password-env", "FANGST_TEST_NEW_PASSWORD"])
+        .env("FANGST_TEST_NEW_PASSWORD", NEW_PASSWORD)
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("no user named nobody"));
+
+    let output = reset_password(dir.path(), "admin")
+        .args(["--password", NEW_PASSWORD])
+        .output()
+        .unwrap();
+    assert!(!output.status.success(), "there is no argument for it");
 }
 
 #[test]
