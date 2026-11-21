@@ -1,0 +1,19 @@
+[package]
+name = "fangst-nzb"
+description = "NZB parsing with input limits and validation."
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license = "MIT OR Apache-2.0"
+repository.workspace = true
+publish.workspace = true
+keywords = ["nzb", "usenet"]
+
+[lints]
+workspace = true
+
+[dependencies]
+quick-xml = "0.42.0"
+
+[dev-dependencies]
+proptest = "1.12.0"
