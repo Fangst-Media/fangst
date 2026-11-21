@@ -64,6 +64,10 @@ fn status(n: u8, files: &[(&str, u64)], have: u64, down: u64) -> TorrentStatus {
         uploaded_bytes: 0,
         download_bps: down,
         upload_bps: 0,
+        seeding: false,
+        seeding_secs: 0,
+        ratio_limit: Some(1.0),
+        seeding_time_limit_secs: Some(604_800),
     }
 }
 

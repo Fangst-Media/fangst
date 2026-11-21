@@ -295,6 +295,7 @@ async fn serve(args: ServeArgs) -> anyhow::Result<ExitCode> {
             disk_check_interval: defaults.disk.check_interval(),
         })
         .with_progress(defaults.progress.clone())
+        .with_seeding(defaults.seeding.clone())
         .with_torrent_limit(args.torrent.max_active(&defaults.torrent));
     if !has_server {
         service = service.without_usenet();

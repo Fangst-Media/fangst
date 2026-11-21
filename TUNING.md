@@ -76,6 +76,26 @@ The TCP port other peers connect to. `fangst-dl serve --torrent-port` overrides 
 - Range: 0 to 65535
 - Change it when the port is taken by another program, or to match a port forwarded on your router.
 
+## `[seeding]`
+
+A finished torrent job stays in the torrent engine and keeps uploading to other peers until one of these limits is reached, whichever comes first. Then it stops seeding; its files stay where they are. A category can set its own limits, which win over these for every job in it. Upload and seed time are recorded in the database, so a restarted daemon picks seeding back up with the time already spent counted.
+
+### `ratio_limit`
+
+Stop seeding once the job has uploaded this many times its own size. Uploads while it was still downloading count too.
+
+- Default: `1.0`
+- Range: 0 or more; a negative value turns the ratio limit off. `0` stops seeding as soon as the download finishes.
+- Raise it on trackers that ask for a higher ratio; lower it on a slow or metered upload.
+
+### `time_limit_secs`
+
+Stop seeding after this many seconds of seeding, counted from when the download finished. Time the daemon was not running does not count.
+
+- Default: `604800` (7 days)
+- Range: 0 or more; a negative value turns the time limit off. With both limits off a torrent seeds until it is deleted.
+- Raise it for private trackers with a minimum seed time.
+
 ## `[extract]`
 
 ### `delete_archives`

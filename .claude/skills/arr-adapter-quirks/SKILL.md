@@ -199,11 +199,15 @@ ratio or seeding-time limit is reached. HolyArrs decodes strictly: `size`, `eta`
 fails the whole poll. `sync/maindata` gives `torrents` as a map of hash to fields without `hash`;
 `full_update: true` is always valid. An empty `category=` asks for torrents without a category.
 Fangst maps queued to `queuedDL`, downloading to `downloading` (`metaDL` while a magnet link waits
-for metadata), paused to `stoppedDL`, completed to `stoppedUP` and failed to `error`. `progress`,
+for metadata), paused to `stoppedDL`, completed and still seeding to `uploading` (sending) or
+`stalledUP` (idle), completed and done seeding to `stoppedUP`, and failed to `error`. `progress`,
 `downloaded`, `amount_left`, `dlspeed` and `eta` come from the job's `downloaded_bytes`,
-`rate_bytes_per_sec` and `eta_seconds` (8640000 when unknown). A finished
-job has stopped seeding, so it reports `ratio_limit` 0 and `seeding_time_limit` 0, which lets
-Sonarr and Radarr remove it after import when "remove completed" is on. Paths: a single-file
+`rate_bytes_per_sec` and `eta_seconds` (8640000 when unknown). `ratio`, `uploaded` and
+`seeding_time` (seconds) count every run. While seeding, `ratio_limit` and `seeding_time_limit`
+(minutes, rounded down) are the job's real limits, -1 when off. Once seeding has stopped they name
+the limit it reached, so the ratio or seed time always reaches it; a job that stopped for another
+reason (engine error, or finished before seeding existed, #25) reports 0 and 0. Either way Sonarr
+and Radarr remove it after import when "remove completed" is on. Paths: a single-file
 torrent's `save_path` is its job folder and `content_path` the file; a multi-file torrent's
 `save_path` is the download root and `content_path` and `root_path` the job folder.
 **Fixture:** `info-category.json`, `info-hashes.json`, `info-empty-category.json`, `maindata.json`,

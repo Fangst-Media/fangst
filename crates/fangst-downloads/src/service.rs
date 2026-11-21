@@ -8,12 +8,12 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use fangst_core::defaults::{Defaults, Progress as ProgressSettings};
+use fangst_core::defaults::{Defaults, Progress as ProgressSettings, Seeding as SeedingSettings};
 use tokio::sync::{Notify, Semaphore, broadcast};
 use tokio::task::AbortHandle;
 
 use crate::notify::{self, Notifications};
-use crate::torrent::{TorrentRunner, TorrentSource, TorrentStatus};
+use crate::torrent::{CategorySeeding, TorrentRunner, TorrentSource, TorrentStatus};
 use crate::{Error, Job, Kind, Progress, Runner, Status, Store};
 
 /// A fallback poll covers jobs queued by another process sharing the database.
@@ -40,6 +40,7 @@ pub struct Service {
     changes: broadcast::Sender<Change>,
     notifications: Arc<Notifications>,
     progress: ProgressSettings,
+    seeding: SeedingSettings,
 }
 
 impl Service {
@@ -49,6 +50,7 @@ impl Service {
     pub fn new(runner: Runner) -> Self {
         // Slow subscribers miss old changes rather than blocking the queue; they re-read state.
         let (changes, _) = broadcast::channel(256);
+        let defaults = Defaults::builtin().expect("built-in defaults parse");
         Self {
             runner,
             torrents: None,
@@ -59,16 +61,28 @@ impl Service {
             running: Arc::new(Mutex::new(HashMap::new())),
             changes,
             notifications: Arc::new(Notifications::none()),
-            progress: Defaults::builtin()
-                .expect("built-in defaults parse")
-                .progress,
+            progress: defaults.progress,
+            seeding: defaults.seeding,
         }
     }
 
     /// How often progress is measured, published and recorded.
     #[must_use]
     pub fn with_progress(mut self, settings: ProgressSettings) -> Self {
+        if let Some(torrents) = &mut self.torrents {
+            torrents.persist_interval = settings.persist_interval();
+        }
         self.progress = settings;
+        self
+    }
+
+    /// When finished torrents stop seeding, for jobs whose category sets no limits of its own.
+    #[must_use]
+    pub fn with_seeding(mut self, settings: SeedingSettings) -> Self {
+        if let Some(torrents) = &mut self.torrents {
+            torrents.seeding = settings.clone();
+        }
+        self.seeding = settings;
         self
     }
 
@@ -81,6 +95,9 @@ impl Service {
             engine,
             root: self.runner.root.clone(),
             live: crate::torrent::Live::default(),
+            seeding: self.seeding.clone(),
+            persist_interval: self.progress.persist_interval(),
+            changes: self.changes.clone(),
         });
         self
     }
@@ -182,9 +199,36 @@ impl Service {
         crate::torrent::status(
             &self.runner.store,
             self.torrents.as_ref().map(|t| &t.live),
+            &self.seeding,
             id,
         )
         .await
+    }
+
+    /// A category's own seeding limits; `None` fields use the defaults.
+    ///
+    /// # Errors
+    /// When the database read fails.
+    pub async fn category_seeding(&self, name: &str) -> Result<CategorySeeding, Error> {
+        self.runner.store.category_seeding(name).await
+    }
+
+    /// Sets a category's seeding limits, creating it if needed. See [`Store::set_category_seeding`].
+    ///
+    /// # Errors
+    /// [`Error::Invalid`] for a bad name or ratio.
+    pub async fn set_category_seeding(
+        &self,
+        name: &str,
+        seeding: CategorySeeding,
+    ) -> Result<(), Error> {
+        self.runner.store.set_category_seeding(name, seeding).await
+    }
+
+    /// The seeding limits that apply when a category sets none.
+    #[must_use]
+    pub fn default_seeding(&self) -> &SeedingSettings {
+        &self.seeding
     }
 
     /// Every category, created or in use by a job.
@@ -394,10 +438,46 @@ impl Service {
         }
     }
 
+    /// Seeds in a task of its own, so a seeding job holds no download slot, and registers it so
+    /// deleting the job stops it.
+    fn spawn_seeding(
+        &self,
+        id: i64,
+        seeding: impl Future<Output = Result<(), Error>> + Send + 'static,
+    ) {
+        let service = self.clone();
+        // Held while spawning, so the task can't finish and clean up before it is registered.
+        let mut running = self.running.lock().expect("running lock");
+        let task = tokio::spawn(async move {
+            // A job deleted before its seeding began has nothing left to record.
+            if let Err(e) = seeding.await
+                && !matches!(e, Error::NotFound(_))
+            {
+                // The job stays completed; only seeding ended early.
+                eprintln!("error: seeding job {id}: {e}");
+                let _ = service
+                    .runner
+                    .store
+                    .add_event(id, "seeding", &format!("stopped seeding: {e}"))
+                    .await;
+            }
+            let me = tokio::task::id();
+            let mut running = service.running.lock().expect("running lock");
+            if running.get(&id).is_some_and(|h| h.id() == me) {
+                running.remove(&id);
+            }
+        });
+        running.insert(id, task.abort_handle());
+    }
+
     async fn run_torrents(&self) -> Result<(), Error> {
         let Some(torrents) = &self.torrents else {
             return std::future::pending().await;
         };
+        for job in self.runner.store.seeding_jobs().await? {
+            let runner = torrents.clone();
+            self.spawn_seeding(job.id, async move { runner.reseed(&job).await });
+        }
         let slots = Arc::new(Semaphore::new(self.torrent_limit));
         loop {
             let slot = Arc::clone(&slots)
@@ -424,8 +504,6 @@ impl Service {
                 .insert(id, task.abort_handle());
             let service = self.clone();
             tokio::spawn(async move {
-                // Held until the job ends, is paused or is deleted, which all end `task`.
-                let _slot = slot;
                 let task_id = task.id();
                 let outcome = task.await;
                 {
@@ -435,13 +513,27 @@ impl Service {
                         running.remove(&id);
                     }
                 }
-                if let Ok(Err(e)) = outcome {
-                    // The database failed mid-job; record it if it has recovered.
-                    let _ = service
-                        .runner
-                        .store
-                        .set_status(id, Status::Failed, Some(&e.to_string()))
-                        .await;
+                // Seeding holds no slot, so the next queued torrent can start.
+                drop(slot);
+                let finished = match outcome {
+                    Ok(Ok(finished)) => finished,
+                    Ok(Err(e)) => {
+                        // The database failed mid-job; record it if it has recovered.
+                        let _ = service
+                            .runner
+                            .store
+                            .set_status(id, Status::Failed, Some(&e.to_string()))
+                            .await;
+                        None
+                    }
+                    Err(_) => None,
+                };
+                if let Some(download) = finished
+                    && let Some(torrents) = &service.torrents
+                {
+                    let torrents = torrents.clone();
+                    service
+                        .spawn_seeding(id, async move { torrents.seed(id, download, false).await });
                 }
                 service.changed(id);
                 notify::job_finished(&service.notifications, &service.runner.store, id);

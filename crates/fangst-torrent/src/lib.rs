@@ -10,7 +10,7 @@ use std::net::SocketAddr;
 use std::num::NonZeroU32;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use librqbit::dht::DhtPersistenceConfig;
 use librqbit::limits::LimitsConfig;
@@ -371,6 +371,34 @@ impl Download {
         }
     }
 
+    /// Starts counting seed time from now, on top of what earlier runs counted. Uploads count from
+    /// when the torrent started in this run, downloading included, so `earlier` must hold only what
+    /// runs before this one sent.
+    #[must_use]
+    pub fn seed_clock(&self, earlier: Seeded) -> SeedClock {
+        SeedClock {
+            handle: Arc::clone(&self.handle),
+            earlier,
+            started: Instant::now(),
+        }
+    }
+
+    /// Seeds until `limits` is reached or the engine fails, checking a few times a second. Peers
+    /// are served all along; this only watches. Cancel by dropping the future, for instance to
+    /// record progress or apply new limits, then call it again with the same clock.
+    pub async fn seed(&self, clock: &SeedClock, limits: &SeedLimits) -> SeedStop {
+        let mut tick = tokio::time::interval(POLL);
+        loop {
+            tick.tick().await;
+            if let Some(error) = clock.error() {
+                return SeedStop::Failed(error);
+            }
+            if let Some(stop) = limits.reached(clock.seeded(), self.total_bytes) {
+                return stop;
+            }
+        }
+    }
+
     /// Removes the torrent from the engine, closing its files, and keeps what is on disk.
     pub async fn stop(mut self) {
         self.stopped = true;
@@ -409,6 +437,130 @@ impl Watch {
             uploaded_bytes: stats.uploaded_bytes,
             download_bps,
             upload_bps,
+        }
+    }
+}
+
+/// What seeding has counted for one torrent, across runs.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Seeded {
+    /// Bytes sent to peers, downloading included.
+    pub uploaded_bytes: u64,
+    /// Time spent seeding after the download finished.
+    pub time: Duration,
+}
+
+impl Seeded {
+    /// Uploaded bytes over the torrent's size; 0 for an empty torrent.
+    #[must_use]
+    pub fn ratio(&self, total_bytes: u64) -> f64 {
+        if total_bytes == 0 {
+            return 0.0;
+        }
+        #[allow(clippy::cast_precision_loss)] // A ratio; 2^52 bytes is far away.
+        let ratio = self.uploaded_bytes as f64 / total_bytes as f64;
+        ratio
+    }
+}
+
+/// When a finished torrent stops seeding: at the ratio or after the time, whichever comes first.
+/// `None` turns that limit off; with both off a torrent seeds until it is deleted.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct SeedLimits {
+    /// Uploaded bytes over the torrent's size.
+    pub ratio: Option<f64>,
+    pub time: Option<Duration>,
+}
+
+/// Why seeding ended.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SeedStop {
+    Ratio {
+        ratio: f64,
+        limit: f64,
+    },
+    Time {
+        limit: Duration,
+    },
+    /// The engine stopped the torrent, for instance because its files went missing.
+    Failed(String),
+}
+
+impl fmt::Display for SeedStop {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Ratio { ratio, limit } => {
+                write!(f, "ratio {ratio:.2} reached the limit of {limit:.2}")
+            }
+            Self::Time { limit } => {
+                write!(f, "seeded for the limit of {} seconds", limit.as_secs())
+            }
+            Self::Failed(e) => write!(f, "torrent engine: {e}"),
+        }
+    }
+}
+
+impl SeedLimits {
+    /// Which limit `seeded` has reached for a torrent of `total_bytes`, ratio first.
+    #[must_use]
+    pub fn reached(&self, seeded: Seeded, total_bytes: u64) -> Option<SeedStop> {
+        if let Some(limit) = self.ratio {
+            let ratio = seeded.ratio(total_bytes);
+            // Compared as bytes so a ratio of exactly 1.0 is reached by sending exactly the size.
+            #[allow(
+                clippy::cast_precision_loss,
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss
+            )]
+            let needed = (limit.max(0.0) * total_bytes as f64).ceil() as u64;
+            if seeded.uploaded_bytes >= needed {
+                return Some(SeedStop::Ratio { ratio, limit });
+            }
+        }
+        if let Some(limit) = self.time
+            && seeded.time >= limit
+        {
+            return Some(SeedStop::Time { limit });
+        }
+        None
+    }
+}
+
+/// Counts a seeding torrent's uploads and seed time; cheap to clone, for readers elsewhere.
+#[derive(Clone)]
+pub struct SeedClock {
+    handle: Arc<ManagedTorrent>,
+    earlier: Seeded,
+    started: Instant,
+}
+
+impl SeedClock {
+    /// Everything counted so far, earlier runs included.
+    #[must_use]
+    pub fn seeded(&self) -> Seeded {
+        Seeded {
+            uploaded_bytes: self.earlier.uploaded_bytes + self.handle.stats().uploaded_bytes,
+            time: self.earlier.time + self.started.elapsed(),
+        }
+    }
+
+    /// Bytes per second sent to peers right now.
+    #[must_use]
+    pub fn upload_bps(&self) -> u64 {
+        self.handle
+            .stats()
+            .live
+            .as_ref()
+            .map_or(0, |live| live.upload_speed.as_bytes())
+    }
+
+    fn error(&self) -> Option<String> {
+        let stats = self.handle.stats();
+        match stats.state {
+            TorrentStatsState::Error => {
+                Some(stats.error.unwrap_or_else(|| "unknown error".to_owned()))
+            }
+            _ => None,
         }
     }
 }
@@ -485,6 +637,39 @@ mod tests {
             parse_magnet("magnet:?dn=nothing"),
             Err(Error::InvalidMagnet(_))
         ));
+    }
+
+    #[test]
+    fn seeding_limits_whichever_comes_first() {
+        let size = 1_000;
+        let seeded = |uploaded_bytes, secs| Seeded {
+            uploaded_bytes,
+            time: Duration::from_secs(secs),
+        };
+        let both = SeedLimits {
+            ratio: Some(1.0),
+            time: Some(Duration::from_mins(1)),
+        };
+        assert_eq!(both.reached(seeded(999, 59), size), None);
+        assert!(matches!(
+            both.reached(seeded(1_000, 0), size),
+            Some(SeedStop::Ratio { .. })
+        ));
+        assert_eq!(
+            both.reached(seeded(10, 60), size),
+            Some(SeedStop::Time {
+                limit: Duration::from_mins(1)
+            })
+        );
+        let none = SeedLimits::default();
+        assert_eq!(none.reached(seeded(u64::MAX / 2, 1 << 40), size), None);
+        let zero = SeedLimits {
+            ratio: Some(0.0),
+            time: None,
+        };
+        assert!(zero.reached(seeded(0, 0), size).is_some());
+        assert!((seeded(1_500, 0).ratio(size) - 1.5).abs() < 1e-9);
+        assert!(seeded(1_500, 0).ratio(0).abs() < f64::EPSILON);
     }
 
     #[test]

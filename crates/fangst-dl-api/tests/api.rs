@@ -214,6 +214,61 @@ async fn job_lifecycle_through_the_api() {
 }
 
 #[tokio::test]
+async fn categories_carry_their_own_seeding_limits() {
+    let h = harness().await;
+    let put = |body: serde_json::Value| {
+        Request::builder()
+            .method("PUT")
+            .uri("/api/v1/categories/private/seeding")
+            .header("x-api-key", KEY)
+            .header("content-type", "application/json")
+            .body(Body::from(body.to_string()))
+            .unwrap()
+    };
+    let (status, body) = call(
+        &h,
+        "GET",
+        "/api/v1/categories/private/seeding",
+        Some(KEY),
+        Body::empty(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&body).unwrap(),
+        serde_json::json!({ "ratio_limit": null, "time_limit_secs": null })
+    );
+
+    let limits = serde_json::json!({ "ratio_limit": 2.5, "time_limit_secs": -1 });
+    let response = app(&h).oneshot(put(limits.clone())).await.unwrap();
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+    let (_, body) = call(
+        &h,
+        "GET",
+        "/api/v1/categories/private/seeding",
+        Some(KEY),
+        Body::empty(),
+    )
+    .await;
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&body).unwrap(),
+        limits
+    );
+    let (_, body) = call(&h, "GET", "/api/v1/categories", Some(KEY), Body::empty()).await;
+    assert_eq!(
+        serde_json::from_slice::<Vec<String>>(&body).unwrap(),
+        ["private"],
+        "setting limits creates the category"
+    );
+
+    // A usenet job never seeds and reports nothing uploaded.
+    let job = add(&h).await;
+    assert!(!job.seeding);
+    assert_eq!((job.uploaded_bytes, job.seeding_secs), (0, 0));
+    assert!(job.ratio.abs() < f64::EPSILON);
+}
+
+#[tokio::test]
 async fn name_defaults_to_the_nzb_title() {
     let h = harness().await;
     let nzb = h.nzb.replacen(
@@ -347,6 +402,7 @@ fn every_route_is_in_the_openapi_document() {
         ("/api/v1/jobs/{id}/category", &["put"]),
         ("/api/v1/categories", &["get"]),
         ("/api/v1/categories/{name}", &["put"]),
+        ("/api/v1/categories/{name}/seeding", &["get", "put"]),
         ("/api/v1/events", &["get"]),
         ("/api/v1/servers/test", &["post"]),
         ("/api/v1/auth/login", &["post"]),
@@ -363,7 +419,7 @@ fn every_route_is_in_the_openapi_document() {
     }
     assert_eq!(
         paths.len(),
-        16,
+        17,
         "a route exists in the document but not in this test"
     );
     assert!(doc["components"]["securitySchemes"]["api_key"].is_object());

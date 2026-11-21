@@ -14,6 +14,10 @@ export function makeJob(overrides: Partial<JobDto> = {}): JobDto {
     downloaded_bytes: 0,
     rate_bytes_per_sec: 0,
     added_at: 1_700_000_000,
+    seeding: false,
+    uploaded_bytes: 0,
+    ratio: 0,
+    seeding_secs: 0,
     ...overrides,
   }
 }

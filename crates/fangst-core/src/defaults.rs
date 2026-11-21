@@ -6,12 +6,14 @@ use serde::Deserialize;
 
 /// Every section of `defaults.toml`. A section unknown here is ignored so a crate can add its own
 /// section before it reads it through this type.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+// Not Eq, since the seeding ratio is a float.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct Defaults {
     pub notify: Notify,
     pub disk: Disk,
     pub progress: Progress,
     pub torrent: Torrent,
+    pub seeding: Seeding,
     pub extract: Extract,
     pub safety: Safety,
 }
@@ -77,6 +79,29 @@ pub struct Torrent {
     pub listen_port: u16,
 }
 
+/// When a finished torrent stops seeding: whichever limit comes first. Negative turns one off.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Seeding {
+    /// Uploaded bytes over the torrent's size.
+    pub ratio_limit: f64,
+    pub time_limit_secs: i64,
+}
+
+impl Seeding {
+    #[must_use]
+    pub fn ratio_limit(&self) -> Option<f64> {
+        (self.ratio_limit >= 0.0).then_some(self.ratio_limit)
+    }
+
+    #[must_use]
+    pub fn time_limit(&self) -> Option<Duration> {
+        u64::try_from(self.time_limit_secs)
+            .ok()
+            .map(Duration::from_secs)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Extract {
@@ -121,11 +146,14 @@ impl Defaults {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use super::Defaults;
 
     /// Every section after `[disk]`, which the tests below don't vary.
     const REST: &str = "[progress]\npublish_interval_ms = 1\nrate_window_secs = 1\npersist_interval_secs = 1\n\
         [torrent]\nmax_active = 1\nlisten_port = 1\n\
+        [seeding]\nratio_limit = 1.0\ntime_limit_secs = -1\n\
         [extract]\ndelete_archives = true\n\
         [safety]\nblocked_extensions = [\"exe\"]\n";
 
@@ -140,6 +168,16 @@ mod tests {
         assert_eq!(defaults.progress.persist_interval_secs, 10);
         assert_eq!(defaults.torrent.max_active, 5);
         assert_eq!(defaults.torrent.listen_port, 6881);
+        assert!(
+            defaults
+                .seeding
+                .ratio_limit()
+                .is_some_and(|r| (r - 1.0).abs() < f64::EPSILON)
+        );
+        assert_eq!(
+            defaults.seeding.time_limit(),
+            Some(Duration::from_hours(7 * 24))
+        );
         assert!(defaults.extract.delete_archives);
         assert_eq!(
             defaults.safety.blocked_extensions,
@@ -147,6 +185,16 @@ mod tests {
                 "exe", "lnk", "scr", "bat", "cmd", "com", "pif", "vbs", "js", "msi", "ps1"
             ]
         );
+    }
+
+    #[test]
+    fn negative_seeding_limits_are_off() {
+        let seeding = super::Seeding {
+            ratio_limit: -1.0,
+            time_limit_secs: -1,
+        };
+        assert_eq!(seeding.ratio_limit(), None);
+        assert_eq!(seeding.time_limit(), None);
     }
 
     #[test]

@@ -39,6 +39,21 @@ export type CategoryChange = {
 };
 
 /**
+ * A category's own seeding limits. `null` uses the daemon's default; a negative value turns that
+ * limit off. A finished torrent stops seeding at whichever limit it reaches first.
+ */
+export type CategorySeedingDto = {
+    /**
+     * Uploaded bytes over the torrent's size.
+     */
+    ratio_limit?: number | null;
+    /**
+     * Seconds of seeding after the download finished.
+     */
+    time_limit_secs?: number | null;
+};
+
+/**
  * A message on the event stream.
  */
 export type ChangeDto = {
@@ -101,8 +116,25 @@ export type JobDto = {
      * Averaged over the last few seconds; 0 unless the job is downloading.
      */
     rate_bytes_per_sec: number;
+    /**
+     * Uploaded bytes over `total_bytes`; 0 while the size is unknown.
+     */
+    ratio: number;
+    /**
+     * A completed torrent job that still uploads to peers; it stops once its category's ratio
+     * or time limit is reached. Always `false` for usenet jobs.
+     */
+    seeding: boolean;
+    /**
+     * Seconds a torrent job seeded after its download finished, every run counted.
+     */
+    seeding_secs: number;
     status: JobStatus;
     total_bytes: number;
+    /**
+     * Bytes a torrent job sent to peers, every run counted; live while it seeds.
+     */
+    uploaded_bytes: number;
 };
 
 export type JobKind = 'usenet' | 'torrent';
@@ -180,9 +212,25 @@ export type TorrentStatusDto = {
      * Lowercase hex of the v1 info hash.
      */
     info_hash: string;
+    /**
+     * The ratio at which seeding stops, from the job's category or the defaults; `null` when off.
+     */
+    ratio_limit?: number | null;
+    /**
+     * The job completed and still uploads to peers.
+     */
+    seeding: boolean;
+    /**
+     * Seconds seeded after the download finished, every run counted.
+     */
+    seeding_secs: number;
+    /**
+     * Seconds of seeding after which it stops; `null` when off.
+     */
+    seeding_time_limit_secs?: number | null;
     upload_bps: number;
     /**
-     * Bytes sent to peers since the torrent started in this run.
+     * Bytes sent to peers over the job's life, every run counted.
      */
     uploaded_bytes: number;
 };
@@ -318,6 +366,49 @@ export type CreateCategoryResponses = {
 };
 
 export type CreateCategoryResponse = CreateCategoryResponses[keyof CreateCategoryResponses];
+
+export type GetCategorySeedingData = {
+    body?: never;
+    path: {
+        name: string;
+    };
+    query?: never;
+    url: '/api/v1/categories/{name}/seeding';
+};
+
+export type GetCategorySeedingErrors = {
+    401: ApiError;
+};
+
+export type GetCategorySeedingError = GetCategorySeedingErrors[keyof GetCategorySeedingErrors];
+
+export type GetCategorySeedingResponses = {
+    200: CategorySeedingDto;
+};
+
+export type GetCategorySeedingResponse = GetCategorySeedingResponses[keyof GetCategorySeedingResponses];
+
+export type SetCategorySeedingData = {
+    body: CategorySeedingDto;
+    path: {
+        name: string;
+    };
+    query?: never;
+    url: '/api/v1/categories/{name}/seeding';
+};
+
+export type SetCategorySeedingErrors = {
+    400: ApiError;
+    401: ApiError;
+};
+
+export type SetCategorySeedingError = SetCategorySeedingErrors[keyof SetCategorySeedingErrors];
+
+export type SetCategorySeedingResponses = {
+    204: void;
+};
+
+export type SetCategorySeedingResponse = SetCategorySeedingResponses[keyof SetCategorySeedingResponses];
 
 export type EventsData = {
     body?: never;

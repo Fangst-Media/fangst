@@ -222,7 +222,7 @@ pub struct AddTorrent {
     pub priority: i64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TorrentStatus {
     /// Lowercase hex of the v1 info hash.
     pub info_hash: String,
@@ -230,9 +230,18 @@ pub struct TorrentStatus {
     pub files: Vec<TorrentFile>,
     /// Bytes on disk that passed the hash check.
     pub have_bytes: u64,
+    /// Bytes sent to peers over the job's life, every run of the daemon counted.
     pub uploaded_bytes: u64,
     pub download_bps: u64,
     pub upload_bps: u64,
+    /// A completed job that still uploads to peers.
+    pub seeding: bool,
+    /// Time spent seeding after the download finished, every run counted.
+    pub seeding_secs: u64,
+    /// Uploaded bytes over the size at which seeding stops; `None` when there is no ratio limit.
+    pub ratio_limit: Option<f64>,
+    /// Seconds of seeding after which it stops; `None` when there is no time limit.
+    pub seeding_time_limit_secs: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

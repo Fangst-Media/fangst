@@ -16,6 +16,23 @@ use sqlx::sqlite::{
 };
 use sqlx::{FromRow, Row};
 
+/// Column list shared by every job query; a macro so the SQL stays a `&'static str`, which sqlx
+/// requires. Defined before the modules so they can use it too.
+macro_rules! job_columns {
+    () => {
+        "jobs.id AS id, kind, name, category, priority, status, error, output_path, total_bytes, downloaded_bytes, added_at, finished_at, \
+         COALESCE(torrent_jobs.uploaded_bytes, 0) AS uploaded_bytes, COALESCE(torrent_jobs.seeding_secs, 0) AS seeding_secs, \
+         COALESCE(torrent_jobs.seeding, 0) AS seeding"
+    };
+}
+
+/// The tables [`job_columns`] reads from.
+macro_rules! job_from {
+    () => {
+        "jobs LEFT JOIN torrent_jobs ON torrent_jobs.job_id = jobs.id"
+    };
+}
+
 mod auth;
 mod categories;
 mod notify;
@@ -28,7 +45,7 @@ pub use notify::Notifications;
 use progress::Meter;
 pub use progress::Progress;
 pub use service::{Change, Service};
-pub use torrent::{TorrentFile, TorrentRunner, TorrentSource, TorrentStatus};
+pub use torrent::{CategorySeeding, TorrentFile, TorrentRunner, TorrentSource, TorrentStatus};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Kind {
@@ -96,6 +113,12 @@ pub struct Job {
     /// Unix seconds.
     pub added_at: i64,
     pub finished_at: Option<i64>,
+    /// A completed torrent job that still uploads to peers. Usenet jobs never seed.
+    pub seeding: bool,
+    /// Bytes a torrent job sent to peers over every run; live while it seeds.
+    pub uploaded_bytes: i64,
+    /// Seconds a torrent job seeded after its download finished, over every run; live while it seeds.
+    pub seeding_secs: i64,
 }
 
 /// One entry in a job's timeline.
@@ -123,6 +146,9 @@ struct JobRow {
     downloaded_bytes: i64,
     added_at: i64,
     finished_at: Option<i64>,
+    uploaded_bytes: i64,
+    seeding_secs: i64,
+    seeding: bool,
 }
 
 impl TryFrom<JobRow> for Job {
@@ -143,6 +169,9 @@ impl TryFrom<JobRow> for Job {
             eta_seconds: None,
             added_at: row.added_at,
             finished_at: row.finished_at,
+            seeding: row.seeding,
+            uploaded_bytes: row.uploaded_bytes,
+            seeding_secs: row.seeding_secs,
         })
     }
 }
@@ -205,13 +234,6 @@ impl From<sqlx::Error> for Error {
     }
 }
 
-/// Column list shared by every job query; a macro so the SQL stays a `&'static str`, which sqlx requires.
-macro_rules! job_columns {
-    () => {
-        "id, kind, name, category, priority, status, error, output_path, total_bytes, downloaded_bytes, added_at, finished_at"
-    };
-}
-
 fn now() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -222,6 +244,7 @@ fn now() -> i64 {
 pub struct Store {
     pub(crate) pool: SqlitePool,
     pub(crate) meters: progress::Meters,
+    pub(crate) seeds: torrent::Seeds,
 }
 
 impl Store {
@@ -266,6 +289,7 @@ impl Store {
         Ok(Self {
             pool,
             meters: progress::Meters::default(),
+            seeds: torrent::Seeds::default(),
         })
     }
 
@@ -350,7 +374,9 @@ impl Store {
         sqlx::query_as::<_, JobRow>(concat!(
             "SELECT ",
             job_columns!(),
-            " FROM jobs ORDER BY id DESC"
+            " FROM ",
+            job_from!(),
+            " ORDER BY jobs.id DESC"
         ))
         .fetch_all(&self.pool)
         .await?
@@ -365,7 +391,9 @@ impl Store {
         sqlx::query_as::<_, JobRow>(concat!(
             "SELECT ",
             job_columns!(),
-            " FROM jobs WHERE id = ?"
+            " FROM ",
+            job_from!(),
+            " WHERE id = ?"
         ))
         .bind(id)
         .fetch_optional(&self.pool)
@@ -375,8 +403,15 @@ impl Store {
         .map(|job| self.with_live_progress(job))
     }
 
-    /// Replaces the recorded byte count of a job this process is downloading with the live one.
+    /// Replaces the recorded counts of a job this process is downloading or seeding with live ones.
     fn with_live_progress(&self, mut job: Job) -> Job {
+        if job.seeding
+            && let Some(clock) = self.seeds.clock(job.id)
+        {
+            let seeded = clock.seeded();
+            job.uploaded_bytes = i64::try_from(seeded.uploaded_bytes).unwrap_or(i64::MAX);
+            job.seeding_secs = i64::try_from(seeded.time.as_secs()).unwrap_or(i64::MAX);
+        }
         if job.status == Status::Downloading
             && let Some(live) = self.progress(job.id)
         {
@@ -397,7 +432,9 @@ impl Store {
         sqlx::query_as::<_, JobRow>(concat!(
             "SELECT ",
             job_columns!(),
-            " FROM jobs WHERE status = 'queued' ORDER BY priority DESC, id LIMIT 1"
+            " FROM ",
+            job_from!(),
+            " WHERE status = 'queued' ORDER BY priority DESC, id LIMIT 1"
         ))
         .fetch_optional(&self.pool)
         .await?
@@ -413,7 +450,9 @@ impl Store {
         sqlx::query_as::<_, JobRow>(concat!(
             "SELECT ",
             job_columns!(),
-            " FROM jobs WHERE status = 'queued' AND kind = ? ORDER BY priority DESC, id LIMIT 1"
+            " FROM ",
+            job_from!(),
+            " WHERE status = 'queued' AND kind = ? ORDER BY priority DESC, id LIMIT 1"
         ))
         .bind(kind.as_str())
         .fetch_optional(&self.pool)

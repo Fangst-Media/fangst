@@ -9,7 +9,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use fangst_bench::tracker::Tracker;
-use fangst_downloads::{Error, Event, Kind, Runner, Service, Status, Store, TorrentSource};
+use fangst_downloads::{
+    CategorySeeding, Error, Event, Kind, Runner, Service, Status, Store, TorrentSource,
+};
 use fangst_torrent::{Config, Download, Engine};
 
 const TIMEOUT: Duration = Duration::from_mins(1);
@@ -350,12 +352,14 @@ async fn service_downloads_a_torrent_file_and_a_magnet_link() {
     assert_eq!(job.kind, Kind::Torrent);
     assert_eq!(job.total_bytes, 2_200_001);
     assert_same_files(&swarm.source, job.output_path.as_ref().unwrap());
+    // Seeding starts on its own after completion; its entries are checked in the seeding tests.
     let kinds: Vec<String> = store
         .timeline(from_magnet)
         .await
         .unwrap()
         .into_iter()
         .map(|e| e.kind)
+        .filter(|kind| kind != "seeding")
         .collect();
     assert_eq!(
         kinds,
@@ -508,5 +512,248 @@ async fn no_more_torrents_run_than_the_limit() {
     service.pause(ids[0]).await.unwrap();
     wait_for(&store, ids[2], Status::Downloading).await;
     assert_eq!(store.get(ids[1]).await.unwrap().status, Status::Downloading);
+    worker.abort();
+}
+
+fn seeding(ratio_limit: f64, time_limit_secs: i64) -> fangst_core::defaults::Seeding {
+    fangst_core::defaults::Seeding {
+        ratio_limit,
+        time_limit_secs,
+    }
+}
+
+/// Seeding counts reach the database every second instead of every ten.
+fn quick_progress() -> fangst_core::defaults::Progress {
+    fangst_core::defaults::Progress {
+        publish_interval_ms: 100,
+        rate_window_secs: 1,
+        persist_interval_secs: 1,
+    }
+}
+
+/// Waits for a timeline entry of kind `seeding` whose message starts with `prefix`.
+async fn seeding_event(store: &Store, id: i64, prefix: &str) -> Event {
+    tokio::time::timeout(TIMEOUT, async {
+        loop {
+            let timeline = store.timeline(id).await.unwrap();
+            if let Some(event) = timeline
+                .into_iter()
+                .find(|e| e.kind == "seeding" && e.message.starts_with(prefix))
+            {
+                return event;
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+    })
+    .await
+    .unwrap_or_else(|_| panic!("job {id} has no seeding entry starting with {prefix:?}"))
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn seeding_stops_at_the_ratio_limit_in_a_test_swarm() {
+    let swarm = Swarm::new().await;
+    let (seeder, seed) = swarm.seeder(Pieces::All).await;
+    let dir = tempfile::tempdir().unwrap();
+    let store = Store::open(&dir.path().join("downloads.db")).await.unwrap();
+    let engine = Engine::start(config()).await.unwrap();
+    let service = service(store.clone(), &dir.path().join("downloads"), engine)
+        .with_progress(quick_progress())
+        .with_seeding(seeding(1.0, -1));
+    let worker = tokio::spawn({
+        let service = service.clone();
+        async move { service.run().await }
+    });
+    let id = service
+        .add_torrent("Some.Release", None, 0, TorrentSource::File(&swarm.torrent))
+        .await
+        .unwrap();
+    let started = seeding_event(&store, id, "seeding").await;
+    assert_eq!(started.message, "seeding until ratio 1.00");
+    let job = store.get(id).await.unwrap();
+    assert_eq!(job.status, Status::Completed);
+    assert!(job.seeding);
+
+    // The first seeder leaves, so a new peer can only get the files from the job.
+    drop(seed);
+    seeder.shutdown().await;
+    let leecher = Engine::start(config()).await.unwrap();
+    let out = dir.path().join("leecher");
+    let download = leecher.start_torrent(&swarm.torrent, &out).await.unwrap();
+
+    let stopped = seeding_event(&store, id, "stopped seeding").await;
+    assert!(
+        stopped.message.starts_with("stopped seeding: ratio 1.0"),
+        "{}",
+        stopped.message
+    );
+    let job = store.get(id).await.unwrap();
+    assert_eq!(
+        job.status,
+        Status::Completed,
+        "files stay, the job stays done"
+    );
+    assert!(!job.seeding);
+    assert!(job.uploaded_bytes >= i64::try_from(TOTAL).unwrap());
+    let status = service.torrent_status(id).await.unwrap().unwrap();
+    assert!(!status.seeding);
+    assert!(status.uploaded_bytes >= TOTAL);
+    assert_eq!(status.ratio_limit, Some(1.0));
+    assert_eq!(status.seeding_time_limit_secs, None);
+    tokio::time::timeout(TIMEOUT, download.wait())
+        .await
+        .expect("the leecher got everything the job sent")
+        .unwrap();
+    assert_same_files(&swarm.source, &out);
+    worker.abort();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn seeding_a_category_override_beats_the_default() {
+    let swarm = Swarm::new().await;
+    let _seeder = swarm.seeder(Pieces::All).await;
+    let dir = tempfile::tempdir().unwrap();
+    let store = Store::open(&dir.path().join("downloads.db")).await.unwrap();
+    let engine = Engine::start(config()).await.unwrap();
+    // By default nothing would ever stop seeding.
+    let service = service(store.clone(), &dir.path().join("downloads"), engine)
+        .with_progress(quick_progress())
+        .with_seeding(seeding(-1.0, -1));
+    let short = CategorySeeding {
+        ratio_limit: Some(5.0),
+        time_limit_secs: Some(1),
+    };
+    service.set_category_seeding("short", short).await.unwrap();
+    assert_eq!(service.category_seeding("short").await.unwrap(), short);
+    assert_eq!(
+        service.category_seeding("other").await.unwrap(),
+        CategorySeeding::default()
+    );
+    assert!(
+        service
+            .categories()
+            .await
+            .unwrap()
+            .contains(&"short".to_owned())
+    );
+    let worker = tokio::spawn({
+        let service = service.clone();
+        async move { service.run().await }
+    });
+    let id = service
+        .add_torrent(
+            "Some.Release",
+            Some("short"),
+            0,
+            TorrentSource::File(&swarm.torrent),
+        )
+        .await
+        .unwrap();
+
+    let started = seeding_event(&store, id, "seeding").await;
+    assert_eq!(
+        started.message,
+        "seeding until ratio 5.00 or for 1 seconds, whichever comes first"
+    );
+    // Nobody leeches, so only the category's time limit can end it.
+    let stopped = seeding_event(&store, id, "stopped seeding").await;
+    assert!(
+        stopped
+            .message
+            .starts_with("stopped seeding: seeded for the limit of 1 seconds"),
+        "{}",
+        stopped.message
+    );
+    let job = store.get(id).await.unwrap();
+    assert!(!job.seeding);
+    assert!(job.seeding_secs >= 1);
+    let status = service.torrent_status(id).await.unwrap().unwrap();
+    assert_eq!(status.ratio_limit, Some(5.0));
+    assert_eq!(status.seeding_time_limit_secs, Some(1));
+    worker.abort();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn seeding_restart_keeps_the_seed_time_counted() {
+    let swarm = Swarm::new().await;
+    let _seeder = swarm.seeder(Pieces::All).await;
+    let dir = tempfile::tempdir().unwrap();
+    let db = dir.path().join("downloads.db");
+    let root = dir.path().join("downloads");
+
+    // The first daemon runs on a runtime of its own, so dropping it ends every task it started,
+    // seeding included, the way a process that stops does.
+    let first = std::thread::spawn({
+        let torrent = swarm.torrent.clone();
+        let db = db.clone();
+        let root = root.clone();
+        move || {
+            let runtime = tokio::runtime::Runtime::new().unwrap();
+            let id = runtime.block_on(async move {
+                let store = Store::open(&db).await.unwrap();
+                let engine = Engine::start(config()).await.unwrap();
+                let service = service(store.clone(), &root, engine)
+                    .with_progress(quick_progress())
+                    .with_seeding(seeding(-1.0, -1));
+                let running = service.clone();
+                tokio::spawn(async move { running.run().await });
+                let id = service
+                    .add_torrent("Some.Release", None, 0, TorrentSource::File(&torrent))
+                    .await
+                    .unwrap();
+                seeding_event(&store, id, "seeding").await;
+                // A second handle on the file sees only what was written, not the live count.
+                let written = Store::open(&db).await.unwrap();
+                tokio::time::timeout(TIMEOUT, async {
+                    while written.get(id).await.unwrap().seeding_secs < 2 {
+                        tokio::time::sleep(Duration::from_millis(100)).await;
+                    }
+                })
+                .await
+                .expect("seed time was written");
+                id
+            });
+            runtime.shutdown_timeout(Duration::from_secs(10));
+            id
+        }
+    });
+    let id = tokio::task::spawn_blocking(move || first.join().unwrap())
+        .await
+        .unwrap();
+
+    let store = Store::open(&db).await.unwrap();
+    let job = store.get(id).await.unwrap();
+    assert!(
+        job.seeding,
+        "the job was still seeding when the daemon stopped"
+    );
+    let counted = job.seeding_secs;
+    assert!(counted >= 2);
+
+    // Two more seconds of seeding reach the limit only if the time already counted counts.
+    let limit = counted + 2;
+    let second = service(store.clone(), &root, Engine::start(config()).await.unwrap())
+        .with_progress(quick_progress())
+        .with_seeding(seeding(-1.0, limit));
+    let worker = tokio::spawn({
+        let second = second.clone();
+        async move { second.run().await }
+    });
+    let resumed = seeding_event(&store, id, "seeding again").await;
+    assert_eq!(
+        resumed.message,
+        format!("seeding again for {limit} seconds, {counted} seconds already counted")
+    );
+    let stopped = seeding_event(&store, id, "stopped seeding").await;
+    assert!(
+        stopped.message.starts_with(&format!(
+            "stopped seeding: seeded for the limit of {limit} seconds"
+        )),
+        "{}",
+        stopped.message
+    );
+    let job = store.get(id).await.unwrap();
+    assert!(!job.seeding);
+    assert!(job.seeding_secs >= limit);
+    assert_eq!(job.status, Status::Completed);
     worker.abort();
 }

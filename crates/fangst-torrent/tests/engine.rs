@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use fangst_bench::tracker::Tracker;
-use fangst_torrent::{Config, Download, Engine, Error};
+use fangst_torrent::{Config, Download, Engine, Error, SeedLimits, SeedStop, Seeded};
 
 const TIMEOUT: Duration = Duration::from_mins(1);
 const PIECE: u32 = 64 * 1024;
@@ -86,7 +86,7 @@ enum Seeder {
 struct Swarm {
     tracker: Tracker,
     _seeder: Engine,
-    _seed: Download,
+    seed: Download,
     torrent: Vec<u8>,
     /// See [`a_pieces`].
     a: std::ops::Range<usize>,
@@ -129,7 +129,7 @@ async fn swarm(seeder: Seeder) -> Swarm {
     Swarm {
         tracker,
         _seeder: engine,
-        _seed: seed,
+        seed,
         torrent,
         a,
         source,
@@ -243,6 +243,68 @@ async fn damaged_pieces_on_disk_are_downloaded_again() {
     );
     finish(download).await;
     assert_same_files(&swarm.source, out.path());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn seeding_stops_at_the_ratio_limit() {
+    let swarm = swarm(Seeder::Everything).await;
+    let total = swarm.seed.total_bytes();
+    let clock = swarm.seed.seed_clock(Seeded::default());
+    let limits = SeedLimits {
+        ratio: Some(1.0),
+        time: None,
+    };
+    // The seeder is the only one holding the pieces, so a full download uploads its whole size.
+    let out = tempfile::tempdir().unwrap();
+    let leecher = Engine::start(config()).await.unwrap();
+    let _download = leecher
+        .start_torrent(&swarm.torrent, out.path())
+        .await
+        .unwrap();
+
+    let stop = tokio::time::timeout(TIMEOUT, swarm.seed.seed(&clock, &limits))
+        .await
+        .expect("the ratio was reached in time");
+    let seeded = clock.seeded();
+    assert!(
+        matches!(stop, SeedStop::Ratio { limit, ratio } if (limit - 1.0).abs() < f64::EPSILON && ratio >= 1.0),
+        "{stop:?}"
+    );
+    assert!(seeded.uploaded_bytes >= total, "{seeded:?}");
+    assert_eq!(stop.to_string().split(' ').next(), Some("ratio"));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn seeding_stops_at_the_time_limit_when_the_ratio_is_not_reached() {
+    let swarm = swarm(Seeder::Everything).await;
+    let limit = Duration::from_secs(1);
+    let limits = SeedLimits {
+        ratio: Some(1.0),
+        time: Some(limit),
+    };
+    let started = std::time::Instant::now();
+    let clock = swarm.seed.seed_clock(Seeded::default());
+    // Nobody leeches, so nothing is uploaded and only the clock can end seeding.
+    let stop = tokio::time::timeout(TIMEOUT, swarm.seed.seed(&clock, &limits))
+        .await
+        .expect("the time limit ended seeding");
+    assert_eq!(stop, SeedStop::Time { limit });
+    assert!(started.elapsed() >= limit);
+    assert_eq!(clock.seeded().uploaded_bytes, 0);
+
+    // Time counted in an earlier run counts towards the limit straight away.
+    let resumed = swarm.seed.seed_clock(Seeded {
+        uploaded_bytes: 0,
+        time: Duration::from_hours(1),
+    });
+    let long = SeedLimits {
+        ratio: None,
+        time: Some(Duration::from_hours(1)),
+    };
+    let stop = tokio::time::timeout(TIMEOUT, swarm.seed.seed(&resumed, &long))
+        .await
+        .expect("an earlier run already seeded long enough");
+    assert!(matches!(stop, SeedStop::Time { .. }));
 }
 
 #[tokio::test]

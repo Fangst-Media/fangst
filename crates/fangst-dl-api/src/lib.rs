@@ -43,8 +43,8 @@ struct ApiState {
 #[derive(OpenApi)]
 #[openapi(
     info(title = "Fangst download daemon", description = "Native API of fangst-dl."),
-    paths(health, auth::login, auth::logout, auth::me, auth::change_password, list_jobs, add_job, get_job, pause_job, resume_job, delete_job, job_timeline, job_torrent, set_job_category, list_categories, create_category, events, test_server),
-    components(schemas(Health, JobDto, EventDto, ApiError, ChangeDto, JobStatus, JobKind, TorrentStatusDto, TorrentFileDto, CategoryChange, AddJobLink, AddJobUrl, AddJobMagnet, ServerTestRequest, ServerTestResult, UserDto, LoginRequest, PasswordChange)),
+    paths(health, auth::login, auth::logout, auth::me, auth::change_password, list_jobs, add_job, get_job, pause_job, resume_job, delete_job, job_timeline, job_torrent, set_job_category, list_categories, create_category, get_category_seeding, set_category_seeding, events, test_server),
+    components(schemas(Health, JobDto, EventDto, ApiError, ChangeDto, JobStatus, JobKind, TorrentStatusDto, TorrentFileDto, CategoryChange, CategorySeedingDto, AddJobLink, AddJobUrl, AddJobMagnet, ServerTestRequest, ServerTestResult, UserDto, LoginRequest, PasswordChange)),
     modifiers(&ApiKeyScheme),
     security(("api_key" = []), ("session" = []))
 )]
@@ -122,6 +122,10 @@ pub fn router_with_adapters(
         .route("/api/v1/jobs/{id}/category", put(set_job_category))
         .route("/api/v1/categories", get(list_categories))
         .route("/api/v1/categories/{name}", put(create_category))
+        .route(
+            "/api/v1/categories/{name}/seeding",
+            get(get_category_seeding).put(set_category_seeding),
+        )
         .route("/api/v1/events", get(events))
         .route("/api/v1/servers/test", post(test_server))
         .route("/api/v1/auth/me", get(auth::me))
@@ -225,7 +229,7 @@ pub enum JobKind {
     Torrent,
 }
 
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, ToSchema, Debug, Clone, PartialEq)]
 pub struct JobDto {
     pub id: i64,
     pub kind: JobKind,
@@ -247,11 +251,27 @@ pub struct JobDto {
     /// Unix seconds.
     pub added_at: i64,
     pub finished_at: Option<i64>,
+    /// A completed torrent job that still uploads to peers; it stops once its category's ratio
+    /// or time limit is reached. Always `false` for usenet jobs.
+    pub seeding: bool,
+    /// Bytes a torrent job sent to peers, every run counted; live while it seeds.
+    pub uploaded_bytes: i64,
+    /// Uploaded bytes over `total_bytes`; 0 while the size is unknown.
+    pub ratio: f64,
+    /// Seconds a torrent job seeded after its download finished, every run counted.
+    pub seeding_secs: i64,
 }
 
 impl From<Job> for JobDto {
     fn from(job: Job) -> Self {
         use fangst_downloads::{Kind, Status};
+        let ratio = if job.total_bytes > 0 {
+            #[allow(clippy::cast_precision_loss)] // A ratio; 2^52 bytes is far away.
+            let ratio = job.uploaded_bytes as f64 / job.total_bytes as f64;
+            ratio
+        } else {
+            0.0
+        };
         Self {
             id: job.id,
             kind: match job.kind {
@@ -276,6 +296,10 @@ impl From<Job> for JobDto {
             eta_seconds: job.eta_seconds,
             added_at: job.added_at,
             finished_at: job.finished_at,
+            seeding: job.seeding,
+            uploaded_bytes: job.uploaded_bytes,
+            ratio,
+            seeding_secs: job.seeding_secs,
         }
     }
 }
@@ -299,7 +323,7 @@ impl From<Event> for EventDto {
 }
 
 /// A message on the event stream.
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, ToSchema, Debug, Clone, PartialEq)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum ChangeDto {
     Updated {
@@ -646,7 +670,7 @@ async fn job_timeline(State(state): State<ApiState>, Path(id): Path<i64>) -> Res
 }
 
 /// A torrent job's hash, files and live progress.
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, ToSchema, Debug, Clone, PartialEq)]
 pub struct TorrentStatusDto {
     /// Lowercase hex of the v1 info hash.
     pub info_hash: String,
@@ -654,11 +678,19 @@ pub struct TorrentStatusDto {
     pub files: Vec<TorrentFileDto>,
     /// Bytes on disk that passed the hash check.
     pub have_bytes: u64,
-    /// Bytes sent to peers since the torrent started in this run.
+    /// Bytes sent to peers over the job's life, every run counted.
     pub uploaded_bytes: u64,
     /// Bytes per second; 0 while not running.
     pub download_bps: u64,
     pub upload_bps: u64,
+    /// The job completed and still uploads to peers.
+    pub seeding: bool,
+    /// Seconds seeded after the download finished, every run counted.
+    pub seeding_secs: u64,
+    /// The ratio at which seeding stops, from the job's category or the defaults; `null` when off.
+    pub ratio_limit: Option<f64>,
+    /// Seconds of seeding after which it stops; `null` when off.
+    pub seeding_time_limit_secs: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, ToSchema, Debug, Clone, PartialEq, Eq)]
@@ -684,6 +716,10 @@ impl From<fangst_downloads::TorrentStatus> for TorrentStatusDto {
             uploaded_bytes: status.uploaded_bytes,
             download_bps: status.download_bps,
             upload_bps: status.upload_bps,
+            seeding: status.seeding,
+            seeding_secs: status.seeding_secs,
+            ratio_limit: status.ratio_limit,
+            seeding_time_limit_secs: status.seeding_time_limit_secs,
         }
     }
 }
@@ -755,6 +791,57 @@ async fn list_categories(State(state): State<ApiState>) -> Response {
 )]
 async fn create_category(State(state): State<ApiState>, Path(name): Path<String>) -> Response {
     match state.service.create_category(&name).await {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(e) => queue_error(&e),
+    }
+}
+
+/// A category's own seeding limits. `null` uses the daemon's default; a negative value turns that
+/// limit off. A finished torrent stops seeding at whichever limit it reaches first.
+#[derive(Serialize, Deserialize, ToSchema, Debug, Clone, Copy, PartialEq)]
+pub struct CategorySeedingDto {
+    /// Uploaded bytes over the torrent's size.
+    pub ratio_limit: Option<f64>,
+    /// Seconds of seeding after the download finished.
+    pub time_limit_secs: Option<i64>,
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/categories/{name}/seeding",
+    params(("name" = String, Path)),
+    description = "A category's own seeding limits; both `null` for a category that sets none.",
+    responses((status = 200, body = CategorySeedingDto), (status = 401, body = ApiError))
+)]
+async fn get_category_seeding(State(state): State<ApiState>, Path(name): Path<String>) -> Response {
+    match state.service.category_seeding(&name).await {
+        Ok(seeding) => Json(CategorySeedingDto {
+            ratio_limit: seeding.ratio_limit,
+            time_limit_secs: seeding.time_limit_secs,
+        })
+        .into_response(),
+        Err(e) => queue_error(&e),
+    }
+}
+
+#[utoipa::path(
+    put,
+    path = "/api/v1/categories/{name}/seeding",
+    params(("name" = String, Path)),
+    request_body = CategorySeedingDto,
+    description = "Sets a category's seeding limits, creating the category if needed. Jobs already seeding apply them the next time their counts are written.",
+    responses((status = 204), (status = 400, body = ApiError), (status = 401, body = ApiError))
+)]
+async fn set_category_seeding(
+    State(state): State<ApiState>,
+    Path(name): Path<String>,
+    Json(body): Json<CategorySeedingDto>,
+) -> Response {
+    let seeding = fangst_downloads::CategorySeeding {
+        ratio_limit: body.ratio_limit,
+        time_limit_secs: body.time_limit_secs,
+    };
+    match state.service.set_category_seeding(&name, seeding).await {
         Ok(()) => StatusCode::NO_CONTENT.into_response(),
         Err(e) => queue_error(&e),
     }

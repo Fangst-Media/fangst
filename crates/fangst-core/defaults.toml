@@ -26,6 +26,13 @@ max_active = 5
 # TCP port peers connect to. Forward it on the router for incoming peers.
 listen_port = 6881
 
+[seeding]
+# A finished torrent keeps seeding until it has uploaded this many times its size or has seeded
+# for this many seconds (7 days), whichever comes first. A negative value turns that limit off.
+# Categories can override both.
+ratio_limit = 1.0
+time_limit_secs = 604800
+
 [extract]
 # Delete the archive files of a job once every archive in it extracted.
 delete_archives = true

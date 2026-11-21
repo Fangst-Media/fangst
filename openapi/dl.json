@@ -250,6 +250,89 @@
         }
       }
     },
+    "/api/v1/categories/{name}/seeding": {
+      "get": {
+        "tags": [],
+        "description": "A category's own seeding limits; both `null` for a category that sets none.",
+        "operationId": "get_category_seeding",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategorySeedingDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [],
+        "description": "Sets a category's seeding limits, creating the category if needed. Jobs already seeding apply them the next time their counts are written.",
+        "operationId": "set_category_seeding",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategorySeedingDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {},
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/events": {
       "get": {
         "tags": [],
@@ -869,6 +952,28 @@
           }
         }
       },
+      "CategorySeedingDto": {
+        "type": "object",
+        "description": "A category's own seeding limits. `null` uses the daemon's default; a negative value turns that\nlimit off. A finished torrent stops seeding at whichever limit it reaches first.",
+        "properties": {
+          "ratio_limit": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Uploaded bytes over the torrent's size."
+          },
+          "time_limit_secs": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Seconds of seeding after the download finished."
+          }
+        }
+      },
       "ChangeDto": {
         "oneOf": [
           {
@@ -996,7 +1101,11 @@
           "total_bytes",
           "downloaded_bytes",
           "rate_bytes_per_sec",
-          "added_at"
+          "added_at",
+          "seeding",
+          "uploaded_bytes",
+          "ratio",
+          "seeding_secs"
         ],
         "properties": {
           "added_at": {
@@ -1062,12 +1171,31 @@
             "format": "int64",
             "description": "Averaged over the last few seconds; 0 unless the job is downloading."
           },
+          "ratio": {
+            "type": "number",
+            "format": "double",
+            "description": "Uploaded bytes over `total_bytes`; 0 while the size is unknown."
+          },
+          "seeding": {
+            "type": "boolean",
+            "description": "A completed torrent job that still uploads to peers; it stops once its category's ratio\nor time limit is reached. Always `false` for usenet jobs."
+          },
+          "seeding_secs": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Seconds a torrent job seeded after its download finished, every run counted."
+          },
           "status": {
             "$ref": "#/components/schemas/JobStatus"
           },
           "total_bytes": {
             "type": "integer",
             "format": "int64"
+          },
+          "uploaded_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Bytes a torrent job sent to peers, every run counted; live while it seeds."
           }
         }
       },
@@ -1219,7 +1347,9 @@
           "have_bytes",
           "uploaded_bytes",
           "download_bps",
-          "upload_bps"
+          "upload_bps",
+          "seeding",
+          "seeding_secs"
         ],
         "properties": {
           "download_bps": {
@@ -1245,6 +1375,33 @@
             "type": "string",
             "description": "Lowercase hex of the v1 info hash."
           },
+          "ratio_limit": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "The ratio at which seeding stops, from the job's category or the defaults; `null` when off."
+          },
+          "seeding": {
+            "type": "boolean",
+            "description": "The job completed and still uploads to peers."
+          },
+          "seeding_secs": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Seconds seeded after the download finished, every run counted.",
+            "minimum": 0
+          },
+          "seeding_time_limit_secs": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Seconds of seeding after which it stops; `null` when off.",
+            "minimum": 0
+          },
           "upload_bps": {
             "type": "integer",
             "format": "int64",
@@ -1253,7 +1410,7 @@
           "uploaded_bytes": {
             "type": "integer",
             "format": "int64",
-            "description": "Bytes sent to peers since the torrent started in this run.",
+            "description": "Bytes sent to peers over the job's life, every run counted.",
             "minimum": 0
           }
         }

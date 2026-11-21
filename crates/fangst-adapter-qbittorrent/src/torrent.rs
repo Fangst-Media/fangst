@@ -133,24 +133,55 @@ impl Torrent {
         }
     }
 
-    /// qBittorrent 5 state names. A finished job has left the engine and seeds no more, so it
-    /// is `stoppedUP`; a job still waiting for a magnet link's metadata is `metaDL`.
+    /// qBittorrent 5 state names. A finished job is `uploading` while it sends to peers,
+    /// `stalledUP` while it seeds with nobody asking, and `stoppedUP` once seeding ended; a job
+    /// still waiting for a magnet link's metadata is `metaDL`.
     fn state(&self) -> &'static str {
         match self.job.status.as_str() {
             "queued" => "queuedDL",
             "downloading" if self.status.files.is_empty() => "metaDL",
             "downloading" => "downloading",
             "paused" => "stoppedDL",
+            "completed" if self.status.seeding && self.status.upload_bps > 0 => "uploading",
+            "completed" if self.status.seeding => "stalledUP",
             "completed" => "stoppedUP",
             _ => "error",
         }
     }
 
-    /// Seeding stops when the download finishes, so for a finished torrent the share limit has
-    /// been reached: a limit of 0 against a ratio of 0. Sonarr and Radarr remove a finished
-    /// torrent after import only once its limit is reached; without this they never would.
+    /// `ratio_limit` and `seeding_time_limit` (minutes), where -1 is no limit and -2 the global
+    /// one. Sonarr and Radarr remove a finished torrent after import only when it is `stoppedUP`
+    /// and `ratio` or `seeding_time` has reached one of these, so a torrent that stopped seeding
+    /// reports the limit it reached. One that stopped for another reason (an engine error, or it
+    /// finished before seeding existed) reports 0, which every ratio has reached.
     fn share_limit(&self) -> (f64, i64) {
-        if self.done() { (0.0, 0) } else { (-2.0, -2) }
+        if !self.done() {
+            return (-2.0, -2);
+        }
+        let ratio_limit = self.status.ratio_limit.unwrap_or(-1.0);
+        let time_limit_secs = self.status.seeding_time_limit_secs;
+        let minutes = |secs: u64| i64::try_from(secs / 60).unwrap_or(i64::MAX);
+        let time_limit = time_limit_secs.map_or(-1, minutes);
+        if self.status.seeding {
+            return (ratio_limit, time_limit);
+        }
+        let ratio_reached = self.status.ratio_limit.is_some_and(|limit| {
+            #[allow(
+                clippy::cast_precision_loss,
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss
+            )]
+            let needed = (limit.max(0.0) * self.total() as f64).ceil() as u64;
+            self.status.uploaded_bytes >= needed
+        });
+        if ratio_reached {
+            return (ratio_limit, time_limit);
+        }
+        // Rounded down to whole minutes, so the seconds seeded always reach it.
+        match time_limit_secs {
+            Some(limit) if self.status.seeding_secs >= limit => (ratio_limit, minutes(limit)),
+            _ => (0.0, 0),
+        }
     }
 
     fn completion_on(&self) -> i64 {
@@ -224,7 +255,7 @@ impl Torrent {
             "last_activity": self.job.finished_at.unwrap_or(self.job.added_at),
             "auto_tmm": false,
             "time_active": 0,
-            "seeding_time": 0,
+            "seeding_time": self.status.seeding_secs,
             "availability": -1.0,
             "reannounce": 0,
             "comment": "",
@@ -253,7 +284,7 @@ impl Torrent {
             "completion_date": self.completion_on(),
             "last_seen": -1,
             "time_elapsed": 0,
-            "seeding_time": 0,
+            "seeding_time": self.status.seeding_secs,
             "eta": self.eta(),
             "nb_connections": 0,
             "nb_connections_limit": -1,
@@ -315,5 +346,85 @@ impl Torrent {
             })
             .collect();
         Value::Array(files)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const SIZE: u64 = 1_000;
+
+    fn finished(seeding: bool, uploaded: u64, seeded_secs: u64, upload_bps: u64) -> Torrent {
+        Torrent {
+            job: JobSummary {
+                id: 1,
+                kind: "torrent".to_owned(),
+                name: "x".to_owned(),
+                category: None,
+                priority: 0,
+                status: "completed".to_owned(),
+                error: None,
+                output_path: None,
+                total_bytes: 1_000,
+                downloaded_bytes: 1_000,
+                rate_bytes_per_sec: 0,
+                eta_seconds: None,
+                added_at: 0,
+                finished_at: Some(1),
+            },
+            status: TorrentStatus {
+                info_hash: "a".repeat(40),
+                files: Vec::new(),
+                have_bytes: SIZE,
+                uploaded_bytes: uploaded,
+                download_bps: 0,
+                upload_bps,
+                seeding,
+                seeding_secs: seeded_secs,
+                ratio_limit: Some(1.0),
+                seeding_time_limit_secs: Some(90),
+            },
+        }
+    }
+
+    /// Sonarr and Radarr remove a finished torrent once it is `stoppedUP` or `pausedUP` and its
+    /// ratio has reached `ratio_limit` or `seeding_time` (seconds) has reached
+    /// `seeding_time_limit` (minutes).
+    fn removable(torrent: &Torrent) -> bool {
+        let (ratio_limit, time_limit) = torrent.share_limit();
+        let stopped = torrent.state() == "stoppedUP";
+        let by_ratio = ratio_limit >= 0.0 && torrent.ratio() >= ratio_limit - 0.001;
+        let by_time = time_limit >= 0
+            && i64::try_from(torrent.status.seeding_secs).unwrap() >= time_limit * 60;
+        stopped && (by_ratio || by_time)
+    }
+
+    #[test]
+    fn a_seeding_torrent_uploads_and_is_not_removed() {
+        let busy = finished(true, 10, 5, 2_048);
+        assert_eq!(busy.state(), "uploading");
+        assert_eq!(finished(true, 10, 5, 0).state(), "stalledUP");
+        let (ratio, minutes) = busy.share_limit();
+        assert!((ratio - 1.0).abs() < f64::EPSILON);
+        assert_eq!(minutes, 1, "90 seconds, rounded down to whole minutes");
+        assert!(!removable(&busy));
+    }
+
+    #[test]
+    fn a_torrent_that_stopped_seeding_is_removed() {
+        let by_ratio = finished(false, SIZE, 5, 0);
+        assert_eq!(by_ratio.state(), "stoppedUP");
+        assert!(removable(&by_ratio));
+
+        let by_time = finished(false, 10, 90, 0);
+        assert_eq!(by_time.share_limit().1, 1);
+        assert!(removable(&by_time));
+
+        // Neither limit reached: an engine error ended seeding, or it finished before seeding
+        // existed.
+        let other = finished(false, 0, 0, 0);
+        assert_eq!(other.share_limit(), (0.0, 0));
+        assert!(removable(&other));
     }
 }

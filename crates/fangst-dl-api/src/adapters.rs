@@ -270,6 +270,10 @@ impl Jobs for ServiceJobs {
                 uploaded_bytes: s.uploaded_bytes,
                 download_bps: s.download_bps,
                 upload_bps: s.upload_bps,
+                seeding: s.seeding,
+                seeding_secs: s.seeding_secs,
+                ratio_limit: s.ratio_limit,
+                seeding_time_limit_secs: s.seeding_time_limit_secs,
             }))
         })
     }

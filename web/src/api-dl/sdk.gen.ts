@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddJobData, AddJobErrors, AddJobResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, CreateCategoryData, CreateCategoryErrors, CreateCategoryResponses, DeleteJobData, DeleteJobErrors, DeleteJobResponses, EventsData, EventsErrors, GetJobData, GetJobErrors, GetJobResponses, HealthData, HealthResponses, JobTimelineData, JobTimelineErrors, JobTimelineResponses, JobTorrentData, JobTorrentErrors, JobTorrentResponses, ListCategoriesData, ListCategoriesErrors, ListCategoriesResponses, ListJobsData, ListJobsErrors, ListJobsResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutResponses, MeData, MeErrors, MeResponses, PauseJobData, PauseJobErrors, PauseJobResponses, ResumeJobData, ResumeJobErrors, ResumeJobResponses, SetJobCategoryData, SetJobCategoryErrors, SetJobCategoryResponses, TestServerData, TestServerErrors, TestServerResponses } from './types.gen';
+import type { AddJobData, AddJobErrors, AddJobResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, CreateCategoryData, CreateCategoryErrors, CreateCategoryResponses, DeleteJobData, DeleteJobErrors, DeleteJobResponses, EventsData, EventsErrors, GetCategorySeedingData, GetCategorySeedingErrors, GetCategorySeedingResponses, GetJobData, GetJobErrors, GetJobResponses, HealthData, HealthResponses, JobTimelineData, JobTimelineErrors, JobTimelineResponses, JobTorrentData, JobTorrentErrors, JobTorrentResponses, ListCategoriesData, ListCategoriesErrors, ListCategoriesResponses, ListJobsData, ListJobsErrors, ListJobsResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutResponses, MeData, MeErrors, MeResponses, PauseJobData, PauseJobErrors, PauseJobResponses, ResumeJobData, ResumeJobErrors, ResumeJobResponses, SetCategorySeedingData, SetCategorySeedingErrors, SetCategorySeedingResponses, SetJobCategoryData, SetJobCategoryErrors, SetJobCategoryResponses, TestServerData, TestServerErrors, TestServerResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -86,6 +86,36 @@ export const createCategory = <ThrowOnError extends boolean = false>(options: Op
         }],
     url: '/api/v1/categories/{name}',
     ...options
+});
+
+/**
+ * A category's own seeding limits; both `null` for a category that sets none.
+ */
+export const getCategorySeeding = <ThrowOnError extends boolean = false>(options: Options<GetCategorySeedingData, ThrowOnError>) => (options.client ?? client).get<GetCategorySeedingResponses, GetCategorySeedingErrors, ThrowOnError>({
+    security: [{ name: 'X-Api-Key', type: 'apiKey' }, {
+            in: 'cookie',
+            name: 'fangst_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/categories/{name}/seeding',
+    ...options
+});
+
+/**
+ * Sets a category's seeding limits, creating the category if needed. Jobs already seeding apply them the next time their counts are written.
+ */
+export const setCategorySeeding = <ThrowOnError extends boolean = false>(options: Options<SetCategorySeedingData, ThrowOnError>) => (options.client ?? client).put<SetCategorySeedingResponses, SetCategorySeedingErrors, ThrowOnError>({
+    security: [{ name: 'X-Api-Key', type: 'apiKey' }, {
+            in: 'cookie',
+            name: 'fangst_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/categories/{name}/seeding',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**
