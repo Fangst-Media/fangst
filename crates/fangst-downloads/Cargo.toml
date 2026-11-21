@@ -1,0 +1,26 @@
+[package]
+name = "fangst-downloads"
+description = "The download job queue: jobs for both protocols, persistence and resume."
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+fangst-core = { version = "0.1.0", path = "../fangst-core" }
+fangst-nntp = { version = "0.1.0", path = "../fangst-nntp" }
+fangst-nzb = { version = "0.1.0", path = "../fangst-nzb" }
+fangst-usenet = { version = "0.1.0", path = "../fangst-usenet" }
+sqlx = { version = "0.9.1", default-features = false, features = ["runtime-tokio", "sqlite", "migrate", "macros"] }
+tokio = { version = "1.54.1", features = ["sync", "fs", "rt", "time", "macros"] }
+
+[dev-dependencies]
+fangst-bench = { path = "../../tools/fangst-bench" }
+sqlx = { version = "0.9.1", default-features = false, features = ["runtime-tokio", "sqlite"] }
+tempfile = "3.27.0"
+tokio = { version = "1.54.1", features = ["rt-multi-thread"] }
