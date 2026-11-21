@@ -63,9 +63,7 @@ struct Reply {
 
 fn send(addr: &str, method: &str, path: &str, cookie: Option<&str>, form: &str) -> Reply {
     let mut stream = TcpStream::connect(addr).unwrap();
-    let cookie = cookie
-        .map(|c| format!("Cookie: SID={c}\r\n"))
-        .unwrap_or_default();
+    let cookie = cookie.map_or_default(|c| format!("Cookie: SID={c}\r\n"));
     write!(
         stream,
         "{method} {path} HTTP/1.1\r\nHost: {addr}\r\n{cookie}Content-Type: application/x-www-form-urlencoded\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{form}",

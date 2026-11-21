@@ -349,8 +349,7 @@ async fn serve(state: ApiState, adapter: Arc<dyn ApiAdapter>, request: Request) 
         query: parts
             .uri
             .query()
-            .map(|q| form_urlencoded::parse(q.as_bytes()).into_owned().collect())
-            .unwrap_or_default(),
+            .map_or_default(|q| form_urlencoded::parse(q.as_bytes()).into_owned().collect()),
         headers: parts
             .headers
             .iter()

@@ -28,8 +28,7 @@ impl ArchiveSet {
         self.volumes
             .first()
             .and_then(|p| p.file_name())
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_default()
+            .map_or_default(|n| n.to_string_lossy().into_owned())
     }
 
     /// The folder the archive's entries extract into.
@@ -119,7 +118,7 @@ pub fn find(files: &[PathBuf]) -> Vec<ArchiveSet> {
         let Some((format, base, position)) = classify(name) else {
             continue;
         };
-        let folder = path.parent().map(Path::to_owned).unwrap_or_default();
+        let folder = path.parent().map_or_default(Path::to_owned);
         sets.entry((folder, format, base))
             .or_default()
             .push((position, path.clone()));

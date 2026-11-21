@@ -311,8 +311,7 @@ async fn check(path: &Path) -> Vec<String> {
         .headers
         .iter()
         .find(|(k, _)| k == "content-type")
-        .map(|(_, v)| v.as_str())
-        .unwrap_or_default();
+        .map_or_default(|(_, v)| v.as_str());
     if expected["content_type"] == "text" {
         if !content_type.starts_with("text/plain") {
             problems.push(format!("content type {content_type}"));

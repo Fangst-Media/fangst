@@ -80,8 +80,7 @@ fn get(addr: &str, path: &str) -> (u16, String) {
     let status = response.split_whitespace().nth(1).unwrap().parse().unwrap();
     let body = response
         .split_once("\r\n\r\n")
-        .map(|(_, b)| b.to_owned())
-        .unwrap_or_default();
+        .map_or_default(|(_, b)| b.to_owned());
     (status, body)
 }
 

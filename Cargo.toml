@@ -4,7 +4,7 @@ members = ["crates/*", "tools/*"]
 
 [workspace.package]
 edition = "2024"
-rust-version = "1.95"
+rust-version = "1.100"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Fangst-Media/fangst"
 publish = false

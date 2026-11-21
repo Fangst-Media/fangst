@@ -97,8 +97,8 @@ fn recovery_block(slices: &[Vec<u8>], constants: &[u16], exponent: u32, size: us
     let mut words = vec![0u16; size / 2];
     for (slice, &constant) in slices.iter().zip(constants) {
         let factor = gf::pow(constant, exponent);
-        for (acc, pair) in words.iter_mut().zip(slice.chunks_exact(2)) {
-            *acc ^= gf::mul(factor, u16::from_le_bytes([pair[0], pair[1]]));
+        for (acc, pair) in words.iter_mut().zip(slice.as_chunks::<2>().0) {
+            *acc ^= gf::mul(factor, u16::from_le_bytes(*pair));
         }
     }
     words.iter().flat_map(|w| w.to_le_bytes()).collect()

@@ -8,7 +8,10 @@ const MAGNET: &str = "magnet:?xt=urn:btih:cab507494d02ebb1178b38f2e9d7be299c86b8
 async fn categories_are_the_created_ones_and_those_jobs_use() {
     let dir = tempfile::tempdir().unwrap();
     let store = Store::open(&dir.path().join("downloads.db")).await.unwrap();
-    assert!(store.categories().await.unwrap().is_empty());
+    assert_eq!(
+        store.categories().await.unwrap(),
+        [] as [std::string::String; 0]
+    );
 
     store.create_category("tv-sonarr").await.unwrap();
     // Creating twice is not an error; clients create before every add.

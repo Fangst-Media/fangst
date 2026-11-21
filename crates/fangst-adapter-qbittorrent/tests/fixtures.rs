@@ -447,8 +447,7 @@ fn header<'a>(response: &'a HttpResponse, name: &str) -> &'a str {
         .headers
         .iter()
         .find(|(k, _)| k == name)
-        .map(|(_, v)| v.as_str())
-        .unwrap_or_default()
+        .map_or_default(|(_, v)| v.as_str())
 }
 
 fn check_body(fixture: &Value, response: &HttpResponse, problems: &mut Vec<String>) {

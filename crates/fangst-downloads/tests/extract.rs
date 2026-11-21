@@ -207,7 +207,7 @@ async fn safety_blocks_a_download_with_an_executable_before_extraction() {
         Some("postproc-safety: executable.rar contains `setup.exe`, a blocked file type")
     );
     assert_eq!(files_in(&outcome.folder), ["executable.rar"]);
-    assert!(outcome.postprocess.is_empty());
+    assert_eq!(outcome.postprocess, [] as [std::string::String; 0]);
 }
 
 #[tokio::test]

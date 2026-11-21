@@ -80,7 +80,10 @@ async fn invalid_nzb_is_refused() {
     let store = Store::open(&dir.path().join("downloads.db")).await.unwrap();
     let err = store.add_nzb("bad", None, 0, b"<html/>").await.unwrap_err();
     assert!(matches!(err, Error::InvalidNzb(_)));
-    assert!(store.list().await.unwrap().is_empty());
+    assert_eq!(
+        store.list().await.unwrap(),
+        [] as [fangst_downloads::Job; 0]
+    );
 }
 
 #[tokio::test]

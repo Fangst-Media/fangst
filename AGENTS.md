@@ -9,7 +9,7 @@ This file is for every coding agent (Claude Code, Codex, Cursor, Copilot, Gemini
 
 ## Pinned versions
 
-- Rust 1.95.0, pinned in `rust-toolchain.toml`.
+- Rust 1.100.0, pinned in `rust-toolchain.toml`. Upgrade it as its own PR: new toolchains bring new clippy lints, and `cargo clippy --fix` handles most of them.
 - Dev tools: `just`, `cargo-nextest`, `cargo-deny`, `changesetter`, Bun.
 - Bun for the JS side. The web app in `web/` is React 19, TanStack Router and Query, Tailwind 3, Vite, TypeScript strict.
 
