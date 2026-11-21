@@ -140,8 +140,12 @@ fn error(status: StatusCode, message: impl Into<String>) -> Response {
 fn queue_error(e: &QueueError) -> Response {
     match e {
         QueueError::NotFound(_) => error(StatusCode::NOT_FOUND, e.to_string()),
-        QueueError::InvalidNzb(_) => error(StatusCode::UNPROCESSABLE_ENTITY, e.to_string()),
-        QueueError::InvalidState { .. } => error(StatusCode::CONFLICT, e.to_string()),
+        QueueError::InvalidNzb(_) | QueueError::InvalidTorrent(_) => {
+            error(StatusCode::UNPROCESSABLE_ENTITY, e.to_string())
+        }
+        QueueError::InvalidState { .. } | QueueError::DuplicateTorrent(_) => {
+            error(StatusCode::CONFLICT, e.to_string())
+        }
         _ => error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     }
 }

@@ -1,4 +1,8 @@
 //! The long-running side of the queue: runs jobs as they arrive and lets callers change them.
+//!
+//! Each protocol has its own lane. Usenet jobs run one at a time in priority order, since one job
+//! already uses every connection. Torrent jobs all start as soon as they are queued, since each
+//! one waits on its own peers.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -7,7 +11,11 @@ use std::time::Duration;
 use tokio::sync::{Notify, broadcast};
 use tokio::task::AbortHandle;
 
-use crate::{Error, Job, Runner, Status, Store};
+use crate::torrent::{TorrentRunner, TorrentSource};
+use crate::{Error, Job, Kind, Runner, Status, Store};
+
+/// A fallback poll covers jobs queued by another process sharing the database.
+const IDLE_POLL: Duration = Duration::from_secs(30);
 
 /// Sent whenever a job is added, changes status or is deleted.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -19,7 +27,10 @@ pub enum Change {
 #[derive(Clone)]
 pub struct Service {
     runner: Runner,
+    torrents: Option<TorrentRunner>,
+    usenet: bool,
     wake: Arc<Notify>,
+    wake_torrents: Arc<Notify>,
     running: Arc<Mutex<HashMap<i64, AbortHandle>>>,
     changes: broadcast::Sender<Change>,
 }
@@ -31,10 +42,32 @@ impl Service {
         let (changes, _) = broadcast::channel(256);
         Self {
             runner,
+            torrents: None,
+            usenet: true,
             wake: Arc::new(Notify::new()),
+            wake_torrents: Arc::new(Notify::new()),
             running: Arc::new(Mutex::new(HashMap::new())),
             changes,
         }
+    }
+
+    /// Runs torrent jobs on `engine`, in job folders under the usenet runner's root. Without an
+    /// engine, torrent jobs can still be added and wait in the queue.
+    #[must_use]
+    pub fn with_torrents(mut self, engine: fangst_torrent::Engine) -> Self {
+        self.torrents = Some(TorrentRunner {
+            store: self.runner.store.clone(),
+            engine,
+            root: self.runner.root.clone(),
+        });
+        self
+    }
+
+    /// Leaves usenet jobs waiting in the queue, for when no usenet server is configured.
+    #[must_use]
+    pub fn without_usenet(mut self) -> Self {
+        self.usenet = false;
+        self
     }
 
     #[must_use]
@@ -49,6 +82,11 @@ impl Service {
 
     fn changed(&self, id: i64) {
         let _ = self.changes.send(Change::Updated(id));
+    }
+
+    fn wake_all(&self) {
+        self.wake.notify_one();
+        self.wake_torrents.notify_one();
     }
 
     /// Queues an NZB and wakes the queue.
@@ -72,7 +110,28 @@ impl Service {
         Ok(id)
     }
 
-    /// Stops a queued or running job until it is resumed. Finished segments are kept.
+    /// Queues a magnet link or `.torrent` file and wakes the queue.
+    ///
+    /// # Errors
+    /// See [`Store::add_torrent`].
+    pub async fn add_torrent(
+        &self,
+        name: &str,
+        category: Option<&str>,
+        priority: i64,
+        source: TorrentSource<'_>,
+    ) -> Result<i64, Error> {
+        let id = self
+            .runner
+            .store
+            .add_torrent(name, category, priority, source)
+            .await?;
+        self.changed(id);
+        self.wake_torrents.notify_one();
+        Ok(id)
+    }
+
+    /// Stops a queued or running job until it is resumed. Finished segments and pieces are kept.
     ///
     /// # Errors
     /// [`Error::NotFound`] for an unknown id; completed and failed jobs can't be paused.
@@ -112,7 +171,7 @@ impl Service {
             .set_status(id, Status::Queued, None)
             .await?;
         self.changed(id);
-        self.wake.notify_one();
+        self.wake_all();
         self.runner.store.get(id).await
     }
 
@@ -123,6 +182,13 @@ impl Service {
     pub async fn delete(&self, id: i64, delete_files: bool) -> Result<(), Error> {
         let job = self.runner.store.get(id).await?;
         self.cancel(id);
+        if job.kind == Kind::Torrent
+            && let Some(torrents) = &self.torrents
+        {
+            // The engine must close the files before they can be removed, on Windows especially.
+            let hash = self.runner.store.torrent_info_hash(id).await?;
+            torrents.engine.forget(&hash).await;
+        }
         self.runner.store.delete(id).await?;
         if delete_files && let Some(path) = job.output_path {
             match tokio::fs::remove_dir_all(&path).await {
@@ -146,7 +212,7 @@ impl Service {
         }
     }
 
-    /// Runs queued jobs one at a time until the task is dropped.
+    /// Runs queued jobs until the task is dropped.
     ///
     /// # Errors
     /// When the database fails while picking or finishing a job.
@@ -160,10 +226,16 @@ impl Service {
                 self.changed(job.id);
             }
         }
+        tokio::try_join!(self.run_usenet(), self.run_torrents()).map(|_| ())
+    }
+
+    async fn run_usenet(&self) -> Result<(), Error> {
+        if !self.usenet {
+            return std::future::pending().await;
+        }
         loop {
-            let Some(job) = self.runner.store.next_queued().await? else {
-                // A fallback poll covers jobs queued by another process sharing the database.
-                let _ = tokio::time::timeout(Duration::from_secs(30), self.wake.notified()).await;
+            let Some(job) = self.runner.store.next_queued_of(Kind::Usenet).await? else {
+                let _ = tokio::time::timeout(IDLE_POLL, self.wake.notified()).await;
                 continue;
             };
             let runner = self.runner.clone();
@@ -186,6 +258,52 @@ impl Service {
                 Err(e) => return Err(Error::Download(e.to_string())),
             }
             self.changed(id);
+        }
+    }
+
+    async fn run_torrents(&self) -> Result<(), Error> {
+        let Some(torrents) = &self.torrents else {
+            return std::future::pending().await;
+        };
+        loop {
+            let Some(job) = self.runner.store.next_queued_of(Kind::Torrent).await? else {
+                let _ = tokio::time::timeout(IDLE_POLL, self.wake_torrents.notified()).await;
+                continue;
+            };
+            let id = job.id;
+            // Set before spawning so the next pick doesn't see this job as queued again.
+            self.runner
+                .store
+                .set_status(id, Status::Downloading, None)
+                .await?;
+            self.changed(id);
+            let runner = torrents.clone();
+            let task = tokio::spawn(async move { runner.execute(&job).await });
+            self.running
+                .lock()
+                .expect("running lock")
+                .insert(id, task.abort_handle());
+            let service = self.clone();
+            tokio::spawn(async move {
+                let task_id = task.id();
+                let outcome = task.await;
+                {
+                    // A job paused and resumed quickly already has a newer task under its id.
+                    let mut running = service.running.lock().expect("running lock");
+                    if running.get(&id).is_some_and(|h| h.id() == task_id) {
+                        running.remove(&id);
+                    }
+                }
+                if let Ok(Err(e)) = outcome {
+                    // The database failed mid-job; record it if it has recovered.
+                    let _ = service
+                        .runner
+                        .store
+                        .set_status(id, Status::Failed, Some(&e.to_string()))
+                        .await;
+                }
+                service.changed(id);
+            });
         }
     }
 }

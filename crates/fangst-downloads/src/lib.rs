@@ -17,7 +17,9 @@ use sqlx::sqlite::{
 use sqlx::{FromRow, Row};
 
 mod service;
+mod torrent;
 pub use service::{Change, Service};
+pub use torrent::{TorrentRunner, TorrentSource};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Kind {
@@ -130,6 +132,9 @@ pub enum Error {
     Database(sqlx::Error),
     Migration(String),
     InvalidNzb(fangst_nzb::Error),
+    InvalidTorrent(fangst_torrent::Error),
+    /// The torrent is already job `0`.
+    DuplicateTorrent(i64),
     NotFound(i64),
     Corrupt(String),
     Download(String),
@@ -146,6 +151,8 @@ impl fmt::Display for Error {
             Self::Database(e) => write!(f, "database error: {e}"),
             Self::Migration(e) => write!(f, "could not migrate downloads.db: {e}"),
             Self::InvalidNzb(e) => write!(f, "invalid NZB: {e}"),
+            Self::InvalidTorrent(e) => write!(f, "{e}"),
+            Self::DuplicateTorrent(id) => write!(f, "this torrent is already job {id}"),
             Self::NotFound(id) => write!(f, "job {id} does not exist"),
             Self::Corrupt(e) => write!(f, "downloads.db holds unexpected data: {e}"),
             Self::Download(e) => write!(f, "download failed: {e}"),
@@ -345,6 +352,23 @@ impl Store {
         .transpose()
     }
 
+    /// Like [`Store::next_queued`], limited to one protocol, so each protocol's lane only picks its own jobs.
+    ///
+    /// # Errors
+    /// When the database read fails.
+    pub async fn next_queued_of(&self, kind: Kind) -> Result<Option<Job>, Error> {
+        sqlx::query_as::<_, JobRow>(concat!(
+            "SELECT ",
+            job_columns!(),
+            " FROM jobs WHERE status = 'queued' AND kind = ? ORDER BY priority DESC, id LIMIT 1"
+        ))
+        .bind(kind.as_str())
+        .fetch_optional(&self.pool)
+        .await?
+        .map(Job::try_from)
+        .transpose()
+    }
+
     /// # Errors
     /// When the database write fails.
     pub async fn set_status(
@@ -413,6 +437,18 @@ impl Store {
             .await?;
         tx.commit().await?;
         Ok(result.rows_affected())
+    }
+
+    /// The job's folder under `root`, chosen and recorded on its first run.
+    async fn job_folder(&self, job: &Job, root: &Path) -> Result<PathBuf, Error> {
+        if let Some(path) = &job.output_path {
+            return Ok(path.clone());
+        }
+        let folder =
+            fangst_core::path::safe_file_name(&job.name).unwrap_or_else(|| "job".to_owned());
+        let path = root.join(format!("{}-{folder}", job.id));
+        self.set_output_path(job.id, &path).await?;
+        Ok(path)
     }
 
     async fn set_output_path(&self, id: i64, path: &Path) -> Result<(), Error> {
@@ -495,7 +531,7 @@ impl Runner {
     /// When the database fails. A job that fails is marked failed and the runner moves on.
     pub async fn run_until_idle(&self) -> Result<(), Error> {
         self.store.requeue_interrupted().await?;
-        while let Some(job) = self.store.next_queued().await? {
+        while let Some(job) = self.store.next_queued_of(Kind::Usenet).await? {
             self.run(&job).await?;
         }
         Ok(())
@@ -505,15 +541,7 @@ impl Runner {
         self.store
             .set_status(job.id, Status::Downloading, None)
             .await?;
-        let out = if let Some(path) = &job.output_path {
-            path.clone()
-        } else {
-            let folder =
-                fangst_core::path::safe_file_name(&job.name).unwrap_or_else(|| "job".to_owned());
-            let path = self.root.join(format!("{}-{folder}", job.id));
-            self.store.set_output_path(job.id, &path).await?;
-            path
-        };
+        let out = self.store.job_folder(job, &self.root).await?;
         let nzb_bytes = self.store.nzb(job.id).await?;
         let nzb = match fangst_nzb::parse(&nzb_bytes, &fangst_nzb::Limits::default()) {
             Ok(nzb) => nzb,
