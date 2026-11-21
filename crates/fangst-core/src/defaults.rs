@@ -10,6 +10,7 @@ use serde::Deserialize;
 pub struct Defaults {
     pub notify: Notify,
     pub disk: Disk,
+    pub progress: Progress,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -36,6 +37,31 @@ impl Disk {
     #[must_use]
     pub fn check_interval(&self) -> Duration {
         Duration::from_secs(self.check_interval_secs)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Progress {
+    pub publish_interval_ms: u64,
+    pub rate_window_secs: u64,
+    pub persist_interval_secs: u64,
+}
+
+impl Progress {
+    #[must_use]
+    pub fn publish_interval(&self) -> Duration {
+        Duration::from_millis(self.publish_interval_ms)
+    }
+
+    #[must_use]
+    pub fn rate_window(&self) -> Duration {
+        Duration::from_secs(self.rate_window_secs)
+    }
+
+    #[must_use]
+    pub fn persist_interval(&self) -> Duration {
+        Duration::from_secs(self.persist_interval_secs)
     }
 }
 
@@ -78,6 +104,9 @@ mod tests {
         assert_eq!(defaults.notify.timeout_secs, 10);
         assert_eq!(defaults.disk.min_free_bytes, 5 * 1024 * 1024 * 1024);
         assert_eq!(defaults.disk.check_interval_secs, 60);
+        assert_eq!(defaults.progress.publish_interval_ms, 1000);
+        assert_eq!(defaults.progress.rate_window_secs, 5);
+        assert_eq!(defaults.progress.persist_interval_secs, 10);
     }
 
     #[test]
@@ -96,7 +125,7 @@ mod tests {
 
     #[test]
     fn unknown_section_is_ignored() {
-        let text = "[later]\nx = 1\n[notify]\ntimeout_secs = 1\n[disk]\nmin_free_bytes = 1\ncheck_interval_secs = 1\n";
+        let text = "[later]\nx = 1\n[notify]\ntimeout_secs = 1\n[disk]\nmin_free_bytes = 1\ncheck_interval_secs = 1\n[progress]\npublish_interval_ms = 1\nrate_window_secs = 1\npersist_interval_secs = 1\n";
         assert_eq!(Defaults::parse(text).unwrap().notify.timeout_secs, 1);
     }
 }

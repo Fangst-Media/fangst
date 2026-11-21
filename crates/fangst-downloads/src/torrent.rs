@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use fangst_torrent::{Engine, Metadata};
 
+use crate::progress::Meter;
 use crate::{Error, Job, Status, Store, now};
 
 /// What a user hands in to start a torrent job.
@@ -169,15 +170,30 @@ impl TorrentRunner {
 
     /// [`TorrentRunner::run`] for a job whose status the caller already set to downloading.
     pub(crate) async fn execute(&self, job: &Job) -> Result<(), Error> {
+        let running = self.store.start_meter(job.id);
+        let failure = self.download(job, &running.meter).await?;
+        running.finish().await?;
+        match failure {
+            Some(reason) => {
+                self.store
+                    .set_status(job.id, Status::Failed, Some(&reason))
+                    .await
+            }
+            None => self.store.set_status(job.id, Status::Completed, None).await,
+        }
+    }
+
+    /// Fetches the metadata if needed and downloads the torrent. Returns why it fails, if it does.
+    async fn download(&self, job: &Job, meter: &Meter) -> Result<Option<String>, Error> {
         let out = self.store.job_folder(job, &self.root).await?;
         let row = self.store.torrent(job.id).await?;
         let metainfo = if let Some(bytes) = row.metainfo {
             bytes
         } else {
             let Some(link) = row.magnet else {
-                return self
-                    .fail(job.id, "the job has neither metadata nor a magnet link")
-                    .await;
+                return Ok(Some(
+                    "the job has neither metadata nor a magnet link".to_owned(),
+                ));
             };
             self.store
                 .add_event(job.id, "metadata", "asking peers for the file list")
@@ -187,16 +203,18 @@ impl TorrentRunner {
                     self.store.set_torrent_metadata(job.id, &meta).await?;
                     meta.torrent
                 }
-                Err(e) => return self.fail(job.id, &e.to_string()).await,
+                Err(e) => return Ok(Some(e.to_string())),
             }
         };
 
         let download = match self.engine.start_torrent(&metainfo, &out).await {
             Ok(download) => download,
-            Err(e) => return self.fail(job.id, &e.to_string()).await,
+            Err(e) => return Ok(Some(e.to_string())),
         };
         let kept = download.kept_bytes();
         let total = download.total_bytes();
+        meter.set_target(total);
+        meter.follow(download.have_bytes_reader());
         if kept > 0 {
             self.store
                 .add_event(
@@ -207,6 +225,7 @@ impl TorrentRunner {
                 .await?;
         }
         let result = download.wait().await;
+        meter.settle(download.have_bytes());
         download.stop().await;
         match result {
             Ok(()) => {
@@ -217,15 +236,9 @@ impl TorrentRunner {
                         &format!("downloaded {} bytes from peers", total - kept),
                     )
                     .await?;
-                self.store.set_status(job.id, Status::Completed, None).await
+                Ok(None)
             }
-            Err(e) => self.fail(job.id, &e.to_string()).await,
+            Err(e) => Ok(Some(e.to_string())),
         }
-    }
-
-    async fn fail(&self, id: i64, reason: &str) -> Result<(), Error> {
-        self.store
-            .set_status(id, Status::Failed, Some(reason))
-            .await
     }
 }

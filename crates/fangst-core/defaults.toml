@@ -11,3 +11,11 @@ timeout_secs = 10
 min_free_bytes = 5368709120
 # Seconds between free-space checks.
 check_interval_secs = 60
+
+[progress]
+# Milliseconds between progress messages for one running job on the event stream.
+publish_interval_ms = 1000
+# Seconds of recent progress the download rate is averaged over.
+rate_window_secs = 5
+# Seconds between writes of a running job's downloaded bytes to the database.
+persist_interval_secs = 10

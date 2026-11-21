@@ -6,23 +6,26 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
+use fangst_core::defaults::{Defaults, Progress as ProgressSettings};
 use tokio::sync::{Notify, broadcast};
 use tokio::task::AbortHandle;
 
 use crate::notify::{self, Notifications};
 use crate::torrent::{TorrentRunner, TorrentSource};
-use crate::{Error, Job, Kind, Runner, Status, Store};
+use crate::{Error, Job, Kind, Progress, Runner, Status, Store};
 
 /// A fallback poll covers jobs queued by another process sharing the database.
 const IDLE_POLL: Duration = Duration::from_secs(30);
 
-/// Sent whenever a job is added, changes status or is deleted.
+/// Sent whenever a job is added, changes status or is deleted, and on a timer while it downloads.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Change {
     Updated(i64),
     Deleted(i64),
+    /// At most once per publish interval for each running job.
+    Progress(i64, Progress),
 }
 
 #[derive(Clone)]
@@ -35,9 +38,12 @@ pub struct Service {
     running: Arc<Mutex<HashMap<i64, AbortHandle>>>,
     changes: broadcast::Sender<Change>,
     notifications: Arc<Notifications>,
+    progress: ProgressSettings,
 }
 
 impl Service {
+    /// # Panics
+    /// Only if the built-in defaults file is broken, which its tests catch.
     #[must_use]
     pub fn new(runner: Runner) -> Self {
         // Slow subscribers miss old changes rather than blocking the queue; they re-read state.
@@ -51,7 +57,17 @@ impl Service {
             running: Arc::new(Mutex::new(HashMap::new())),
             changes,
             notifications: Arc::new(Notifications::none()),
+            progress: Defaults::builtin()
+                .expect("built-in defaults parse")
+                .progress,
         }
+    }
+
+    /// How often progress is measured, published and recorded.
+    #[must_use]
+    pub fn with_progress(mut self, settings: ProgressSettings) -> Self {
+        self.progress = settings;
+        self
     }
 
     /// Runs torrent jobs on `engine`, in job folders under the usenet runner's root. Without an
@@ -160,6 +176,12 @@ impl Service {
                 action: "pause",
             });
         }
+        if let Some(live) = self.runner.store.progress(id) {
+            self.runner
+                .store
+                .set_downloaded(id, live.downloaded_bytes)
+                .await?;
+        }
         self.runner
             .store
             .set_status(id, Status::Paused, None)
@@ -251,7 +273,42 @@ impl Service {
             .await;
             Ok(())
         };
-        tokio::try_join!(self.run_usenet(), self.run_torrents(), disk).map(|_| ())
+        tokio::try_join!(
+            self.run_usenet(),
+            self.run_torrents(),
+            self.publish_progress(),
+            disk
+        )
+        .map(|_| ())
+    }
+
+    /// Measures every running job once per interval, publishes the result and records the bytes
+    /// every so often, so a restart shows a recent count without a write per segment.
+    async fn publish_progress(&self) -> Result<(), Error> {
+        let store = &self.runner.store;
+        let mut tick = tokio::time::interval(
+            self.progress
+                .publish_interval()
+                .max(Duration::from_millis(1)),
+        );
+        tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        let mut recorded = Instant::now();
+        loop {
+            tick.tick().await;
+            let now = Instant::now();
+            let record = now.duration_since(recorded) >= self.progress.persist_interval();
+            for (id, meter) in store.meters.all() {
+                let progress = meter.sample(now, self.progress.rate_window());
+                let _ = self.changes.send(Change::Progress(id, progress));
+                // A failed write only leaves an older count for a restart to show.
+                if record {
+                    let _ = store.set_downloaded(id, progress.downloaded_bytes).await;
+                }
+            }
+            if record {
+                recorded = now;
+            }
+        }
     }
 
     async fn run_usenet(&self) -> Result<(), Error> {

@@ -50,6 +50,9 @@ pub(crate) fn summary(job: Job) -> JobSummary {
         error: job.error,
         output_path: job.output_path,
         total_bytes: job.total_bytes,
+        downloaded_bytes: job.downloaded_bytes,
+        rate_bytes_per_sec: job.rate_bytes_per_sec,
+        eta_seconds: job.eta_seconds,
         added_at: job.added_at,
         finished_at: job.finished_at,
     }

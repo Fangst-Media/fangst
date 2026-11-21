@@ -221,6 +221,12 @@ pub struct JobSummary {
     pub error: Option<String>,
     pub output_path: Option<PathBuf>,
     pub total_bytes: i64,
+    /// Bytes on disk; a completed job counts as `total_bytes`.
+    pub downloaded_bytes: i64,
+    /// Averaged over the last few seconds; 0 unless downloading.
+    pub rate_bytes_per_sec: i64,
+    /// Seconds left at the current rate, when known.
+    pub eta_seconds: Option<i64>,
     pub added_at: i64,
     pub finished_at: Option<i64>,
 }

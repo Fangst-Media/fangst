@@ -11,6 +11,8 @@ export function makeJob(overrides: Partial<JobDto> = {}): JobDto {
     status: 'queued',
     priority: 0,
     total_bytes: 1024,
+    downloaded_bytes: 0,
+    rate_bytes_per_sec: 0,
     added_at: 1_700_000_000,
     ...overrides,
   }

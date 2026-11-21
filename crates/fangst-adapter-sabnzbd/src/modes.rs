@@ -154,6 +154,46 @@ fn to_units(bytes: i64, postfix: &str) -> String {
     }
 }
 
+/// SABnzbd's `format_time_left`: `H:MM:SS`, with a day field in front from one day up. Sonarr
+/// fails the whole queue on anything else, so an unknown time is `0:00:00` as in SABnzbd.
+fn time_left(seconds: Option<i64>) -> String {
+    let total = seconds.unwrap_or(0).max(0);
+    let (days, rest) = (total / DAY, total % DAY);
+    let (hours, minutes, secs) = (rest / 3600, rest % 3600 / 60, rest % 60);
+    if days > 0 {
+        format!("{days}:{hours:02}:{minutes:02}:{secs:02}")
+    } else {
+        format!("{hours}:{minutes:02}:{secs:02}")
+    }
+}
+
+/// A whole number in a string; Sonarr fails on `"45.5"`.
+fn percentage(downloaded: i64, total: i64) -> String {
+    if total <= 0 {
+        return "0".to_owned();
+    }
+    let done = i128::from(downloaded.clamp(0, total)) * 100 / i128::from(total);
+    done.to_string()
+}
+
+fn bytes_left(job: &JobSummary) -> i64 {
+    job.total_bytes.saturating_sub(job.downloaded_bytes).max(0)
+}
+
+fn kb_per_sec(rate: i64) -> String {
+    format!("{:.2}", as_f64(rate) / 1024.0)
+}
+
+/// SABnzbd always puts a space before the unit, which is empty below 1 KiB.
+fn speed(rate: i64) -> String {
+    let text = to_units(rate, "");
+    if text.contains(' ') {
+        text
+    } else {
+        format!("{text} ")
+    }
+}
+
 fn priority_name(priority: i64) -> &'static str {
     match priority {
         p if p >= 2 => "Force",
@@ -182,17 +222,15 @@ fn queue_slot(index: usize, job: &JobSummary) -> Value {
         "labels": [],
         "password": "",
         "cat": category_out(job),
-        // Fangst reports no byte progress yet, so a job in the queue has everything left.
-        "mbleft": mb(job.total_bytes),
+        "mbleft": mb(bytes_left(job)),
         "mb": mb(job.total_bytes),
         "size": to_units(job.total_bytes, "B"),
-        "sizeleft": to_units(job.total_bytes, "B"),
-        "percentage": "0",
+        "sizeleft": to_units(bytes_left(job), "B"),
+        "percentage": percentage(job.downloaded_bytes, job.total_bytes),
         "mbmissing": "0.0",
         "direct_unpack": null,
         "status": queue_status(job),
-        // Without a speed there is no estimate; SABnzbd shows this for idle jobs too.
-        "timeleft": "0:00:00",
+        "timeleft": time_left(job.eta_seconds),
         "avg_age": "-",
         "time_added": job.added_at,
     })
@@ -206,6 +244,15 @@ fn sum_bytes<'a>(jobs: impl Iterator<Item = &'a JobSummary>) -> i64 {
 fn header(all: &[JobSummary]) -> serde_json::Map<String, Value> {
     let queued: Vec<&JobSummary> = all.iter().filter(|j| is_queue(j)).collect();
     let bytes = sum_bytes(queued.iter().copied());
+    let left = queued
+        .iter()
+        .map(|j| bytes_left(j))
+        .fold(0, i64::saturating_add);
+    let rate = queued
+        .iter()
+        .filter(|j| j.status == "downloading")
+        .map(|j| j.rate_bytes_per_sec.max(0))
+        .fold(0, i64::saturating_add);
     let downloading = queued.iter().any(|j| j.status == "downloading");
     let Value::Object(map) = json!({
         "version": SAB_VERSION,
@@ -228,14 +275,15 @@ fn header(all: &[JobSummary]) -> serde_json::Map<String, Value> {
         "left_quota": "0 ",
         "cache_art": "0",
         "cache_size": "0 B",
-        "kbpersec": "0.00",
-        "speed": "0 ",
-        "mbleft": mb(bytes),
+        "kbpersec": kb_per_sec(rate),
+        "speed": speed(rate),
+        "mbleft": mb(left),
         "mb": mb(bytes),
-        "sizeleft": to_units(bytes, "B"),
+        "sizeleft": to_units(left, "B"),
         "size": to_units(bytes, "B"),
         "status": if downloading { "Downloading" } else { "Idle" },
-        "timeleft": "0:00:00",
+        // Everything queued at the combined speed, as SABnzbd estimates it.
+        "timeleft": time_left((rate > 0).then(|| left.saturating_add(rate - 1) / rate)),
     }) else {
         unreachable!("json! of an object literal is an object")
     };
@@ -638,5 +686,71 @@ mod tests {
     fn mb_has_two_decimals() {
         assert_eq!(mb(1_339_755_315), "1277.69");
         assert_eq!(mb(0), "0.00");
+    }
+
+    #[test]
+    fn time_left_is_hours_or_days() {
+        assert_eq!(time_left(None), "0:00:00");
+        assert_eq!(time_left(Some(0)), "0:00:00");
+        assert_eq!(time_left(Some(1004)), "0:16:44");
+        assert_eq!(time_left(Some(36_000 + 61)), "10:01:01");
+        assert_eq!(time_left(Some(DAY + 3_661)), "1:01:01:01");
+    }
+
+    #[test]
+    fn percentage_is_a_whole_number() {
+        assert_eq!(percentage(0, 0), "0");
+        assert_eq!(percentage(455, 1000), "45");
+        assert_eq!(percentage(1000, 1000), "100");
+        assert_eq!(percentage(2000, 1000), "100");
+    }
+
+    #[test]
+    fn speed_keeps_sabnzbd_spacing() {
+        assert_eq!(kb_per_sec(1_327_124), "1296.02");
+        assert_eq!(speed(0), "0 ");
+        assert_eq!(speed(1_327_124), "1.3 M");
+    }
+
+    fn running(total: i64, downloaded: i64, rate: i64, eta: Option<i64>) -> JobSummary {
+        JobSummary {
+            id: 1,
+            kind: "usenet".to_owned(),
+            name: "x".to_owned(),
+            category: None,
+            priority: 0,
+            status: "downloading".to_owned(),
+            error: None,
+            output_path: None,
+            total_bytes: total,
+            downloaded_bytes: downloaded,
+            rate_bytes_per_sec: rate,
+            eta_seconds: eta,
+            added_at: 0,
+            finished_at: None,
+        }
+    }
+
+    #[test]
+    fn queue_slot_reports_progress() {
+        let slot = queue_slot(0, &running(4 * 1_048_576, 1_048_576, 1_048_576, Some(3)));
+        assert_eq!(slot["mb"], "4.00");
+        assert_eq!(slot["mbleft"], "3.00");
+        assert_eq!(slot["sizeleft"], "3.0 MB");
+        assert_eq!(slot["percentage"], "25");
+        assert_eq!(slot["timeleft"], "0:00:03");
+    }
+
+    #[test]
+    fn header_sums_speed_and_time_left() {
+        let jobs = [
+            running(4 * 1_048_576, 1_048_576, 1_048_576, Some(3)),
+            running(2 * 1_048_576, 0, 0, None),
+        ];
+        let header = header(&jobs);
+        assert_eq!(header["kbpersec"], "1024.00");
+        assert_eq!(header["speed"], "1.0 M");
+        assert_eq!(header["mbleft"], "5.00");
+        assert_eq!(header["timeleft"], "0:00:05");
     }
 }

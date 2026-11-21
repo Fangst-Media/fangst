@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import type { JobDto } from '../api-dl'
-import { dlKeys, eventsUrl, parseChange, upsertJob } from '../lib/dl-api'
+import { applyProgress, dlKeys, eventsUrl, parseChange, upsertJob } from '../lib/dl-api'
 
 export type EventsStatus = 'connecting' | 'live' | 'offline'
 
@@ -44,6 +44,14 @@ export function useJobEvents(apiKey: string | null): EventsStatus {
           )
           queryClient.setQueryData<JobDto>(dlKeys.job(job.id), job)
           void queryClient.invalidateQueries({ queryKey: dlKeys.timeline(job.id) })
+        } else if (change.type === 'progress') {
+          // Arrives about once a second per running job and never adds a timeline entry.
+          queryClient.setQueryData<JobDto[]>(dlKeys.jobs, (jobs) =>
+            jobs?.map((job) => (job.id === change.id ? applyProgress(job, change) : job))
+          )
+          queryClient.setQueryData<JobDto>(dlKeys.job(change.id), (job) =>
+            job === undefined ? job : applyProgress(job, change)
+          )
         } else {
           const { id } = change
           queryClient.setQueryData<JobDto[]>(dlKeys.jobs, (jobs) =>

@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { getJob, jobTimeline } from '../../api-dl'
 import { ApiKeyForm } from '../../components/downloads/ApiKeyForm'
 import { JobActions } from '../../components/downloads/JobActions'
+import { JobProgress } from '../../components/downloads/JobProgress'
 import { JobStatusBadge } from '../../components/downloads/JobStatusBadge'
 import {
   NotFoundError,
@@ -80,6 +81,8 @@ export default function JobDetail({ jobId }: { jobId: number }) {
         </div>
         <JobActions job={data} onDeleted={() => void navigate({ to: '/downloads' })} />
       </div>
+
+      <JobProgress job={data} />
 
       {data.status === 'failed' && (
         <div

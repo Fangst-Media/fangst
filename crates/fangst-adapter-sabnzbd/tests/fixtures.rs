@@ -30,6 +30,9 @@ fn job(id: i64, name: &str, category: &str, status: &str, priority: i64, bytes: 
         error: None,
         output_path: None,
         total_bytes: bytes,
+        downloaded_bytes: 0,
+        rate_bytes_per_sec: 0,
+        eta_seconds: None,
         added_at: 1_469_171_000 + id * 1_000,
         finished_at: None,
     }
@@ -65,16 +68,21 @@ impl FakeJobs {
         failed.output_path = Some(PathBuf::from(
             "/data/downloads/5-TV.Show.S04E03.720p.BluRay.x264-xHD",
         ));
+        // Matches the fixture's 1296.02 KB/s and 0:16:44 left.
+        let mut downloading = job(
+            1,
+            "TV.Show.S04E11.720p.HDTV.x264",
+            "tv",
+            "downloading",
+            0,
+            1_339_755_315,
+        );
+        downloading.downloaded_bytes = 7_600_000;
+        downloading.rate_bytes_per_sec = 1_327_124;
+        downloading.eta_seconds = Some(1004);
         Arc::new(Self {
             jobs: Mutex::new(vec![
-                job(
-                    1,
-                    "TV.Show.S04E11.720p.HDTV.x264",
-                    "tv",
-                    "downloading",
-                    0,
-                    1_339_755_315,
-                ),
+                downloading,
                 job(
                     2,
                     "TV.Show.S04E12.720p.HDTV.x264",

@@ -31,3 +31,29 @@ How often free space in the downloads folder is checked. Only runs while at leas
 - Default: `60`
 - Range: 1 or more
 - Lower it when the disk fills quickly, for example with fast connections and small disks.
+
+## `[progress]`
+
+### `publish_interval_ms`
+
+How often a running job's downloaded bytes, rate and time left go out on the event stream (`/api/v1/events`) and are measured for the API. Each running job sends at most one progress message per interval.
+
+- Default: `1000`
+- Range: 1 or more
+- Raise it when many clients watch the event stream over a slow link.
+
+### `rate_window_secs`
+
+The download rate is the bytes downloaded over this many recent seconds, divided by the time they took. A longer window gives a steadier rate and time left; a shorter one follows changes faster.
+
+- Default: `5`
+- Range: 1 or more
+- Raise it when your connection's speed jumps around and the time left jumps with it.
+
+### `persist_interval_secs`
+
+How often a running job's downloaded bytes are written to the database, so the queue shows a sensible number after a restart. Bytes are also written whenever a job stops, pauses or finishes.
+
+- Default: `10`
+- Range: 1 or more
+- Lower it if a crash should lose less of the shown progress; the downloaded data itself is never lost by this.

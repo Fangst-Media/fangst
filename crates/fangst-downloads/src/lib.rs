@@ -4,7 +4,7 @@
 //! [`Runner`] takes queued jobs in priority order and drives the protocol engine, recording each
 //! stored segment so a restart continues where the last run stopped.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -19,10 +19,13 @@ use sqlx::{FromRow, Row};
 mod auth;
 mod notify;
 mod pipeline;
+mod progress;
 mod service;
 mod torrent;
 pub use auth::{Auth, ENVIRONMENT_KEY, FIRST_USER, MIN_PASSWORD_CHARS, Secrets, User};
 pub use notify::Notifications;
+use progress::Meter;
+pub use progress::Progress;
 pub use service::{Change, Service};
 pub use torrent::{TorrentRunner, TorrentSource};
 
@@ -82,6 +85,13 @@ pub struct Job {
     pub error: Option<String>,
     pub output_path: Option<PathBuf>,
     pub total_bytes: i64,
+    /// Bytes on disk: live while the job runs in this process, else as last recorded. A completed
+    /// job counts as `total_bytes`, even when PAR2 recovery volumes it did not need were skipped.
+    pub downloaded_bytes: i64,
+    /// Averaged over the last few seconds; 0 unless the job is downloading.
+    pub rate_bytes_per_sec: i64,
+    /// Seconds left at the current rate; `None` when not downloading or not yet known.
+    pub eta_seconds: Option<i64>,
     /// Unix seconds.
     pub added_at: i64,
     pub finished_at: Option<i64>,
@@ -109,6 +119,7 @@ struct JobRow {
     error: Option<String>,
     output_path: Option<String>,
     total_bytes: i64,
+    downloaded_bytes: i64,
     added_at: i64,
     finished_at: Option<i64>,
 }
@@ -126,6 +137,9 @@ impl TryFrom<JobRow> for Job {
             error: row.error,
             output_path: row.output_path.map(PathBuf::from),
             total_bytes: row.total_bytes,
+            downloaded_bytes: row.downloaded_bytes,
+            rate_bytes_per_sec: 0,
+            eta_seconds: None,
             added_at: row.added_at,
             finished_at: row.finished_at,
         })
@@ -193,7 +207,7 @@ impl From<sqlx::Error> for Error {
 /// Column list shared by every job query; a macro so the SQL stays a `&'static str`, which sqlx requires.
 macro_rules! job_columns {
     () => {
-        "id, kind, name, category, priority, status, error, output_path, total_bytes, added_at, finished_at"
+        "id, kind, name, category, priority, status, error, output_path, total_bytes, downloaded_bytes, added_at, finished_at"
     };
 }
 
@@ -206,6 +220,7 @@ fn now() -> i64 {
 #[derive(Clone)]
 pub struct Store {
     pub(crate) pool: SqlitePool,
+    pub(crate) meters: progress::Meters,
 }
 
 impl Store {
@@ -247,7 +262,10 @@ impl Store {
             .run(&pool)
             .await
             .map_err(|e| Error::Migration(e.to_string()))?;
-        Ok(Self { pool })
+        Ok(Self {
+            pool,
+            meters: progress::Meters::default(),
+        })
     }
 
     /// Queues an NZB after checking that it parses.
@@ -336,7 +354,7 @@ impl Store {
         .fetch_all(&self.pool)
         .await?
         .into_iter()
-        .map(Job::try_from)
+        .map(|row| Job::try_from(row).map(|job| self.with_live_progress(job)))
         .collect()
     }
 
@@ -353,6 +371,21 @@ impl Store {
         .await?
         .ok_or(Error::NotFound(id))?
         .try_into()
+        .map(|job| self.with_live_progress(job))
+    }
+
+    /// Replaces the recorded byte count of a job this process is downloading with the live one.
+    fn with_live_progress(&self, mut job: Job) -> Job {
+        if job.status == Status::Downloading
+            && let Some(live) = self.progress(job.id)
+        {
+            job.downloaded_bytes = i64::try_from(live.downloaded_bytes).unwrap_or(i64::MAX);
+            job.rate_bytes_per_sec = i64::try_from(live.rate_bytes_per_sec).unwrap_or(i64::MAX);
+            job.eta_seconds = live
+                .eta_seconds
+                .map(|s| i64::try_from(s).unwrap_or(i64::MAX));
+        }
+        job
     }
 
     /// The queued job that should run next: highest priority, then oldest.
@@ -403,11 +436,16 @@ impl Store {
         };
         // The status change and its timeline entry land together or not at all.
         let mut tx = self.pool.begin().await?;
-        sqlx::query("UPDATE jobs SET status = ?, error = ?, finished_at = ? WHERE id = ?")
-            .bind(status.as_str())
-            .bind(error)
-            .bind(finished)
-            .bind(id)
+        // A completed job has everything it needs, even when unneeded PAR2 volumes were skipped.
+        sqlx::query(
+            "UPDATE jobs SET status = ?1, error = ?2, finished_at = ?3,
+             downloaded_bytes = CASE WHEN ?1 = 'completed' THEN total_bytes ELSE downloaded_bytes END
+             WHERE id = ?4",
+        )
+        .bind(status.as_str())
+        .bind(error)
+        .bind(finished)
+        .bind(id)
             .execute(&mut *tx)
             .await?;
         sqlx::query(
@@ -563,16 +601,26 @@ impl Runner {
         self.store
             .set_status(job.id, Status::Downloading, None)
             .await?;
+        let running = self.store.start_meter(job.id);
+        let failure = self.download(job, &running.meter).await?;
+        running.finish().await?;
+        match failure {
+            Some(reason) => {
+                self.store
+                    .set_status(job.id, Status::Failed, Some(&reason))
+                    .await
+            }
+            None => self.store.set_status(job.id, Status::Completed, None).await,
+        }
+    }
+
+    /// Downloads, verifies and post-processes a job. Returns why it fails, if it does.
+    async fn download(&self, job: &Job, meter: &Arc<Meter>) -> Result<Option<String>, Error> {
         let out = self.store.job_folder(job, &self.root).await?;
         let nzb_bytes = self.store.nzb(job.id).await?;
         let nzb = match fangst_nzb::parse(&nzb_bytes, &fangst_nzb::Limits::default()) {
             Ok(nzb) => nzb,
-            Err(e) => {
-                self.store
-                    .set_status(job.id, Status::Failed, Some(&format!("invalid NZB: {e}")))
-                    .await?;
-                return Ok(());
-            }
+            Err(e) => return Ok(Some(format!("invalid NZB: {e}"))),
         };
 
         let done = self.store.done_segments(job.id).await?;
@@ -593,41 +641,47 @@ impl Runner {
         let sets = fangst_postproc_par2::sets(names.iter().map(String::as_str));
         let held = pipeline::held_volumes(&names, &sets);
         let first: HashSet<usize> = (0..names.len()).filter(|i| !held.contains(i)).collect();
-        let report = match self.fetch(job.id, &nzb, &out, &first).await? {
+        let report = match self.fetch(job.id, &nzb, &out, &first, meter).await? {
             Ok(report) => report,
-            Err(e) => {
-                return self
-                    .store
-                    .set_status(job.id, Status::Failed, Some(&e.to_string()))
-                    .await;
-            }
+            Err(e) => return Ok(Some(e.to_string())),
         };
-        let failure = match self
-            .verify_and_repair(job.id, &nzb, &out, &names, &sets, &report)
+        match self
+            .verify_and_repair(job.id, &nzb, &out, &names, &sets, &report, meter)
             .await?
         {
-            Some(reason) => Some(reason),
-            None => self.post_process(job, &nzb, &out).await?,
-        };
-        match failure {
-            Some(reason) => {
-                self.store
-                    .set_status(job.id, Status::Failed, Some(&reason))
-                    .await
-            }
-            None => self.store.set_status(job.id, Status::Completed, None).await,
+            Some(reason) => Ok(Some(reason)),
+            None => self.post_process(job, &nzb, &out).await,
         }
     }
 
-    /// Downloads the `selected` files of `nzb`, recording each stored segment and each file's result.
+    /// Downloads the `selected` files of `nzb`, recording each stored segment and each file's
+    /// result, and counting their bytes on `meter`.
     async fn fetch(
         &self,
         job_id: i64,
         nzb: &fangst_nzb::Nzb,
         out: &Path,
         selected: &HashSet<usize>,
+        meter: &Arc<Meter>,
     ) -> Result<Result<fangst_usenet::Report, fangst_usenet::Error>, Error> {
         let done = self.store.done_segments(job_id).await?;
+        // Progress counts the segment sizes the NZB lists, the same sizes `total_bytes` adds up,
+        // so a job ends at its total.
+        let sizes: HashMap<(usize, u32), u64> = nzb
+            .files
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| selected.contains(i))
+            .flat_map(|(i, file)| file.segments.iter().map(move |s| ((i, s.number), s.bytes)))
+            .collect();
+        meter.add_target(sizes.values().sum());
+        meter.add(
+            sizes
+                .iter()
+                .filter(|(key, _)| done.contains(key))
+                .map(|(_, bytes)| bytes)
+                .sum(),
+        );
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<(usize, u32)>();
         let store = self.store.clone();
         let recorder = tokio::spawn(async move {
@@ -636,9 +690,11 @@ impl Runner {
             }
             Ok::<(), Error>(())
         });
+        let counted = Arc::clone(meter);
         let resume = fangst_usenet::Resume {
             done,
             on_stored: Arc::new(move |file, number| {
+                counted.add(sizes.get(&(file, number)).copied().unwrap_or(0));
                 let _ = tx.send((file, number));
             }),
         };

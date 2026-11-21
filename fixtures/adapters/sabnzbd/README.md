@@ -36,5 +36,6 @@ the `exact` pointers that still hold.
 | 4 | `TV.Show.S04E02.720p.BluRay.x264-xHD` | tv | completed | 0 | 2436906376 |
 | 5 | `TV.Show.S04E03.720p.BluRay.x264-xHD` | tv | failed | 0 | 2436906376 |
 
+Job 1 has 7600000 bytes on disk and downloads at 1327124 bytes per second with 1004 seconds left.
 The download root is `/data/downloads`; job 4 finished into `/data/downloads/4-TV.Show.S04E02.720p.BluRay.x264-xHD`.
 The API key is `fixture-api-key-0000`, a placeholder.

@@ -336,6 +336,13 @@ impl Download {
         self.handle.stats().progress_bytes
     }
 
+    /// Reads [`Download::have_bytes`] without holding on to the download, for progress reports
+    /// taken while another task waits on it.
+    pub fn have_bytes_reader(&self) -> impl Fn() -> u64 + Send + Sync + 'static {
+        let handle = Arc::clone(&self.handle);
+        move || handle.stats().progress_bytes
+    }
+
     /// Waits until every piece is on disk and checked.
     ///
     /// # Errors
