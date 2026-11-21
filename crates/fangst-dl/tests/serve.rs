@@ -105,3 +105,23 @@ fn committed_openapi_document_is_current() {
         String::from_utf8_lossy(&output.stderr)
     );
 }
+
+#[test]
+fn unknown_provider_stops_startup_with_the_reason() {
+    let dir = tempfile::tempdir().unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_fangst-dl"))
+        .args([
+            "serve",
+            "--data-dir",
+            dir.path().to_str().unwrap(),
+            "--listen",
+            "127.0.0.1:0",
+            "--enable",
+            "notify-nope",
+        ])
+        .env("FANGST_API_KEY", "a-long-enough-test-key")
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("unknown provider `notify-nope`"));
+}

@@ -636,6 +636,7 @@ dependencies = [
  "fangst-downloads",
  "fangst-nntp",
  "fangst-nzb",
+ "fangst-providers",
  "fangst-usenet",
  "tempfile",
  "tokio",
@@ -693,6 +694,15 @@ version = "0.1.0"
 dependencies = [
  "proptest",
  "quick-xml",
+]
+
+[[package]]
+name = "fangst-providers"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
