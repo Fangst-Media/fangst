@@ -96,7 +96,7 @@ export const addJob = <ThrowOnError extends boolean = false>(options: Options<Ad
     url: '/api/v1/jobs',
     ...options,
     headers: {
-        'Content-Type': 'application/x-nzb',
+        'Content-Type': 'application/json',
         ...options.headers
     }
 });

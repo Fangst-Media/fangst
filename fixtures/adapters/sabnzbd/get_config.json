@@ -1,0 +1,56 @@
+{
+  "source": "derived",
+  "client": "sonarr",
+  "note": "Sonarr's connection test reads misc.complete_dir (must be absolute or it falls back to fullstatus), misc.pre_check, misc.history_retention_option, categories[].name/dir, and sorters[].is_active/sort_cats. sorters must be an array. Real SABnzbd sends many more misc keys; these are the ones clients read.",
+  "request": {
+    "method": "GET",
+    "query": [["mode", "get_config"], ["apikey", "fixture-api-key-0000"], ["output", "json"]]
+  },
+  "response": {
+    "status": 200,
+    "content_type": "json",
+    "body": {
+      "config": {
+        "misc": {
+          "complete_dir": "/data/downloads",
+          "download_dir": "/data/downloads",
+          "pre_check": 0,
+          "history_retention": "",
+          "history_retention_option": "all",
+          "history_retention_number": 1
+        },
+        "categories": [
+          {
+            "name": "*",
+            "order": 0,
+            "pp": "3",
+            "script": "None",
+            "dir": "",
+            "newzbin": "",
+            "priority": 0
+          },
+          {
+            "name": "audio",
+            "order": 1,
+            "pp": "",
+            "script": "Default",
+            "dir": "",
+            "newzbin": "",
+            "priority": -100
+          }
+        ],
+        "sorters": [],
+        "servers": [],
+        "rss": []
+      }
+    }
+  },
+  "exact": [
+    "/config/misc/complete_dir",
+    "/config/misc/pre_check",
+    "/config/misc/history_retention_option",
+    "/config/categories/0/name",
+    "/config/categories/0/dir",
+    "/config/sorters"
+  ]
+}

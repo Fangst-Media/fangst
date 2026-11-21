@@ -291,8 +291,13 @@
           }
         ],
         "requestBody": {
-          "description": "The NZB file",
+          "description": "The NZB file, or JSON naming a URL to fetch it from. Without `name` the job is named after the NZB's title, then the file name in the URL.",
           "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddJobUrl"
+              }
+            },
             "application/x-nzb": {
               "schema": {
                 "type": "array",
@@ -316,6 +321,16 @@
               }
             }
           },
+          "400": {
+            "description": "The URL is invalid or not http(s)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "401": {
             "content": {
               "application/json": {
@@ -326,6 +341,17 @@
             }
           },
           "422": {
+            "description": "Not a valid NZB, or the fetched NZB is too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The URL could not be fetched",
             "content": {
               "application/json": {
                 "schema": {
@@ -591,6 +617,19 @@
   },
   "components": {
     "schemas": {
+      "AddJobUrl": {
+        "type": "object",
+        "description": "An NZB for the daemon to download itself.",
+        "required": [
+          "url"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "`http` or `https`; redirects are followed only to `http` and `https`."
+          }
+        }
+      },
       "ApiError": {
         "type": "object",
         "required": [

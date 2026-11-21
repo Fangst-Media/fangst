@@ -1,0 +1,57 @@
+{
+  "source": "derived",
+  "client": "holyarrs",
+  "note": "HolyArrs pages with start/limit (alphabetical query order, Go url.Values) and stops when a page is short or noofslots_total is reached. Higher priority runs first, so the movie leads.",
+  "request": {
+    "method": "GET",
+    "query": [
+      ["apikey", "fixture-api-key-0000"],
+      ["limit", "1"],
+      ["mode", "queue"],
+      ["output", "json"],
+      ["start", "0"]
+    ]
+  },
+  "response": {
+    "status": 200,
+    "content_type": "json",
+    "body": {
+      "queue": {
+        "paused": false,
+        "diskspace1": "161.16",
+        "diskspace2": "161.16",
+        "speedlimit_abs": "",
+        "kbpersec": "0.00",
+        "noofslots_total": 3,
+        "noofslots": 1,
+        "start": 0,
+        "limit": 1,
+        "timeleft": "0:00:00",
+        "slots": [
+          {
+            "index": 0,
+            "nzo_id": "SABnzbd_nzo_3",
+            "priority": "High",
+            "filename": "Movie.2020.1080p.BluRay.x264",
+            "cat": "movies",
+            "mbleft": "8192.00",
+            "mb": "8192.00",
+            "percentage": "0",
+            "status": "Queued",
+            "timeleft": "0:00:00",
+            "avg_age": "12d",
+            "time_added": 1469173000
+          }
+        ]
+      }
+    }
+  },
+  "exact": [
+    "/queue/noofslots_total",
+    "/queue/noofslots",
+    "/queue/slots/0/nzo_id",
+    "/queue/slots/0/priority",
+    "/queue/slots/0/mb",
+    "/queue/slots/0/status"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "source": "derived",
+  "client": "sonarr",
+  "note": "Sonarr removes a job still in the queue with mode=queue&name=delete. It reads nothing but a non-error answer.",
+  "request": {
+    "method": "GET",
+    "query": [
+      ["mode", "queue"],
+      ["name", "delete"],
+      ["del_files", "1"],
+      ["value", "SABnzbd_nzo_2"],
+      ["apikey", "fixture-api-key-0000"],
+      ["output", "json"]
+    ]
+  },
+  "response": {
+    "status": 200,
+    "content_type": "json",
+    "body": { "status": true, "nzo_ids": ["SABnzbd_nzo_2"] }
+  },
+  "exact": ["/status", "/nzo_ids/0"],
+  "gone": [2]
+}

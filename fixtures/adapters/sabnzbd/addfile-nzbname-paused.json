@@ -1,0 +1,25 @@
+{
+  "source": "derived",
+  "client": "holyarrs",
+  "note": "HolyArrs sends nzbname and a generic application/octet-stream part. Priority -2 is SABnzbd's add-paused, which Sonarr sends when its priority setting is Paused.",
+  "request": {
+    "method": "POST",
+    "query": [
+      ["apikey", "fixture-api-key-0000"],
+      ["cat", "movies"],
+      ["mode", "addfile"],
+      ["nzbname", "Other.Movie.2021"],
+      ["output", "json"],
+      ["priority", "-2"]
+    ],
+    "headers": [["content-type", "multipart/form-data; boundary=3f1e0c9a"]],
+    "body": "--3f1e0c9a\r\nContent-Disposition: form-data; name=\"name\"; filename=\"release.nzb\"\r\nContent-Type: application/octet-stream\r\n\r\n<nzb></nzb>\r\n--3f1e0c9a--\r\n"
+  },
+  "response": {
+    "status": 200,
+    "content_type": "json",
+    "body": { "status": true, "nzo_ids": ["SABnzbd_nzo_6"] }
+  },
+  "exact": ["/status", "/nzo_ids/0"],
+  "added": { "name": "Other.Movie.2021", "category": "movies", "priority": 0, "status": "paused" }
+}

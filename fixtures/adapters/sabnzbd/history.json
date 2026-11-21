@@ -1,0 +1,110 @@
+{
+  "source": "derived",
+  "client": "sonarr",
+  "note": "Sonarr asks for 60 entries (DownloadClientHistoryLimit) in its category. It reads nzo_id, name, category, bytes, status, fail_message and storage; storage is the finished job folder. Shape from the SABnzbd 4.5 docs history example.",
+  "request": {
+    "method": "GET",
+    "query": [
+      ["mode", "history"],
+      ["start", "0"],
+      ["limit", "60"],
+      ["category", "tv"],
+      ["apikey", "fixture-api-key-0000"],
+      ["output", "json"]
+    ]
+  },
+  "response": {
+    "status": 200,
+    "content_type": "json",
+    "body": {
+      "history": {
+        "noofslots": 2,
+        "ppslots": 0,
+        "day_size": "1.9 G",
+        "week_size": "30.4 G",
+        "month_size": "167.3 G",
+        "total_size": "678.1 G",
+        "last_history_update": 1469210913,
+        "slots": [
+          {
+            "action_line": "",
+            "duplicate_key": "TV.Show/4/3",
+            "meta": null,
+            "fail_message": "12 segments missing on the server, 0 could not be downloaded",
+            "loaded": false,
+            "size": "2.3 GB",
+            "category": "tv",
+            "pp": "D",
+            "retry": 0,
+            "script": "None",
+            "nzb_name": "TV.Show.S04E03.720p.BluRay.x264-xHD.nzb",
+            "download_time": 64,
+            "storage": "/data/downloads/5-TV.Show.S04E03.720p.BluRay.x264-xHD",
+            "status": "Failed",
+            "script_line": "",
+            "completed": 1469173100,
+            "time_added": 1469172100,
+            "nzo_id": "SABnzbd_nzo_5",
+            "downloaded": 0,
+            "report": "",
+            "password": "",
+            "path": "/data/downloads/5-TV.Show.S04E03.720p.BluRay.x264-xHD",
+            "postproc_time": 0,
+            "name": "TV.Show.S04E03.720p.BluRay.x264-xHD",
+            "url": "",
+            "md5sum": "",
+            "archive": false,
+            "bytes": 2436906376,
+            "url_info": "",
+            "stage_log": []
+          },
+          {
+            "action_line": "",
+            "duplicate_key": "TV.Show/4/2",
+            "meta": null,
+            "fail_message": "",
+            "loaded": false,
+            "size": "2.3 GB",
+            "category": "tv",
+            "pp": "D",
+            "retry": 0,
+            "script": "None",
+            "nzb_name": "TV.Show.S04E02.720p.BluRay.x264-xHD.nzb",
+            "download_time": 64,
+            "storage": "/data/downloads/4-TV.Show.S04E02.720p.BluRay.x264-xHD",
+            "status": "Completed",
+            "script_line": "",
+            "completed": 1469172988,
+            "time_added": 1469172000,
+            "nzo_id": "SABnzbd_nzo_4",
+            "downloaded": 2436906376,
+            "report": "",
+            "password": "",
+            "path": "/data/downloads/4-TV.Show.S04E02.720p.BluRay.x264-xHD",
+            "postproc_time": 40,
+            "name": "TV.Show.S04E02.720p.BluRay.x264-xHD",
+            "url": "TV.Show.S04E02.720p.BluRay.x264-xHD.nzb",
+            "md5sum": "d2c16aeecbc1b1921d04422850e93013",
+            "archive": false,
+            "bytes": 2436906376,
+            "url_info": "",
+            "stage_log": []
+          }
+        ]
+      }
+    }
+  },
+  "exact": [
+    "/history/noofslots",
+    "/history/slots/0/nzo_id",
+    "/history/slots/0/status",
+    "/history/slots/0/fail_message",
+    "/history/slots/1/nzo_id",
+    "/history/slots/1/name",
+    "/history/slots/1/category",
+    "/history/slots/1/status",
+    "/history/slots/1/storage",
+    "/history/slots/1/bytes",
+    "/history/slots/1/size"
+  ]
+}

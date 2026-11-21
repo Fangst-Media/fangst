@@ -15,6 +15,7 @@ workspace = true
 anyhow = "1.0.104"
 axum = "0.8.9"
 clap = { version = "4.6.9", features = ["derive"] }
+fangst-adapter-sabnzbd = { version = "0.1.0", path = "../fangst-adapter-sabnzbd" }
 fangst-core = { version = "0.1.0", path = "../fangst-core" }
 fangst-dl-api = { version = "0.1.0", path = "../fangst-dl-api" }
 fangst-downloads = { version = "0.1.0", path = "../fangst-downloads" }

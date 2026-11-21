@@ -1,0 +1,15 @@
+{
+  "source": "derived",
+  "client": "sonarr",
+  "note": "First call of Sonarr's connection test. The version must match \\d+.\\d+.(\\d+|x).",
+  "request": {
+    "method": "GET",
+    "query": [["mode", "version"], ["apikey", "fixture-api-key-0000"], ["output", "json"]]
+  },
+  "response": {
+    "status": 200,
+    "content_type": "json",
+    "body": { "version": "4.5.5" }
+  },
+  "exact": ["/version"]
+}

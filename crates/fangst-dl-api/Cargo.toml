@@ -15,6 +15,11 @@ workspace = true
 axum = { version = "0.8.9", features = ["ws", "macros"] }
 fangst-downloads = { version = "0.1.0", path = "../fangst-downloads" }
 fangst-nntp = { version = "0.1.0", path = "../fangst-nntp" }
+fangst-providers = { version = "0.1.0", path = "../fangst-providers" }
+form_urlencoded = "1.2.3"
+# Already in the tree through librqbit with the same rustls backend; no system proxy, so a
+# fetch goes where its URL says.
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 tokio = { version = "1.54.1", features = ["sync", "macros"] }
@@ -24,6 +29,7 @@ utoipa = "6.0.0"
 fangst-bench = { path = "../../tools/fangst-bench" }
 fangst-core = { path = "../fangst-core" }
 fangst-nntp = { path = "../fangst-nntp" }
+fangst-providers = { path = "../fangst-providers" }
 fangst-usenet = { path = "../fangst-usenet" }
 futures-util = "0.3.34"
 http-body-util = "0.1.5"

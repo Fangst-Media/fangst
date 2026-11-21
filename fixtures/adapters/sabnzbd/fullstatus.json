@@ -1,0 +1,31 @@
+{
+  "source": "derived",
+  "client": "sonarr",
+  "note": "Sonarr and HolyArrs read only status.completedir. Real SABnzbd adds machine details (IP addresses, pystone, log paths) that Fangst does not report.",
+  "request": {
+    "method": "GET",
+    "query": [
+      ["mode", "fullstatus"],
+      ["skip_dashboard", "1"],
+      ["apikey", "fixture-api-key-0000"],
+      ["output", "json"]
+    ]
+  },
+  "response": {
+    "status": 200,
+    "content_type": "json",
+    "body": {
+      "status": {
+        "version": "4.5.5",
+        "paused": false,
+        "downloaddir": "/data/downloads",
+        "completedir": "/data/downloads",
+        "have_warnings": "0",
+        "warnings": [],
+        "folders": [],
+        "servers": []
+      }
+    }
+  },
+  "exact": ["/status/completedir"]
+}

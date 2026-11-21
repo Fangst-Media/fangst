@@ -85,6 +85,12 @@ impl Service {
         &self.runner.store
     }
 
+    /// The folder each job gets its own subfolder in.
+    #[must_use]
+    pub fn download_root(&self) -> &std::path::Path {
+        &self.runner.root
+    }
+
     #[must_use]
     pub fn subscribe(&self) -> broadcast::Receiver<Change> {
         self.changes.subscribe()
