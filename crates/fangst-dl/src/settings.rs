@@ -13,8 +13,9 @@ use anyhow::Context;
 use fangst_core::config::{self, Config, Layers, Table, Value};
 use fangst_dl_api::{
     CategorySettings, ControlError, ControlFuture, DiscordSettings, EnabledAdapters,
-    FolderSettings, NotifierSettings, NtfySettings, ProviderSettings, SavedSettings,
-    ServerSettings, SettingSource, SettingsDto, TorrentSettings, WebhookSettings,
+    FolderCheckRequest, FolderCheckResult, FolderSettings, FolderStatus, NotifierSettings,
+    NtfySettings, ProviderSettings, SavedSettings, ServerSettings, SettingSource, SettingsDto,
+    TorrentSettings, WebhookSettings,
 };
 use fangst_downloads::{Notifications, Secrets, Service};
 use fangst_nntp::{Pool, ServerConfig};
@@ -364,6 +365,8 @@ pub struct Daemon {
     adapters: EnabledAdapters,
     /// Adapters and post-processors compiled in.
     providers: Vec<ProviderInfo>,
+    /// `FANGST_OWNER_PASSWORD` set the owner's password, so there is nothing to set up.
+    owner_from_env: bool,
 }
 
 pub struct DaemonParts {
@@ -373,6 +376,7 @@ pub struct DaemonParts {
     pub service: Service,
     pub adapters: EnabledAdapters,
     pub providers: Vec<ProviderInfo>,
+    pub owner_from_env: bool,
 }
 
 impl Daemon {
@@ -388,6 +392,7 @@ impl Daemon {
             service: parts.service,
             adapters: parts.adapters,
             providers: parts.providers,
+            owner_from_env: parts.owner_from_env,
         })
     }
 
@@ -837,6 +842,76 @@ impl fangst_dl_api::Control for Daemon {
         settings: SettingsDto,
     ) -> ControlFuture<'_, Result<SavedSettings, ControlError>> {
         Box::pin(self.save(settings))
+    }
+
+    fn setup_completed(&self) -> ControlFuture<'_, Result<bool, ControlError>> {
+        Box::pin(async move {
+            let layers = self.layers.lock().await;
+            let config = layers.resolve().map_err(internal)?;
+            Ok(config.settings.setup.completed || self.owner_from_env)
+        })
+    }
+
+    fn complete_setup(&self) -> ControlFuture<'_, Result<(), ControlError>> {
+        Box::pin(async move {
+            let mut layers = self.layers.lock().await;
+            let mut file = layers.file.clone();
+            config::insert_path(
+                &mut file,
+                &["setup".to_owned(), "completed".to_owned()],
+                Value::Boolean(true),
+            );
+            config::write_file(&self.file_path, &file).map_err(internal)?;
+            *layers = layers.with_file(file);
+            Ok(())
+        })
+    }
+
+    fn check_folders(
+        &self,
+        request: FolderCheckRequest,
+    ) -> ControlFuture<'_, Result<FolderCheckResult, ControlError>> {
+        Box::pin(async move {
+            let downloads = request.downloads.trim();
+            if downloads.is_empty() {
+                return Err(invalid("the downloads folder can't be empty"));
+            }
+            let downloads = config::resolve(&self.data_dir, downloads);
+            let media = blank_to_none(request.media).map(|m| config::resolve(&self.data_dir, &m));
+            tokio::task::spawn_blocking(move || check_folders(&downloads, media.as_deref()))
+                .await
+                .map_err(internal)
+        })
+    }
+}
+
+fn folder_status(check: fangst_core::folders::FolderCheck) -> FolderStatus {
+    FolderStatus {
+        path: check.path.to_string_lossy().into_owned(),
+        created: check.created,
+        writable: check.writable,
+        problem: check.problem,
+    }
+}
+
+fn check_folders(downloads: &Path, media: Option<&Path>) -> FolderCheckResult {
+    use fangst_core::folders::{check_folder, check_hardlink};
+    let downloads = check_folder(downloads);
+    let media = media.map(check_folder);
+    let (hardlinks, hardlink_problem) = match &media {
+        Some(media) if downloads.writable && media.writable => {
+            match check_hardlink(&downloads.path, &media.path) {
+                Ok(()) => (Some(true), None),
+                Err(why) => (Some(false), Some(why)),
+            }
+        }
+        _ => (None, None),
+    };
+    FolderCheckResult {
+        downloads: folder_status(downloads),
+        media: media.map(folder_status),
+        hardlinks,
+        hardlink_problem,
     }
 }
 

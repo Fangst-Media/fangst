@@ -354,6 +354,10 @@ fn every_route_is_in_the_openapi_document() {
         ("/api/v1/auth/me", &["get"]),
         ("/api/v1/auth/password", &["put"]),
         ("/api/v1/settings", &["get", "put"]),
+        ("/api/v1/settings/folders/check", &["post"]),
+        ("/api/v1/setup", &["get"]),
+        ("/api/v1/setup/owner", &["post"]),
+        ("/api/v1/setup/complete", &["post"]),
     ] {
         for method in methods {
             assert!(
@@ -364,7 +368,7 @@ fn every_route_is_in_the_openapi_document() {
     }
     assert_eq!(
         paths.len(),
-        17,
+        21,
         "a route exists in the document but not in this test"
     );
     assert!(doc["components"]["securitySchemes"]["api_key"].is_object());

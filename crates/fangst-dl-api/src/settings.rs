@@ -35,6 +35,17 @@ pub trait Control: Send + Sync {
         &self,
         settings: SettingsDto,
     ) -> ControlFuture<'_, Result<SavedSettings, ControlError>>;
+
+    /// Whether the first-run setup finished or the environment configured everything.
+    fn setup_completed(&self) -> ControlFuture<'_, Result<bool, ControlError>>;
+
+    fn complete_setup(&self) -> ControlFuture<'_, Result<(), ControlError>>;
+
+    /// Checks the folders without saving them.
+    fn check_folders(
+        &self,
+        request: crate::FolderCheckRequest,
+    ) -> ControlFuture<'_, Result<crate::FolderCheckResult, ControlError>>;
 }
 
 /// Every setting the web UI manages.
@@ -212,7 +223,7 @@ pub(crate) async fn owner_only(state: &ApiState, caller: &Caller) -> Result<(), 
     }
 }
 
-fn no_control() -> Response {
+pub(crate) fn no_control() -> Response {
     error(
         StatusCode::SERVICE_UNAVAILABLE,
         "settings can't be changed in this setup",

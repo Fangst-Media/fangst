@@ -19,6 +19,9 @@ pub const FIRST_USER: &str = "admin";
 /// Name of the API key set from the environment on every start.
 pub const ENVIRONMENT_KEY: &str = "environment";
 
+/// Name of the API key made on a start without one in the environment.
+pub const GENERATED_KEY: &str = "generated";
+
 /// Twelve characters keeps online guessing hopeless under the login rate limit while staying
 /// typeable; there is no upper bound on character classes, only length.
 pub const MIN_PASSWORD_CHARS: usize = 12;
@@ -89,6 +92,40 @@ impl Auth {
             self.end_sessions(user.id).await?;
         }
         Ok(user)
+    }
+
+    /// Like [`Auth::bootstrap`] for a start without an API key in the environment: creates the
+    /// first user on a fresh database and gives them a generated key named [`GENERATED_KEY`] if
+    /// they have no key at all, so clients such as Sonarr have one to use. Keys from earlier
+    /// starts stay.
+    ///
+    /// # Errors
+    /// When the random source or the database fails.
+    pub async fn bootstrap_without_key(&self) -> Result<User, Error> {
+        let user = match self.owner().await? {
+            Some(user) => user,
+            None => self.create_user(FIRST_USER, None).await?,
+        };
+        let keys: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM api_keys WHERE user_id = ?")
+            .bind(user.id)
+            .fetch_one(&self.pool)
+            .await?;
+        if keys == 0 {
+            self.set_api_key(user.id, GENERATED_KEY, &secret::random_token()?)
+                .await?;
+        }
+        Ok(user)
+    }
+
+    /// The key to give clients of `user`: the environment's, else the generated one.
+    ///
+    /// # Errors
+    /// When the database read fails or the key can't be decrypted.
+    pub async fn client_key(&self, user_id: i64) -> Result<Option<String>, Error> {
+        match self.api_key(user_id, ENVIRONMENT_KEY).await? {
+            Some(key) => Ok(Some(key)),
+            None => self.api_key(user_id, GENERATED_KEY).await,
+        }
     }
 
     /// The first user, who owns the daemon and may change its settings. `None` before the first

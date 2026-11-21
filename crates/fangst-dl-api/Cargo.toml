@@ -13,6 +13,7 @@ workspace = true
 
 [dependencies]
 axum = { version = "0.8.9", features = ["ws", "macros"] }
+fangst-core = { version = "0.1.0", path = "../fangst-core" }
 fangst-downloads = { version = "0.1.0", path = "../fangst-downloads" }
 fangst-nntp = { version = "0.1.0", path = "../fangst-nntp" }
 fangst-providers = { version = "0.1.0", path = "../fangst-providers" }
@@ -28,7 +29,6 @@ utoipa = "6.0.0"
 
 [dev-dependencies]
 fangst-bench = { path = "../../tools/fangst-bench" }
-fangst-core = { path = "../fangst-core" }
 fangst-nntp = { path = "../fangst-nntp" }
 fangst-providers = { path = "../fangst-providers" }
 fangst-usenet = { path = "../fangst-usenet" }

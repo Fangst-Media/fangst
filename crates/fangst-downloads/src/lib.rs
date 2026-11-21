@@ -23,7 +23,9 @@ mod pipeline;
 mod progress;
 mod service;
 mod torrent;
-pub use auth::{Auth, ENVIRONMENT_KEY, FIRST_USER, MIN_PASSWORD_CHARS, Secrets, User};
+pub use auth::{
+    Auth, ENVIRONMENT_KEY, FIRST_USER, GENERATED_KEY, MIN_PASSWORD_CHARS, Secrets, User,
+};
 pub use notify::Notifications;
 use progress::Meter;
 pub use progress::Progress;

@@ -11,6 +11,16 @@ struct Daemon {
     addr: String,
     /// What the daemon printed up to its provider listing.
     banner: Vec<String>,
+    /// The rest of its output, such as the setup token line.
+    stdout: BufReader<std::process::ChildStdout>,
+}
+
+impl Daemon {
+    fn next_line(&mut self) -> String {
+        let mut line = String::new();
+        self.stdout.read_line(&mut line).unwrap();
+        line.trim().to_owned()
+    }
 }
 
 impl Drop for Daemon {
@@ -34,7 +44,16 @@ fn start(data_dir: &std::path::Path) -> Daemon {
 }
 
 fn start_with(data_dir: &std::path::Path, extra: &[&str]) -> Daemon {
-    let mut child = Command::new(env!("CARGO_BIN_EXE_fangst-dl"))
+    start_env(data_dir, extra, &[("FANGST_API_KEY", KEY)])
+}
+
+/// Starts the daemon with only `env` from the `FANGST_*` family set.
+fn start_env(data_dir: &std::path::Path, extra: &[&str], env: &[(&str, &str)]) -> Daemon {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_fangst-dl"));
+    for (name, _) in std::env::vars().filter(|(n, _)| n.starts_with("FANGST_")) {
+        command.env_remove(name);
+    }
+    let mut child = command
         .args([
             "serve",
             "--data-dir",
@@ -43,7 +62,7 @@ fn start_with(data_dir: &std::path::Path, extra: &[&str]) -> Daemon {
             "127.0.0.1:0",
         ])
         .args(extra)
-        .env("FANGST_API_KEY", KEY)
+        .envs(env.iter().copied())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -77,6 +96,7 @@ fn start_with(data_dir: &std::path::Path, extra: &[&str]) -> Daemon {
         child,
         addr,
         banner,
+        stdout,
     }
 }
 
@@ -468,6 +488,125 @@ fn environment_variables_override_the_config_file() {
         body(&response).contains(r#""torrent.max_active""#),
         "{response}"
     );
+}
+
+/// A request carrying the session cookie, from the daemon's own origin as a browser sends it.
+fn with_session(addr: &str, method: &str, path: &str, cookie: &str, json: &str) -> String {
+    let mut stream = TcpStream::connect(addr).unwrap();
+    write!(
+        stream,
+        "{method} {path} HTTP/1.1\r\nHost: {addr}\r\nOrigin: http://{addr}\r\nCookie: {cookie}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{json}",
+        json.len()
+    )
+    .unwrap();
+    let mut response = String::new();
+    stream.read_to_string(&mut response).unwrap();
+    response
+}
+
+fn session_cookie(response: &str) -> String {
+    response
+        .lines()
+        .find_map(|l| l.strip_prefix("set-cookie: "))
+        .and_then(|c| c.split(';').next())
+        .unwrap_or_else(|| panic!("no cookie in {response}"))
+        .to_owned()
+}
+
+#[test]
+fn a_fresh_start_needs_no_settings_and_prints_a_token_that_claims_the_owner_once() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut daemon = start_env(dir.path(), LOCAL_TORRENTS, &[]);
+    let line = daemon.next_line();
+    let token = line
+        .rsplit(' ')
+        .next()
+        .filter(|_| line.starts_with("setup:"))
+        .unwrap_or_else(|| panic!("{line}"))
+        .to_owned();
+
+    let (_, status) = http(&daemon.addr, "/api/v1/setup", None);
+    assert!(
+        body(&status).contains(r#""owner_has_password":false,"completed":false"#),
+        "{status}"
+    );
+    let claim = format!(r#"{{"token":"{token}","password":"{NEW_PASSWORD}"}}"#);
+    let (code, response) = request(&daemon.addr, "POST", "/api/v1/setup/owner", None, &claim);
+    assert_eq!(code, 200, "{response}");
+    let cookie = session_cookie(&response);
+    let (code, _) = request(&daemon.addr, "POST", "/api/v1/setup/owner", None, &claim);
+    assert_eq!(code, 409);
+
+    let media = dir.path().join("media");
+    let check = format!(
+        r#"{{"downloads":"downloads","media":{}}}"#,
+        serde_json_string(media.to_str().unwrap())
+    );
+    let response = with_session(
+        &daemon.addr,
+        "POST",
+        "/api/v1/settings/folders/check",
+        &cookie,
+        &check,
+    );
+    assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+    assert!(
+        body(&response).contains(r#""hardlinks":true"#),
+        "{response}"
+    );
+    assert!(dir.path().join("downloads").is_dir());
+
+    let response = with_session(&daemon.addr, "POST", "/api/v1/setup/complete", &cookie, "");
+    assert!(response.starts_with("HTTP/1.1 204"), "{response}");
+    let (_, status) = http(&daemon.addr, "/api/v1/setup", None);
+    assert!(body(&status).contains(r#""completed":true"#), "{status}");
+    drop(daemon);
+
+    let daemon = start_env(dir.path(), LOCAL_TORRENTS, &[]);
+    assert_eq!(login(&daemon.addr, NEW_PASSWORD), 200);
+    let (_, status) = http(&daemon.addr, "/api/v1/setup", None);
+    assert!(body(&status).contains(r#""completed":true"#), "{status}");
+}
+
+#[test]
+fn environment_variables_alone_give_a_finished_setup() {
+    let dir = tempfile::tempdir().unwrap();
+    let downloads = dir.path().join("elsewhere");
+    let daemon = start_env(
+        dir.path(),
+        LOCAL_TORRENTS,
+        &[
+            ("FANGST_API_KEY", KEY),
+            ("FANGST_OWNER_PASSWORD", NEW_PASSWORD),
+            ("FANGST_FOLDERS__DOWNLOADS", downloads.to_str().unwrap()),
+            ("FANGST_USENET_HOST", "news.example.invalid"),
+            ("FANGST_USENET_TLS", "false"),
+            ("FANGST_USENET_USERNAME", "someone"),
+            ("FANGST_USENET_PASSWORD", USENET_PASSWORD),
+        ],
+    );
+    assert!(
+        !daemon.banner.iter().any(|l| l.contains("no usenet server")),
+        "{:?}",
+        daemon.banner
+    );
+    let (_, status) = http(&daemon.addr, "/api/v1/setup", None);
+    assert!(
+        body(&status).contains(r#""owner_has_password":true,"completed":true"#),
+        "{status}"
+    );
+    assert_eq!(login(&daemon.addr, NEW_PASSWORD), 200);
+    let (_, settings) = http(&daemon.addr, "/api/v1/settings", Some(KEY));
+    let settings = body(&settings);
+    assert!(settings.contains(r#""source":"environment""#), "{settings}");
+    assert!(settings.contains(r#""has_password":true"#), "{settings}");
+    assert!(!settings.contains(USENET_PASSWORD), "{settings}");
+    assert!(settings.contains(r#""folders.downloads""#), "{settings}");
+}
+
+/// `text` as a JSON string, for paths with backslashes on Windows.
+fn serde_json_string(text: &str) -> String {
+    format!("\"{}\"", text.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
 /// The crate folder at run time. `env!("CARGO_MANIFEST_DIR")` is baked in at compile time, and a

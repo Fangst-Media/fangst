@@ -1,5 +1,6 @@
 //! The settings routes: owner only, and a thin pass-through to the daemon's [`Control`].
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use axum::body::Body;
@@ -7,8 +8,9 @@ use axum::http::{Request, StatusCode};
 use fangst_core::secret::MasterKey;
 use fangst_dl_api::{
     AuthSettings, Control, ControlError, ControlFuture, DiscordSettings, EnabledAdapters,
-    FetchLimits, FolderSettings, NotifierSettings, NtfySettings, Options, SavedSettings,
-    SettingsDto, TorrentSettings, WebhookSettings, app,
+    FetchLimits, FolderCheckRequest, FolderCheckResult, FolderSettings, FolderStatus,
+    NotifierSettings, NtfySettings, Options, SavedSettings, SettingsDto, TorrentSettings,
+    WebhookSettings, app,
 };
 use fangst_downloads::{Auth, Runner, Service, Store};
 use fangst_providers::{
@@ -72,6 +74,7 @@ fn sample() -> SettingsDto {
 #[derive(Default)]
 struct Fake {
     saved: Mutex<Option<SettingsDto>>,
+    completed: AtomicBool,
 }
 
 impl Control for Fake {
@@ -98,6 +101,36 @@ impl Control for Fake {
                 settings,
                 restart_required: true,
                 restart_reasons: vec!["the downloads folder".to_owned()],
+            })
+        })
+    }
+
+    fn setup_completed(&self) -> ControlFuture<'_, Result<bool, ControlError>> {
+        Box::pin(async move { Ok(self.completed.load(Ordering::SeqCst)) })
+    }
+
+    fn complete_setup(&self) -> ControlFuture<'_, Result<(), ControlError>> {
+        Box::pin(async move {
+            self.completed.store(true, Ordering::SeqCst);
+            Ok(())
+        })
+    }
+
+    fn check_folders(
+        &self,
+        request: FolderCheckRequest,
+    ) -> ControlFuture<'_, Result<FolderCheckResult, ControlError>> {
+        Box::pin(async move {
+            Ok(FolderCheckResult {
+                downloads: FolderStatus {
+                    path: request.downloads,
+                    created: false,
+                    writable: true,
+                    problem: None,
+                },
+                media: None,
+                hardlinks: None,
+                hardlink_problem: None,
             })
         })
     }
@@ -138,6 +171,13 @@ struct Harness {
 }
 
 async fn harness(control: Option<Arc<dyn Control>>) -> Harness {
+    harness_with(control, false).await
+}
+
+const SETUP_TOKEN: &str = "setup-token-placeholder";
+const OWNER_PASSWORD: &str = "placeholder-password";
+
+async fn harness_with(control: Option<Arc<dyn Control>>, owner_password: bool) -> Harness {
     let dir = tempfile::tempdir().unwrap();
     let store = Store::open(&dir.path().join("downloads.db")).await.unwrap();
     let auth = Auth::new(
@@ -149,6 +189,10 @@ async fn harness(control: Option<Arc<dyn Control>>) -> Harness {
     auth.bootstrap(OWNER_KEY).await.unwrap();
     let other = auth.create_user("someone", None).await.unwrap();
     auth.set_api_key(other.id, "cli", OTHER_KEY).await.unwrap();
+    if owner_password {
+        let owner = auth.owner().await.unwrap().unwrap();
+        auth.set_password(owner.id, OWNER_PASSWORD).await.unwrap();
+    }
     let runner = Runner {
         store,
         servers: Vec::new(),
@@ -170,6 +214,7 @@ async fn harness(control: Option<Arc<dyn Control>>) -> Harness {
             adapters: vec![Arc::new(Probe)],
             enabled_adapters: enabled.clone(),
             control,
+            setup_token: Some(SETUP_TOKEN.to_owned()),
         },
     );
     Harness {
@@ -280,6 +325,110 @@ async fn without_a_control_the_settings_routes_say_so() {
     let h = harness(None).await;
     let (status, _) = call(&h.app, "GET", "/api/v1/settings", Some(OWNER_KEY), None).await;
     assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+}
+
+async fn post_json(
+    app: &axum::Router,
+    path: &str,
+    key: Option<&str>,
+    json: &str,
+) -> (StatusCode, Option<String>, String) {
+    let mut request = Request::builder()
+        .method("POST")
+        .uri(path)
+        .header("Content-Type", "application/json");
+    if let Some(key) = key {
+        request = request.header("X-Api-Key", key);
+    }
+    let response = app
+        .clone()
+        .oneshot(request.body(Body::from(json.to_owned())).unwrap())
+        .await
+        .unwrap();
+    let status = response.status();
+    let cookie = response
+        .headers()
+        .get("set-cookie")
+        .map(|v| v.to_str().unwrap().to_owned());
+    let bytes = response.into_body().collect().await.unwrap().to_bytes();
+    (status, cookie, String::from_utf8_lossy(&bytes).into_owned())
+}
+
+fn claim(token: &str, password: &str) -> String {
+    serde_json::json!({ "token": token, "password": password }).to_string()
+}
+
+#[tokio::test]
+async fn setup_status_needs_no_credentials_and_follows_the_owner() {
+    let h = harness(Some(Arc::new(Fake::default()))).await;
+    let (status, body) = call(&h.app, "GET", "/api/v1/setup", None, None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&body).unwrap(),
+        serde_json::json!({ "owner_has_password": false, "completed": false })
+    );
+    let (status, _, _) = post_json(&h.app, "/api/v1/setup/complete", Some(OTHER_KEY), "").await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let (status, _, _) = post_json(&h.app, "/api/v1/setup/complete", Some(OWNER_KEY), "").await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let (_, body) = call(&h.app, "GET", "/api/v1/setup", None, None).await;
+    assert!(body.contains(r#""completed":true"#), "{body}");
+}
+
+#[tokio::test]
+async fn the_setup_token_claims_the_owner_once_and_signs_them_in() {
+    let h = harness(Some(Arc::new(Fake::default()))).await;
+    let wrong = claim("not-the-token", OWNER_PASSWORD);
+    let (status, cookie, body) = post_json(&h.app, "/api/v1/setup/owner", None, &wrong).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED, "{body}");
+    assert!(cookie.is_none());
+
+    let short = claim(SETUP_TOKEN, "short");
+    let (status, _, body) = post_json(&h.app, "/api/v1/setup/owner", None, &short).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+
+    let good = claim(SETUP_TOKEN, OWNER_PASSWORD);
+    let (status, cookie, body) = post_json(&h.app, "/api/v1/setup/owner", None, &good).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert!(body.contains(r#""username":"admin""#), "{body}");
+    assert!(cookie.unwrap().starts_with("fangst_session="));
+
+    let again = claim(SETUP_TOKEN, "another-placeholder");
+    let (status, _, _) = post_json(&h.app, "/api/v1/setup/owner", None, &again).await;
+    assert_eq!(status, StatusCode::CONFLICT, "works once");
+    let (_, body) = call(&h.app, "GET", "/api/v1/setup", None, None).await;
+    assert!(body.contains(r#""owner_has_password":true"#), "{body}");
+}
+
+#[tokio::test]
+async fn the_owners_api_key_also_claims_the_account_but_another_users_does_not() {
+    let h = harness(Some(Arc::new(Fake::default()))).await;
+    let other = claim(OTHER_KEY, OWNER_PASSWORD);
+    let (status, _, _) = post_json(&h.app, "/api/v1/setup/owner", None, &other).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    let owner = claim(OWNER_KEY, OWNER_PASSWORD);
+    let (status, _, body) = post_json(&h.app, "/api/v1/setup/owner", None, &owner).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+}
+
+#[tokio::test]
+async fn an_owner_with_a_password_signs_in_instead() {
+    let h = harness_with(Some(Arc::new(Fake::default())), true).await;
+    let again = claim(SETUP_TOKEN, "another-placeholder");
+    let (status, _, _) = post_json(&h.app, "/api/v1/setup/owner", None, &again).await;
+    assert_eq!(status, StatusCode::CONFLICT);
+}
+
+#[tokio::test]
+async fn only_the_owner_checks_folders() {
+    let h = harness(Some(Arc::new(Fake::default()))).await;
+    let request = r#"{"downloads":"downloads","media":null}"#;
+    let path = "/api/v1/settings/folders/check";
+    let (status, _, _) = post_json(&h.app, path, Some(OTHER_KEY), request).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let (status, _, body) = post_json(&h.app, path, Some(OWNER_KEY), request).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert!(body.contains(r#""writable":true"#), "{body}");
 }
 
 #[tokio::test]

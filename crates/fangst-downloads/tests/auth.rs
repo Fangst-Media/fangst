@@ -285,3 +285,29 @@ async fn only_the_first_user_is_the_owner() {
     assert!(auth.is_owner(admin.id).await.unwrap());
     assert!(!auth.is_owner(other.id).await.unwrap());
 }
+
+#[tokio::test]
+async fn without_an_environment_key_the_owner_gets_one_generated_key() {
+    let s = setup().await;
+    let auth = Auth::new(&s.store, s.key.clone()).await.unwrap();
+    let admin = auth.bootstrap_without_key().await.unwrap();
+    assert_eq!(admin.username, FIRST_USER);
+    let key = auth.client_key(admin.id).await.unwrap().unwrap();
+    assert_eq!(key.len(), 64);
+    assert_eq!(
+        auth.user_for_api_key(&key).await.unwrap(),
+        Some(admin.clone())
+    );
+    auth.bootstrap_without_key().await.unwrap();
+    assert_eq!(
+        auth.client_key(admin.id).await.unwrap().as_deref(),
+        Some(key.as_str()),
+        "a restart keeps the generated key"
+    );
+    auth.bootstrap("environment-key-now-set").await.unwrap();
+    assert_eq!(
+        auth.client_key(admin.id).await.unwrap().as_deref(),
+        Some("environment-key-now-set"),
+        "the environment's key is the one to hand out"
+    );
+}

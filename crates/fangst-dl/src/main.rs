@@ -296,7 +296,7 @@ async fn serve(args: ServeArgs) -> anyhow::Result<ExitCode> {
         &data_dir.join("master.key"),
     )?);
     let auth = fangst_downloads::Auth::new(&store, Arc::clone(&master_key)).await?;
-    auth.bootstrap(&api_key).await?;
+    let owner = accounts(&auth, api_key.as_deref(), &env).await?;
     let extra_server = match args.usenet.server()? {
         Some(server) => Some(server),
         None => settings::env_server(&*env)?,
@@ -344,6 +344,7 @@ async fn serve(args: ServeArgs) -> anyhow::Result<ExitCode> {
         service: service.clone(),
         adapters: enabled_adapters.clone(),
         providers: infos,
+        owner_from_env: owner.from_env,
     })?;
     daemon
         .apply_categories(&config, &[])
@@ -360,6 +361,11 @@ async fn serve(args: ServeArgs) -> anyhow::Result<ExitCode> {
         engine.as_ref(),
         &registry,
     );
+    if let Some(token) = &owner.setup_token {
+        println!(
+            "setup: open the web UI and enter this setup token to choose the owner's password: {token}"
+        );
+    }
 
     let app = fangst_dl_api::app(
         service.clone(),
@@ -373,6 +379,7 @@ async fn serve(args: ServeArgs) -> anyhow::Result<ExitCode> {
             adapters,
             enabled_adapters,
             control: Some(Arc::new(daemon)),
+            setup_token: owner.setup_token,
         },
     );
     run(listener, app, service, engine).await?;
@@ -403,20 +410,70 @@ async fn run(
     Ok(())
 }
 
-fn api_key(args: &ServeArgs) -> anyhow::Result<String> {
-    let api_key = std::env::var(&args.api_key_env).with_context(|| {
-        format!(
-            "set the API key in the {} environment variable",
-            args.api_key_env
-        )
-    })?;
+/// The API key from the environment, if one is set. Without one the owner gets a generated key,
+/// shown on the connection details page.
+fn api_key(args: &ServeArgs) -> anyhow::Result<Option<String>> {
+    let Some(api_key) = std::env::var(&args.api_key_env)
+        .ok()
+        .filter(|k| !k.is_empty())
+    else {
+        return Ok(None);
+    };
     if api_key.len() < 16 {
         bail!(
             "the API key in {} must be at least 16 characters",
             args.api_key_env
         );
     }
-    Ok(api_key)
+    Ok(Some(api_key))
+}
+
+/// Variable holding the owner's password, so a container needs no setup in the web UI.
+const OWNER_PASSWORD_ENV: &str = "FANGST_OWNER_PASSWORD";
+
+/// 96 bits: far beyond online guessing under the login rate limit, and short enough to copy.
+const SETUP_TOKEN_CHARS: usize = 24;
+
+struct Owner {
+    /// The password came from the environment, which counts as a finished setup.
+    from_env: bool,
+    /// Claims the owner account in the web UI while it has no password.
+    setup_token: Option<String>,
+}
+
+/// Creates the owner on first start, with the environment's API key and password when set.
+async fn accounts(
+    auth: &fangst_downloads::Auth,
+    api_key: Option<&str>,
+    env: &settings::Env,
+) -> anyhow::Result<Owner> {
+    let owner = match api_key {
+        Some(key) => auth.bootstrap(key).await?,
+        None => auth.bootstrap_without_key().await?,
+    };
+    let password = env(OWNER_PASSWORD_ENV).filter(|p| !p.is_empty());
+    if let Some(password) = &password
+        && !auth.check_password(owner.id, password).await?
+    {
+        // Only on a change: setting a password ends the owner's sessions.
+        auth.set_password(owner.id, password)
+            .await
+            .with_context(|| format!("{OWNER_PASSWORD_ENV} is not usable"))?;
+    }
+    let setup_token = if auth.has_password(owner.id).await? {
+        None
+    } else {
+        Some(
+            fangst_core::secret::random_token()?
+                .chars()
+                .take(SETUP_TOKEN_CHARS)
+                .collect(),
+        )
+    };
+    Ok(Owner {
+        from_env: password.is_some(),
+        setup_token,
+    })
 }
 
 /// The data folder, with `fangst.toml` written on first start, and the settings layered over it.

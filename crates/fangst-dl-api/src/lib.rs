@@ -13,6 +13,7 @@ mod auth;
 mod fetch;
 mod limit;
 mod settings;
+mod setup;
 
 pub use auth::{AuthSettings, LoginRequest, PasswordChange, UserDto};
 pub use fetch::FetchLimits;
@@ -22,6 +23,7 @@ pub use settings::{
     NotifierSettings, NtfySettings, ProviderSettings, SavedSettings, ServerSettings, SettingSource,
     SettingsDto, TorrentSettings, WebhookSettings,
 };
+pub use setup::{FolderCheckRequest, FolderCheckResult, FolderStatus, SetupOwner, SetupStatus};
 
 use axum::Json;
 use axum::Router;
@@ -47,6 +49,8 @@ struct ApiState {
     jobs: adapters::ServiceJobs,
     enabled_adapters: EnabledAdapters,
     control: Option<Arc<dyn Control>>,
+    /// Claims the owner account while it has no password; gone once used.
+    setup_token: Arc<tokio::sync::Mutex<Option<String>>>,
 }
 
 /// The ids of the adapters that answer. Settings switch adapters on and off while running; a
@@ -83,13 +87,15 @@ pub struct Options {
     pub enabled_adapters: EnabledAdapters,
     /// Settings routes answer 503 without one.
     pub control: Option<Arc<dyn Control>>,
+    /// Printed at start while the owner has no password; claims the account once.
+    pub setup_token: Option<String>,
 }
 
 #[derive(OpenApi)]
 #[openapi(
     info(title = "Fangst download daemon", description = "Native API of fangst-dl."),
-    paths(health, auth::login, auth::logout, auth::me, auth::change_password, list_jobs, add_job, get_job, pause_job, resume_job, delete_job, job_timeline, job_torrent, set_job_category, list_categories, create_category, events, test_server, settings::get_settings, settings::put_settings),
-    components(schemas(Health, JobDto, EventDto, ApiError, ChangeDto, JobStatus, JobKind, TorrentStatusDto, TorrentFileDto, CategoryChange, AddJobLink, AddJobUrl, AddJobMagnet, ServerTestRequest, ServerTestResult, UserDto, LoginRequest, PasswordChange, SettingsDto, FolderSettings, ServerSettings, SettingSource, CategorySettings, NotifierSettings, WebhookSettings, NtfySettings, DiscordSettings, TorrentSettings, ProviderSettings, SavedSettings)),
+    paths(health, auth::login, auth::logout, auth::me, auth::change_password, list_jobs, add_job, get_job, pause_job, resume_job, delete_job, job_timeline, job_torrent, set_job_category, list_categories, create_category, events, test_server, settings::get_settings, settings::put_settings, setup::status, setup::claim_owner, setup::complete, setup::check_folders),
+    components(schemas(Health, JobDto, EventDto, ApiError, ChangeDto, JobStatus, JobKind, TorrentStatusDto, TorrentFileDto, CategoryChange, AddJobLink, AddJobUrl, AddJobMagnet, ServerTestRequest, ServerTestResult, UserDto, LoginRequest, PasswordChange, SettingsDto, FolderSettings, ServerSettings, SettingSource, CategorySettings, NotifierSettings, WebhookSettings, NtfySettings, DiscordSettings, TorrentSettings, ProviderSettings, SavedSettings, SetupStatus, SetupOwner, FolderCheckRequest, FolderCheckResult, FolderStatus)),
     modifiers(&ApiKeyScheme),
     security(("api_key" = []), ("session" = []))
 )]
@@ -151,6 +157,7 @@ pub fn router_with_adapters(
             adapters: adapters.to_vec(),
             enabled_adapters: EnabledAdapters::new(adapters.iter().map(|a| a.info().id)),
             control: None,
+            setup_token: None,
         },
     )
 }
@@ -163,6 +170,7 @@ pub fn app(service: Service, auth: Auth, options: Options) -> Router {
         adapters,
         enabled_adapters,
         control,
+        setup_token,
     } = options;
     let state = ApiState {
         jobs: adapters::ServiceJobs {
@@ -175,6 +183,7 @@ pub fn app(service: Service, auth: Auth, options: Options) -> Router {
         settings: Arc::new(settings),
         enabled_adapters,
         control,
+        setup_token: Arc::new(tokio::sync::Mutex::new(setup_token)),
     };
     let protected = Router::new()
         .route(
@@ -199,6 +208,8 @@ pub fn app(service: Service, auth: Auth, options: Options) -> Router {
             "/api/v1/settings",
             get(settings::get_settings).put(settings::put_settings),
         )
+        .route("/api/v1/settings/folders/check", post(setup::check_folders))
+        .route("/api/v1/setup/complete", post(setup::complete))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             auth::require_user,
@@ -207,6 +218,8 @@ pub fn app(service: Service, auth: Auth, options: Options) -> Router {
         .route("/api/v1/health", get(health))
         .route("/api/v1/auth/login", post(auth::login))
         .route("/api/v1/auth/logout", post(auth::logout))
+        .route("/api/v1/setup", get(setup::status))
+        .route("/api/v1/setup/owner", post(setup::claim_owner))
         // Keeps unknown native paths native when an adapter is mounted at `/api`.
         .route("/api/v1/{*rest}", axum::routing::any(not_found))
         .merge(protected);

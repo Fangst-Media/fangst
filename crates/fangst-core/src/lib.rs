@@ -2,6 +2,7 @@
 
 pub mod config;
 pub mod defaults;
+pub mod folders;
 pub mod path;
 pub mod secret;
 

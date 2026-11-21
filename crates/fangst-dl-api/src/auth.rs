@@ -172,7 +172,7 @@ fn session_cookie(headers: &HeaderMap) -> Option<String> {
         })
 }
 
-fn set_cookie(settings: &AuthSettings, token: &str, max_age: Duration) -> HeaderValue {
+pub(crate) fn set_cookie(settings: &AuthSettings, token: &str, max_age: Duration) -> HeaderValue {
     let secure = if settings.secure_cookie {
         "; Secure"
     } else {
@@ -190,7 +190,7 @@ pub(crate) fn client(connect: Option<&ConnectInfo<SocketAddr>>) -> IpAddr {
     connect.map_or(IpAddr::V4(Ipv4Addr::UNSPECIFIED), |c| c.0.ip())
 }
 
-fn too_many(wait: Duration) -> Response {
+pub(crate) fn too_many(wait: Duration) -> Response {
     // Round up so a client that waits exactly this long is let through.
     let seconds = wait.as_secs() + u64::from(wait.subsec_nanos() > 0);
     let mut response = error(
