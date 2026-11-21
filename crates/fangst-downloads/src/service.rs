@@ -1,15 +1,15 @@
 //! The long-running side of the queue: runs jobs as they arrive and lets callers change them.
 //!
 //! Each protocol has its own lane. Usenet jobs run one at a time in priority order, since one job
-//! already uses every connection. Torrent jobs all start as soon as they are queued, since each
-//! one waits on its own peers.
+//! already uses every connection. Torrent jobs run several at once, up to a limit, since each one
+//! waits on its own peers.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use fangst_core::defaults::{Defaults, Progress as ProgressSettings};
-use tokio::sync::{Notify, broadcast};
+use tokio::sync::{Notify, Semaphore, broadcast};
 use tokio::task::AbortHandle;
 
 use crate::notify::{self, Notifications};
@@ -32,6 +32,7 @@ pub enum Change {
 pub struct Service {
     runner: Runner,
     torrents: Option<TorrentRunner>,
+    torrent_limit: usize,
     usenet: bool,
     wake: Arc<Notify>,
     wake_torrents: Arc<Notify>,
@@ -51,6 +52,7 @@ impl Service {
         Self {
             runner,
             torrents: None,
+            torrent_limit: Semaphore::MAX_PERMITS,
             usenet: true,
             wake: Arc::new(Notify::new()),
             wake_torrents: Arc::new(Notify::new()),
@@ -79,6 +81,13 @@ impl Service {
             engine,
             root: self.runner.root.clone(),
         });
+        self
+    }
+
+    /// How many torrent jobs download at once; the rest stay queued. Unlimited unless set.
+    #[must_use]
+    pub fn with_torrent_limit(mut self, max_active: usize) -> Self {
+        self.torrent_limit = max_active.clamp(1, Semaphore::MAX_PERMITS);
         self
     }
 
@@ -348,8 +357,14 @@ impl Service {
         let Some(torrents) = &self.torrents else {
             return std::future::pending().await;
         };
+        let slots = Arc::new(Semaphore::new(self.torrent_limit));
         loop {
+            let slot = Arc::clone(&slots)
+                .acquire_owned()
+                .await
+                .map_err(|e| Error::Download(e.to_string()))?;
             let Some(job) = self.runner.store.next_queued_of(Kind::Torrent).await? else {
+                drop(slot);
                 let _ = tokio::time::timeout(IDLE_POLL, self.wake_torrents.notified()).await;
                 continue;
             };
@@ -368,6 +383,8 @@ impl Service {
                 .insert(id, task.abort_handle());
             let service = self.clone();
             tokio::spawn(async move {
+                // Held until the job ends, is paused or is deleted, which all end `task`.
+                let _slot = slot;
                 let task_id = task.id();
                 let outcome = task.await;
                 {

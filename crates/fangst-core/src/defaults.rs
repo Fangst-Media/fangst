@@ -11,6 +11,7 @@ pub struct Defaults {
     pub notify: Notify,
     pub disk: Disk,
     pub progress: Progress,
+    pub torrent: Torrent,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -65,6 +66,15 @@ impl Progress {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Torrent {
+    /// Torrent jobs downloading at once; the rest wait in the queue.
+    pub max_active: usize,
+    /// TCP port peers connect to.
+    pub listen_port: u16,
+}
+
 #[derive(Debug)]
 pub struct Error(toml::de::Error);
 
@@ -98,6 +108,10 @@ impl Defaults {
 mod tests {
     use super::Defaults;
 
+    const PROGRESS: &str =
+        "[progress]\npublish_interval_ms = 1\nrate_window_secs = 1\npersist_interval_secs = 1\n";
+    const TORRENT: &str = "[torrent]\nmax_active = 1\nlisten_port = 1\n";
+
     #[test]
     fn builtin_defaults_parse() {
         let defaults = Defaults::builtin().unwrap();
@@ -107,12 +121,16 @@ mod tests {
         assert_eq!(defaults.progress.publish_interval_ms, 1000);
         assert_eq!(defaults.progress.rate_window_secs, 5);
         assert_eq!(defaults.progress.persist_interval_secs, 10);
+        assert_eq!(defaults.torrent.max_active, 5);
+        assert_eq!(defaults.torrent.listen_port, 6881);
     }
 
     #[test]
     fn missing_value_is_an_error() {
-        let err = Defaults::parse("[notify]\ntimeout_secs = 1\n[disk]\nmin_free_bytes = 1\n")
-            .unwrap_err();
+        let err = Defaults::parse(&format!(
+            "[notify]\ntimeout_secs = 1\n[disk]\nmin_free_bytes = 1\n{PROGRESS}{TORRENT}"
+        ))
+        .unwrap_err();
         assert!(err.to_string().contains("check_interval_secs"), "{err}");
     }
 
@@ -125,7 +143,9 @@ mod tests {
 
     #[test]
     fn unknown_section_is_ignored() {
-        let text = "[later]\nx = 1\n[notify]\ntimeout_secs = 1\n[disk]\nmin_free_bytes = 1\ncheck_interval_secs = 1\n[progress]\npublish_interval_ms = 1\nrate_window_secs = 1\npersist_interval_secs = 1\n";
-        assert_eq!(Defaults::parse(text).unwrap().notify.timeout_secs, 1);
+        let text = format!(
+            "[later]\nx = 1\n[notify]\ntimeout_secs = 1\n[disk]\nmin_free_bytes = 1\ncheck_interval_secs = 1\n{PROGRESS}{TORRENT}"
+        );
+        assert_eq!(Defaults::parse(&text).unwrap().notify.timeout_secs, 1);
     }
 }

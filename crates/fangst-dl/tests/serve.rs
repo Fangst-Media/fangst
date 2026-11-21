@@ -1,4 +1,6 @@
-//! Boots the real binary with nothing optional configured: no usenet server, every adapter off.
+//! Boots the real binary with nothing optional configured: no usenet server, every adapter off,
+//! and the torrent engine on with nothing that reaches past this machine (DHT, local discovery and
+//! `UPnP` off), or off altogether.
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpStream;
@@ -7,6 +9,8 @@ use std::process::{Child, Command, Stdio};
 struct Daemon {
     child: Child,
     addr: String,
+    /// What the daemon printed up to its provider listing.
+    banner: Vec<String>,
 }
 
 impl Drop for Daemon {
@@ -16,7 +20,20 @@ impl Drop for Daemon {
     }
 }
 
+/// Keeps the torrent engine on this machine: a free port, no DHT, no multicast, no router.
+const LOCAL_TORRENTS: &[&str] = &[
+    "--torrent-port",
+    "0",
+    "--no-dht",
+    "--no-local-discovery",
+    "--no-upnp",
+];
+
 fn start(data_dir: &std::path::Path) -> Daemon {
+    start_with(data_dir, LOCAL_TORRENTS)
+}
+
+fn start_with(data_dir: &std::path::Path, extra: &[&str]) -> Daemon {
     let mut child = Command::new(env!("CARGO_BIN_EXE_fangst-dl"))
         .args([
             "serve",
@@ -25,37 +42,128 @@ fn start(data_dir: &std::path::Path) -> Daemon {
             "--listen",
             "127.0.0.1:0",
         ])
-        .env("FANGST_API_KEY", "a-long-enough-test-key")
+        .args(extra)
+        .env("FANGST_API_KEY", KEY)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
         .unwrap();
-    let mut first_line = String::new();
-    BufReader::new(child.stdout.as_mut().unwrap())
-        .read_line(&mut first_line)
-        .unwrap();
-    let addr = first_line
-        .trim()
+    let mut stdout = BufReader::new(child.stdout.take().unwrap());
+    let mut banner = Vec::new();
+    loop {
+        let mut line = String::new();
+        if stdout.read_line(&mut line).unwrap() == 0 {
+            let mut stderr = String::new();
+            child
+                .stderr
+                .take()
+                .unwrap()
+                .read_to_string(&mut stderr)
+                .unwrap();
+            panic!("the daemon stopped after {banner:?}: {stderr}");
+        }
+        let line = line.trim().to_owned();
+        let last = line.starts_with("providers:");
+        banner.push(line);
+        if last {
+            break;
+        }
+    }
+    let addr = banner[0]
         .strip_prefix("listening on ")
-        .unwrap_or_else(|| panic!("{first_line:?}"))
+        .unwrap_or_else(|| panic!("{banner:?}"))
         .to_owned();
-    Daemon { child, addr }
+    Daemon {
+        child,
+        addr,
+        banner,
+    }
 }
 
 fn http(addr: &str, path: &str, key: Option<&str>) -> (u16, String) {
+    request(addr, "GET", path, key, "")
+}
+
+fn request(addr: &str, method: &str, path: &str, key: Option<&str>, json: &str) -> (u16, String) {
     let mut stream = TcpStream::connect(addr).unwrap();
     let key_header = key
         .map(|k| format!("X-Api-Key: {k}\r\n"))
         .unwrap_or_default();
     write!(
         stream,
-        "GET {path} HTTP/1.1\r\nHost: {addr}\r\n{key_header}Connection: close\r\n\r\n"
+        "{method} {path} HTTP/1.1\r\nHost: {addr}\r\n{key_header}Content-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{json}",
+        json.len()
     )
     .unwrap();
     let mut response = String::new();
     stream.read_to_string(&mut response).unwrap();
     let status = response.split_whitespace().nth(1).unwrap().parse().unwrap();
     (status, response)
+}
+
+const KEY: &str = "a-long-enough-test-key";
+
+/// Adds a magnet link no peer can be found for, waits until the job has failed or `wait` passes,
+/// and returns the job as the API shows it.
+fn add_unresolvable_magnet(addr: &str, wait: std::time::Duration) -> String {
+    let link = format!("magnet:?xt=urn:btih:{}&dn=Nobody", "ab".repeat(20));
+    let (status, body) = request(
+        addr,
+        "POST",
+        "/api/v1/jobs",
+        Some(KEY),
+        &format!(r#"{{"magnet":"{link}"}}"#),
+    );
+    assert_eq!(status, 201, "{body}");
+    let id: String = body
+        .split("\"id\":")
+        .nth(1)
+        .unwrap()
+        .chars()
+        .take_while(char::is_ascii_digit)
+        .collect();
+    let deadline = std::time::Instant::now() + wait;
+    loop {
+        let (_, body) = http(addr, &format!("/api/v1/jobs/{id}"), Some(KEY));
+        if body.contains("\"status\":\"failed\"") || std::time::Instant::now() > deadline {
+            return body;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+}
+
+#[test]
+fn torrents_run_without_a_usenet_server() {
+    let dir = tempfile::tempdir().unwrap();
+    let daemon = start(dir.path());
+    assert!(
+        daemon
+            .banner
+            .iter()
+            .any(|l| l.starts_with("torrents: listening on ")),
+        "{:?}",
+        daemon.banner
+    );
+    // With every way to find peers off, the engine gives up on the link at once, which shows the
+    // torrent lane picked the job up although no usenet server is configured.
+    let job = add_unresolvable_magnet(&daemon.addr, std::time::Duration::from_secs(10));
+    assert!(job.contains("\"status\":\"failed\""), "{job}");
+    assert!(job.contains("resolve peers"), "{job}");
+}
+
+#[test]
+fn boots_with_torrents_off_and_leaves_torrent_jobs_queued() {
+    let dir = tempfile::tempdir().unwrap();
+    let daemon = start_with(dir.path(), &["--no-torrent"]);
+    assert!(
+        daemon.banner.iter().any(|l| l.starts_with("torrents: off")),
+        "{:?}",
+        daemon.banner
+    );
+    assert_eq!(http(&daemon.addr, "/api/v1/health", None).0, 200);
+    // Long enough for a running torrent lane to have failed the link, as in the test above.
+    let job = add_unresolvable_magnet(&daemon.addr, std::time::Duration::from_secs(1));
+    assert!(job.contains("\"status\":\"queued\""), "{job}");
 }
 
 #[test]
@@ -227,7 +335,7 @@ fn unknown_provider_stops_startup_with_the_reason() {
             "--enable",
             "notify-nope",
         ])
-        .env("FANGST_API_KEY", "a-long-enough-test-key")
+        .env("FANGST_API_KEY", KEY)
         .output()
         .unwrap();
     assert!(!output.status.success());

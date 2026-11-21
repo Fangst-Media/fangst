@@ -25,6 +25,7 @@ fangst-notify-ntfy = { version = "0.1.0", path = "../fangst-notify-ntfy" }
 fangst-notify-webhook = { version = "0.1.0", path = "../fangst-notify-webhook" }
 fangst-nzb = { version = "0.1.0", path = "../fangst-nzb" }
 fangst-providers = { version = "0.1.0", path = "../fangst-providers" }
+fangst-torrent = { version = "0.1.0", path = "../fangst-torrent" }
 fangst-usenet = { version = "0.1.0", path = "../fangst-usenet" }
 tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros", "net", "signal"] }
 

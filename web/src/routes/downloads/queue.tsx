@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { listJobs } from '../../api-dl'
+import { AddMagnetForm } from '../../components/downloads/AddMagnetForm'
 import { ApiKeyForm } from '../../components/downloads/ApiKeyForm'
 import { JobActions } from '../../components/downloads/JobActions'
 import { JobProgress } from '../../components/downloads/JobProgress'
@@ -29,6 +30,8 @@ export default function Queue() {
           </span>
         )}
       </div>
+
+      <AddMagnetForm />
 
       {jobs.isPending && (
         <div className="flex justify-center py-16">

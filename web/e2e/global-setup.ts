@@ -100,8 +100,10 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
   try {
     const binary = buildDaemon()
     let stderr = ''
-    // No --host: jobs stay queued, so the test never touches a usenet server.
-    daemon = spawn(binary, ['serve', '--data-dir', dataDir, '--listen', '127.0.0.1:0'], {
+    // No --host and no torrent engine: jobs stay queued, so the test never touches a usenet
+    // server or a peer.
+    const args = ['serve', '--data-dir', dataDir, '--listen', '127.0.0.1:0', '--no-torrent']
+    daemon = spawn(binary, args, {
       cwd: repoRoot,
       env: { ...process.env, FANGST_API_KEY: apiKey },
       stdio: ['ignore', 'pipe', 'pipe'],

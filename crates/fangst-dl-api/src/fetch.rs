@@ -1,11 +1,13 @@
-//! Downloads an NZB by URL, for `POST /api/v1/jobs` with a URL and for adapters.
+//! Downloads an NZB or `.torrent` by URL, for `POST /api/v1/jobs` with a URL and for adapters.
 //!
 //! The URL comes from a caller holding an API key, so this is a server-side request on their
 //! behalf: it can reach anything the daemon can, including addresses on the LAN and loopback.
 //! That is on purpose, since indexers and Prowlarr usually run on the same network, and the
 //! caller already controls the daemon. What stays fenced is the shape of the request: only
 //! `http` and `https`, also after redirects, a bounded number of redirects, a time limit and a
-//! size cap. Error messages name the status or the limit, never the remote body.
+//! size cap. Error messages name the status or the limit, never the remote body. A redirect to a
+//! `magnet:` link is not followed but handed back, since torrent indexers answer that way for
+//! releases they only know by magnet link.
 
 use std::time::Duration;
 
@@ -55,8 +57,17 @@ impl std::fmt::Display for FetchError {
 
 pub(crate) struct Fetched {
     pub bytes: Vec<u8>,
-    /// From `Content-Disposition` or the last path segment, without `.nzb`.
+    /// From `Content-Disposition` or the last path segment, without `.nzb` or `.torrent`.
     pub file_name: Option<String>,
+    /// Set instead of `bytes` when the URL redirected to a magnet link.
+    pub magnet: Option<String>,
+}
+
+impl Fetched {
+    /// A bencoded dictionary starts with `d`; an NZB is XML. Parsing decides the rest.
+    pub(crate) fn is_torrent(&self) -> bool {
+        self.magnet.is_some() || self.bytes.first() == Some(&b'd')
+    }
 }
 
 #[derive(Clone)]
@@ -75,6 +86,8 @@ impl Fetcher {
         let policy = Policy::custom(move |attempt: Attempt| {
             if attempt.previous().len() > max_redirects {
                 attempt.error("too many redirects")
+            } else if attempt.url().scheme() == "magnet" {
+                attempt.stop()
             } else if !allowed_scheme(attempt.url()) {
                 attempt.error("redirect to a URL that is not http or https")
             } else {
@@ -109,6 +122,18 @@ impl Fetcher {
             .map_err(|e| FetchError::Network(describe(&e)))?;
         // reqwest hands back a redirect it won't follow, such as one to `file:`, unfollowed.
         if response.status().is_redirection() {
+            if let Some(link) = response
+                .headers()
+                .get(reqwest::header::LOCATION)
+                .and_then(|v| v.to_str().ok())
+                .filter(|v| v.starts_with("magnet:"))
+            {
+                return Ok(Fetched {
+                    bytes: Vec::new(),
+                    file_name: None,
+                    magnet: Some(link.to_owned()),
+                });
+            }
             return Err(FetchError::Network(
                 "redirect to a URL that is not http or https".to_owned(),
             ));
@@ -125,7 +150,7 @@ impl Fetcher {
         }
         let file_name = disposition_name(response.headers())
             .or_else(|| path_name(response.url()))
-            .map(|name| strip_nzb(&name));
+            .map(|name| strip_extension(&name));
         let mut bytes = Vec::new();
         while let Some(chunk) = response
             .chunk()
@@ -137,7 +162,11 @@ impl Fetcher {
             }
             bytes.extend_from_slice(&chunk);
         }
-        Ok(Fetched { bytes, file_name })
+        Ok(Fetched {
+            bytes,
+            file_name,
+            magnet: None,
+        })
     }
 }
 
@@ -178,17 +207,19 @@ fn clean(name: &str) -> Option<String> {
     (!name.is_empty()).then(|| name.to_owned())
 }
 
-fn strip_nzb(name: &str) -> String {
-    match name
-        .len()
-        .checked_sub(4)
-        .and_then(|cut| name.split_at_checked(cut))
-    {
-        Some((stem, ext)) if !stem.is_empty() && ext.eq_ignore_ascii_case(".nzb") => {
-            stem.to_owned()
+fn strip_extension(name: &str) -> String {
+    for extension in [".nzb", ".torrent"] {
+        if let Some((stem, ext)) = name
+            .len()
+            .checked_sub(extension.len())
+            .and_then(|cut| name.split_at_checked(cut))
+            && !stem.is_empty()
+            && ext.eq_ignore_ascii_case(extension)
+        {
+            return stem.to_owned();
         }
-        _ => name.to_owned(),
     }
+    name.to_owned()
 }
 
 #[cfg(test)]
@@ -203,13 +234,20 @@ mod tests {
             "attachment; filename=\"Show.S01E01.nzb\"".parse().unwrap(),
         );
         assert_eq!(
-            disposition_name(&headers).map(|n| strip_nzb(&n)).as_deref(),
+            disposition_name(&headers)
+                .map(|n| strip_extension(&n))
+                .as_deref(),
             Some("Show.S01E01")
         );
         let url = reqwest::Url::parse("http://x/get/Movie.2020.NZB").unwrap();
         assert_eq!(
-            path_name(&url).map(|n| strip_nzb(&n)).as_deref(),
+            path_name(&url).map(|n| strip_extension(&n)).as_deref(),
             Some("Movie.2020")
+        );
+        let url = reqwest::Url::parse("http://x/dl/Some.Release.Torrent").unwrap();
+        assert_eq!(
+            path_name(&url).map(|n| strip_extension(&n)).as_deref(),
+            Some("Some.Release")
         );
         let url = reqwest::Url::parse("http://x/").unwrap();
         assert_eq!(path_name(&url), None);

@@ -16,6 +16,7 @@ axum = { version = "0.8.9", features = ["ws", "macros"] }
 fangst-downloads = { version = "0.1.0", path = "../fangst-downloads" }
 fangst-nntp = { version = "0.1.0", path = "../fangst-nntp" }
 fangst-providers = { version = "0.1.0", path = "../fangst-providers" }
+fangst-torrent = { version = "0.1.0", path = "../fangst-torrent" }
 form_urlencoded = "1.2.3"
 # Already in the tree through librqbit with the same rustls backend; no system proxy, so a
 # fetch goes where its URL says.
