@@ -1,0 +1,25 @@
+[package]
+name = "fangst-usenet"
+description = "Downloads the files of an NZB: segment scheduling, decoding and assembly."
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+fangst-core = { version = "0.1.0", path = "../fangst-core" }
+fangst-nntp = { version = "0.1.0", path = "../fangst-nntp" }
+fangst-nzb = { version = "0.1.0", path = "../fangst-nzb" }
+fangst-yenc = { version = "0.1.0", path = "../fangst-yenc" }
+tokio = { version = "1.54.1", features = ["sync", "fs", "io-util", "rt", "macros"] }
+
+[dev-dependencies]
+fangst-bench = { path = "../../tools/fangst-bench" }
+fangst-nzb = { path = "../fangst-nzb" }
+tempfile = "3.27.0"
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros"] }
