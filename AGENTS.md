@@ -29,7 +29,7 @@ Commands marked "planned" arrive with the issue named; until then they do not ex
 | Add a changeset | `changesetter add` (planned, #5) |
 | Old TS stack | `bun run dev`; `just ts-check` for typecheck and lint, which fails on main until #66 (until milestone 2) |
 
-Run `just check-full` before committing. If you touched TypeScript, also run `just ts-check` and make sure you added no new errors (main fails it until #66).
+CI (`.github/workflows/check.yml`) runs `just check-full` on Linux, macOS and Windows for every push and for pull requests from forks. Run `just check-full` before committing. If you touched TypeScript, also run `just ts-check` and make sure you added no new errors (main fails it until #66).
 
 ## Architecture rules
 
