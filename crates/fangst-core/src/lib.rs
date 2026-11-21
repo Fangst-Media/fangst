@@ -1,5 +1,7 @@
 //! Shared plumbing for every Fangst crate above layer 0.
 
+pub mod path;
+
 /// The built-in defaults, compiled in so a fresh install runs with no config file.
 pub const DEFAULTS_TOML: &str = include_str!("../defaults.toml");
 
