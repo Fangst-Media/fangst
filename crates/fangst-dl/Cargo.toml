@@ -19,6 +19,9 @@ fangst-core = { version = "0.1.0", path = "../fangst-core" }
 fangst-dl-api = { version = "0.1.0", path = "../fangst-dl-api" }
 fangst-downloads = { version = "0.1.0", path = "../fangst-downloads" }
 fangst-nntp = { version = "0.1.0", path = "../fangst-nntp" }
+fangst-notify-discord = { version = "0.1.0", path = "../fangst-notify-discord" }
+fangst-notify-ntfy = { version = "0.1.0", path = "../fangst-notify-ntfy" }
+fangst-notify-webhook = { version = "0.1.0", path = "../fangst-notify-webhook" }
 fangst-nzb = { version = "0.1.0", path = "../fangst-nzb" }
 fangst-providers = { version = "0.1.0", path = "../fangst-providers" }
 fangst-usenet = { version = "0.1.0", path = "../fangst-usenet" }

@@ -128,6 +128,8 @@ struct ServeArgs {
     secure_cookie: bool,
     #[command(flatten)]
     usenet: UsenetArgs,
+    #[command(flatten)]
+    notify: NotifyArgs,
 }
 
 #[derive(clap::Args)]
@@ -187,7 +189,14 @@ async fn serve(args: ServeArgs) -> anyhow::Result<ExitCode> {
             args.api_key_env
         );
     }
-    let registry = fangst_providers::Registry::build(builtin_providers(), &args.enabled_providers)?;
+    let defaults = fangst_core::defaults::Defaults::builtin()?;
+    let available = builtin_providers(
+        &args.notify,
+        &args.enabled_providers,
+        defaults.notify.timeout(),
+        |name| std::env::var(name).ok(),
+    )?;
+    let registry = fangst_providers::Registry::build(available, &args.enabled_providers)?;
     std::fs::create_dir_all(&args.data_dir)
         .with_context(|| format!("creating {}", args.data_dir.display()))?;
     let store = fangst_downloads::Store::open(&args.data_dir.join("downloads.db")).await?;
@@ -206,7 +215,14 @@ async fn serve(args: ServeArgs) -> anyhow::Result<ExitCode> {
         root: args.data_dir.join("downloads"),
         options: args.usenet.options(),
     };
-    let service = fangst_downloads::Service::new(runner);
+    let service = fangst_downloads::Service::new(runner).with_notifications(
+        fangst_downloads::Notifications {
+            notifiers: registry.notifiers.clone(),
+            timeout: defaults.notify.timeout(),
+            min_free_bytes: defaults.disk.min_free_bytes,
+            disk_check_interval: defaults.disk.check_interval(),
+        },
+    );
 
     let listener = tokio::net::TcpListener::bind(&args.listen)
         .await
@@ -241,9 +257,100 @@ async fn serve(args: ServeArgs) -> anyhow::Result<ExitCode> {
     Ok(ExitCode::SUCCESS)
 }
 
-/// Every provider compiled into this binary; `--enable` picks from these.
-fn builtin_providers() -> Vec<fangst_providers::Provider> {
-    Vec::new()
+/// Every provider compiled into this binary; `--enable` picks from these. Notifiers are only built
+/// when enabled, since they need their settings.
+fn builtin_providers(
+    notify: &NotifyArgs,
+    enabled: &[String],
+    timeout: Duration,
+    env: impl Fn(&str) -> Option<String>,
+) -> anyhow::Result<Vec<fangst_providers::Provider>> {
+    notify.providers(enabled, timeout, env)
+}
+
+/// Notifier settings until the config file arrives (#31). Secrets are read from environment
+/// variables named here, never taken as values, which would leave them in shell history.
+#[derive(clap::Args)]
+struct NotifyArgs {
+    /// URL that notify-webhook posts each event to as JSON.
+    #[arg(long)]
+    webhook_url: Option<String>,
+    /// Name of the environment variable holding a bearer token for the webhook.
+    #[arg(long, requires = "webhook_url")]
+    webhook_token_env: Option<String>,
+    /// ntfy server that notify-ntfy publishes to.
+    #[arg(long, default_value = "https://ntfy.sh")]
+    ntfy_url: String,
+    /// ntfy topic that notify-ntfy publishes to.
+    #[arg(long)]
+    ntfy_topic: Option<String>,
+    /// Name of the environment variable holding an ntfy access token, for protected topics.
+    #[arg(long, requires = "ntfy_topic")]
+    ntfy_token_env: Option<String>,
+    /// Name of the environment variable holding the Discord webhook URL for notify-discord; the
+    /// URL itself contains the token that lets anyone post to the channel.
+    #[arg(long)]
+    discord_webhook_env: Option<String>,
+}
+
+impl NotifyArgs {
+    fn providers(
+        &self,
+        enabled: &[String],
+        timeout: Duration,
+        env: impl Fn(&str) -> Option<String>,
+    ) -> anyhow::Result<Vec<fangst_providers::Provider>> {
+        let on = |id: &str| enabled.iter().any(|e| e == id);
+        let var = |name: &str| {
+            env(name).with_context(|| format!("environment variable {name} is not set"))
+        };
+        let mut notifiers: Vec<Arc<dyn fangst_providers::Notifier>> = Vec::new();
+        if on(fangst_notify_webhook::ID) {
+            let url = self
+                .webhook_url
+                .clone()
+                .context("notify-webhook needs --webhook-url")?;
+            let bearer_token = self.webhook_token_env.as_deref().map(var).transpose()?;
+            notifiers.push(Arc::new(fangst_notify_webhook::WebhookNotifier::new(
+                fangst_notify_webhook::Settings {
+                    url,
+                    bearer_token,
+                    timeout,
+                },
+            )?));
+        }
+        if on(fangst_notify_ntfy::ID) {
+            let topic = self
+                .ntfy_topic
+                .clone()
+                .context("notify-ntfy needs --ntfy-topic")?;
+            let token = self.ntfy_token_env.as_deref().map(var).transpose()?;
+            notifiers.push(Arc::new(fangst_notify_ntfy::NtfyNotifier::new(
+                fangst_notify_ntfy::Settings {
+                    server: self.ntfy_url.clone(),
+                    topic,
+                    token,
+                    timeout,
+                },
+            )?));
+        }
+        if on(fangst_notify_discord::ID) {
+            let name = self
+                .discord_webhook_env
+                .as_deref()
+                .context("notify-discord needs --discord-webhook-env")?;
+            notifiers.push(Arc::new(fangst_notify_discord::DiscordNotifier::new(
+                &fangst_notify_discord::Settings {
+                    webhook_url: var(name)?,
+                    timeout,
+                },
+            )?));
+        }
+        Ok(notifiers
+            .into_iter()
+            .map(fangst_providers::Provider::Notifier)
+            .collect())
+    }
 }
 
 fn describe_providers(registry: &fangst_providers::Registry) -> String {
@@ -380,5 +487,124 @@ async fn get(args: GetArgs) -> anyhow::Result<ExitCode> {
     } else {
         println!("incomplete: repair is not available yet");
         Ok(ExitCode::from(2))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+    use std::time::Duration;
+
+    use clap::Parser;
+
+    use super::{Cli, Command, ServeArgs, builtin_providers};
+
+    fn serve_args(flags: &[&str]) -> ServeArgs {
+        let args = ["fangst-dl", "serve"].iter().chain(flags);
+        match Cli::try_parse_from(args).unwrap().command {
+            Command::Serve(args) => args,
+            _ => unreachable!(),
+        }
+    }
+
+    fn provider_ids(flags: &[&str], env: &[(&str, &str)]) -> anyhow::Result<Vec<String>> {
+        let args = serve_args(flags);
+        let env: HashMap<String, String> = env
+            .iter()
+            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+            .collect();
+        let providers = builtin_providers(
+            &args.notify,
+            &args.enabled_providers,
+            Duration::from_secs(1),
+            |name| env.get(name).cloned(),
+        )?;
+        Ok(providers.iter().map(|p| p.info().id).collect())
+    }
+
+    const ALL_SETTINGS: &[&str] = &[
+        "--webhook-url",
+        "https://example.com/hook",
+        "--webhook-token-env",
+        "HOOK_TOKEN",
+        "--ntfy-topic",
+        "fangst",
+        "--ntfy-token-env",
+        "NTFY_TOKEN",
+        "--discord-webhook-env",
+        "DISCORD_URL",
+    ];
+    const ALL_ENV: &[(&str, &str)] = &[
+        ("HOOK_TOKEN", "t1"),
+        ("NTFY_TOKEN", "tk_2"),
+        ("DISCORD_URL", "https://discord.com/api/webhooks/1/secret"),
+    ];
+
+    #[test]
+    fn settings_alone_build_nothing() {
+        assert!(provider_ids(ALL_SETTINGS, ALL_ENV).unwrap().is_empty());
+    }
+
+    #[test]
+    fn each_enabled_notifier_is_built_from_its_settings() {
+        let mut flags = ALL_SETTINGS.to_vec();
+        flags.extend([
+            "--enable",
+            "notify-discord",
+            "--enable",
+            "notify-ntfy",
+            "--enable",
+            "notify-webhook",
+        ]);
+        assert_eq!(
+            provider_ids(&flags, ALL_ENV).unwrap(),
+            ["notify-webhook", "notify-ntfy", "notify-discord"]
+        );
+
+        let ntfy_only = provider_ids(&["--ntfy-topic", "fangst", "--enable", "notify-ntfy"], &[]);
+        assert_eq!(ntfy_only.unwrap(), ["notify-ntfy"]);
+    }
+
+    #[test]
+    fn enabled_notifier_without_settings_names_the_missing_flag() {
+        for (id, flag) in [
+            ("notify-webhook", "--webhook-url"),
+            ("notify-ntfy", "--ntfy-topic"),
+            ("notify-discord", "--discord-webhook-env"),
+        ] {
+            let err = provider_ids(&["--enable", id], &[]).unwrap_err();
+            assert!(err.to_string().contains(flag), "{id}: {err}");
+        }
+    }
+
+    #[test]
+    fn missing_environment_variable_is_named() {
+        let err = provider_ids(
+            &[
+                "--discord-webhook-env",
+                "DISCORD_URL",
+                "--enable",
+                "notify-discord",
+            ],
+            &[],
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("DISCORD_URL"), "{err}");
+    }
+
+    #[test]
+    fn invalid_settings_stop_startup() {
+        let err = provider_ids(
+            &["--ntfy-topic", "no spaces", "--enable", "notify-ntfy"],
+            &[],
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("topic"), "{err}");
+    }
+
+    #[test]
+    fn token_flags_need_their_setting() {
+        let args = ["fangst-dl", "serve", "--ntfy-token-env", "NTFY_TOKEN"];
+        assert!(Cli::try_parse_from(args).is_err());
     }
 }

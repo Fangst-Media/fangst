@@ -11,6 +11,7 @@ use std::time::Duration;
 use tokio::sync::{Notify, broadcast};
 use tokio::task::AbortHandle;
 
+use crate::notify::{self, Notifications};
 use crate::torrent::{TorrentRunner, TorrentSource};
 use crate::{Error, Job, Kind, Runner, Status, Store};
 
@@ -33,6 +34,7 @@ pub struct Service {
     wake_torrents: Arc<Notify>,
     running: Arc<Mutex<HashMap<i64, AbortHandle>>>,
     changes: broadcast::Sender<Change>,
+    notifications: Arc<Notifications>,
 }
 
 impl Service {
@@ -48,6 +50,7 @@ impl Service {
             wake_torrents: Arc::new(Notify::new()),
             running: Arc::new(Mutex::new(HashMap::new())),
             changes,
+            notifications: Arc::new(Notifications::none()),
         }
     }
 
@@ -60,6 +63,13 @@ impl Service {
             engine,
             root: self.runner.root.clone(),
         });
+        self
+    }
+
+    /// Tells `notifications.notifiers` when jobs complete or fail and when disk space runs low.
+    #[must_use]
+    pub fn with_notifications(mut self, notifications: Notifications) -> Self {
+        self.notifications = Arc::new(notifications);
         self
     }
 
@@ -226,7 +236,16 @@ impl Service {
                 self.changed(job.id);
             }
         }
-        tokio::try_join!(self.run_usenet(), self.run_torrents()).map(|_| ())
+        let disk = async {
+            notify::watch_disk(
+                Arc::clone(&self.notifications),
+                self.runner.store.clone(),
+                self.runner.root.clone(),
+            )
+            .await;
+            Ok(())
+        };
+        tokio::try_join!(self.run_usenet(), self.run_torrents(), disk).map(|_| ())
     }
 
     async fn run_usenet(&self) -> Result<(), Error> {
@@ -258,6 +277,7 @@ impl Service {
                 Err(e) => return Err(Error::Download(e.to_string())),
             }
             self.changed(id);
+            notify::job_finished(&self.notifications, &self.runner.store, id);
         }
     }
 
@@ -303,6 +323,7 @@ impl Service {
                         .await;
                 }
                 service.changed(id);
+                notify::job_finished(&service.notifications, &service.runner.store, id);
             });
         }
     }

@@ -15,8 +15,10 @@ workspace = true
 fangst-core = { version = "0.1.0", path = "../fangst-core" }
 fangst-nntp = { version = "0.1.0", path = "../fangst-nntp" }
 fangst-nzb = { version = "0.1.0", path = "../fangst-nzb" }
+fangst-providers = { version = "0.1.0", path = "../fangst-providers" }
 fangst-torrent = { version = "0.1.0", path = "../fangst-torrent" }
 fangst-usenet = { version = "0.1.0", path = "../fangst-usenet" }
+fs4 = { version = "1.1.0", default-features = false }
 sqlx = { version = "0.9.1", default-features = false, features = ["runtime-tokio", "sqlite", "migrate", "macros"] }
 tokio = { version = "1.54.1", features = ["sync", "fs", "rt", "time", "macros"] }
 

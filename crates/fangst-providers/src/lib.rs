@@ -13,6 +13,7 @@ use std::pin::Pin;
 
 use serde::{Deserialize, Serialize};
 
+mod notify;
 mod registry;
 pub use registry::{Provider, Registry, RegistryError};
 

@@ -14,6 +14,7 @@ use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
 
+pub mod http_sink;
 pub mod tracker;
 
 /// Articles the server can serve, plus the NZB that describes them.
