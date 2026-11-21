@@ -1,0 +1,15 @@
+{
+  "source": "derived",
+  "client": "sonarr",
+  "note": "Sonarr's API key mode sends Authorization: Bearer and never signs in (qBittorrent 5.2 and later accept keys).",
+  "request": {
+    "method": "GET",
+    "path": "/app/version",
+    "headers": [["authorization", "Bearer fixture-api-key-0000"]]
+  },
+  "response": {
+    "status": 200,
+    "content_type": "text",
+    "body": "v5.0.5"
+  }
+}

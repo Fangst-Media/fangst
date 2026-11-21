@@ -1,0 +1,38 @@
+{
+  "source": "derived",
+  "client": "sonarr",
+  "note": "Names are relative to save_path with / between folders. qBittorrent sets is_seed on the first file only; Fangst sets it on every file, which no client reads.",
+  "request": {
+    "method": "GET",
+    "path": "/torrents/files",
+    "query": [["hash", "4444444444444444444444444444444444444444"]],
+    "headers": [["cookie", "SID=fixture-session-0000"]]
+  },
+  "response": {
+    "status": 200,
+    "content_type": "json",
+    "body": [
+      {
+        "index": 0,
+        "name": "4-Show.S01E03.1080p.WEB-DL/Show.S01E03.1080p.WEB-DL.mkv",
+        "size": 1468006400,
+        "progress": 1.0,
+        "priority": 1,
+        "availability": -1.0,
+        "piece_range": [0, 699],
+        "is_seed": true
+      },
+      {
+        "index": 1,
+        "name": "4-Show.S01E03.1080p.WEB-DL/Show.S01E03.1080p.WEB-DL.nfo",
+        "size": 1024,
+        "progress": 1.0,
+        "priority": 1,
+        "availability": -1.0,
+        "piece_range": [699, 699],
+        "is_seed": true
+      }
+    ]
+  },
+  "exact": ["/0/name", "/0/size", "/1/name"]
+}

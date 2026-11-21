@@ -1,0 +1,22 @@
+{
+  "source": "derived",
+  "client": "qbittorrent",
+  "note": "A category that doesn't exist is 409.",
+  "request": {
+    "method": "POST",
+    "path": "/torrents/setCategory",
+    "headers": [
+      ["cookie", "SID=fixture-session-0000"],
+      ["content-type", "application/x-www-form-urlencoded"]
+    ],
+    "body": "hashes=4444444444444444444444444444444444444444&category=nope"
+  },
+  "response": {
+    "status": 409,
+    "content_type": "text",
+    "body": "Incorrect category name"
+  },
+  "job_categories": {
+    "4": "tv-sonarr"
+  }
+}

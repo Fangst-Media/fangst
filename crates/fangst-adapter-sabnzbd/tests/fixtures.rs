@@ -6,8 +6,8 @@ use std::sync::{Arc, Mutex};
 
 use fangst_adapter_sabnzbd::Sabnzbd;
 use fangst_providers::{
-    AddNzb, AddNzbUrl, ApiAdapter, BoxFuture, Credential, HttpRequest, HttpResponse, JobSummary,
-    Jobs, ProviderError,
+    AddNzb, AddNzbUrl, AddTorrent, ApiAdapter, BoxFuture, Credential, HttpRequest, HttpResponse,
+    JobSummary, Jobs, ProviderError, TorrentStatus,
 };
 use serde_json::Value;
 
@@ -179,6 +179,35 @@ impl Jobs for FakeJobs {
     fn download_root(&self) -> PathBuf {
         PathBuf::from("/data/downloads")
     }
+
+    fn add_torrent(&self, _request: AddTorrent) -> BoxFuture<Result<JobSummary, ProviderError>> {
+        not_used()
+    }
+
+    fn torrent(&self, _job_id: i64) -> BoxFuture<Result<Option<TorrentStatus>, ProviderError>> {
+        not_used()
+    }
+
+    fn categories(&self) -> BoxFuture<Result<Vec<String>, ProviderError>> {
+        not_used()
+    }
+
+    fn create_category(&self, _name: String) -> BoxFuture<Result<(), ProviderError>> {
+        not_used()
+    }
+
+    fn set_category(
+        &self,
+        _job_id: i64,
+        _category: Option<String>,
+    ) -> BoxFuture<Result<JobSummary, ProviderError>> {
+        not_used()
+    }
+}
+
+/// Torrent and category operations; the SABnzbd protocol has no use for them.
+fn not_used<T: Send + 'static>() -> BoxFuture<Result<T, ProviderError>> {
+    Box::pin(async { Err(ProviderError::new("not used by this adapter", false)) })
 }
 
 /// What the daemon does around the adapter: check the credential, then hand over.
@@ -188,6 +217,9 @@ async fn send(request: HttpRequest, jobs: Arc<FakeJobs>) -> HttpResponse {
         Credential::Missing => adapter.rejected(&request, true),
         Credential::ApiKey(key) if key != KEY => adapter.rejected(&request, false),
         Credential::ApiKey(_) | Credential::NotNeeded => adapter.handle(request, jobs).await,
+        Credential::Session(_) | Credential::Login { .. } => {
+            unreachable!("SABnzbd has no sessions or logins")
+        }
     }
 }
 

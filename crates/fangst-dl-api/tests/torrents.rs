@@ -209,6 +209,100 @@ async fn magnet_links_come_as_json_or_in_the_query() {
     assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
 }
 
+async fn call(h: &Harness, method: &str, uri: &str, json: Option<&str>) -> (StatusCode, String) {
+    let mut request = Request::builder()
+        .method(method)
+        .uri(uri)
+        .header("x-api-key", KEY);
+    if json.is_some() {
+        request = request.header("content-type", "application/json");
+    }
+    let body = json.map_or_else(Body::empty, |j| Body::from(j.to_owned()));
+    let response = h
+        .app
+        .clone()
+        .oneshot(request.body(body).unwrap())
+        .await
+        .unwrap();
+    let status = response.status();
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    (status, String::from_utf8_lossy(&body).into_owned())
+}
+
+#[tokio::test]
+async fn a_torrent_job_shows_its_hash_and_files() {
+    let h = harness().await;
+    let (status, body) = post(
+        &h,
+        "/api/v1/jobs",
+        Some("application/x-bittorrent"),
+        h.torrent.clone(),
+    )
+    .await;
+    let added = job(status, &body);
+    let (status, body) = call(
+        &h,
+        "GET",
+        &format!("/api/v1/jobs/{}/torrent", added.id),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let torrent: fangst_dl_api::TorrentStatusDto = serde_json::from_str(&body).unwrap();
+    assert_eq!(
+        torrent.info_hash,
+        fangst_torrent::inspect(&h.torrent).unwrap().info_hash
+    );
+    assert_eq!(torrent.files.len(), 1);
+    assert_eq!(torrent.files[0].path, "a.bin");
+    assert_eq!(torrent.have_bytes, 0, "queued, nothing downloaded");
+
+    let (status, _) = call(&h, "GET", "/api/v1/jobs/999/torrent", None).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn categories_can_be_created_listed_and_set_on_a_job() {
+    let h = harness().await;
+    let (status, body) = call(&h, "PUT", "/api/v1/categories/tv-sonarr", None).await;
+    assert_eq!(status, StatusCode::NO_CONTENT, "{body}");
+    let (status, _) = call(&h, "PUT", "/api/v1/categories/tv-sonarr", None).await;
+    assert_eq!(status, StatusCode::NO_CONTENT, "creating twice is fine");
+    let (status, _) = call(&h, "PUT", "/api/v1/categories/%20", None).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+
+    let link = format!("magnet:?xt=urn:btih:{HASH}&dn=Some.Show");
+    let (status, body) = post(
+        &h,
+        "/api/v1/jobs?category=movies",
+        Some("application/json"),
+        json(&serde_json::json!({ "magnet": link })),
+    )
+    .await;
+    let added = job(status, &body);
+    let (_, body) = call(&h, "GET", "/api/v1/categories", None).await;
+    assert_eq!(body, r#"["movies","tv-sonarr"]"#);
+
+    let (status, body) = call(
+        &h,
+        "PUT",
+        &format!("/api/v1/jobs/{}/category", added.id),
+        Some(r#"{"category":"tv-sonarr"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let moved: JobDto = serde_json::from_str(&body).unwrap();
+    assert_eq!(moved.category.as_deref(), Some("tv-sonarr"));
+    let (status, _) = call(
+        &h,
+        "PUT",
+        "/api/v1/jobs/999/category",
+        Some(r#"{"category":null}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
 /// Serves `routes` on a free local port until the test ends.
 async fn web(routes: axum::Router) -> String {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();

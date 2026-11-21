@@ -303,6 +303,25 @@ async fn service_downloads_a_torrent_file_and_a_magnet_link() {
         .unwrap();
     let job = wait_for(&store, from_file, Status::Completed).await;
     assert_same_files(&swarm.source, job.output_path.as_ref().unwrap());
+    let status = service.torrent_status(from_file).await.unwrap().unwrap();
+    assert_eq!(status.info_hash, swarm.info_hash);
+    assert_eq!(
+        status.have_bytes, TOTAL,
+        "a finished torrent has every byte"
+    );
+    let mut files: Vec<(String, u64)> = status
+        .files
+        .iter()
+        .map(|f| (f.path.clone(), f.bytes))
+        .collect();
+    files.sort();
+    assert_eq!(
+        files,
+        [
+            ("a.bin".to_owned(), A_LEN as u64),
+            ("b.bin".to_owned(), B_LEN as u64)
+        ]
+    );
     let timeline = store.timeline(from_file).await.unwrap();
     assert_eq!(
         event(&timeline, "transfer").unwrap().message,
@@ -474,6 +493,17 @@ async fn no_more_torrents_run_than_the_limit() {
         "the third torrent changed while two were running"
     );
     assert_eq!(store.get(ids[2]).await.unwrap().status, Status::Queued);
+    let waiting = service.torrent_status(ids[2]).await.unwrap().unwrap();
+    assert_eq!(waiting.info_hash, "03".repeat(20));
+    assert!(waiting.files.is_empty(), "no metadata yet");
+    assert_eq!(waiting.have_bytes, 0);
+    assert!(
+        service
+            .torrent_status(ids[0] + 100)
+            .await
+            .unwrap()
+            .is_none()
+    );
 
     service.pause(ids[0]).await.unwrap();
     wait_for(&store, ids[2], Status::Downloading).await;

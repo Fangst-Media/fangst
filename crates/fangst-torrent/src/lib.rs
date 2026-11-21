@@ -343,6 +343,14 @@ impl Download {
         move || handle.stats().progress_bytes
     }
 
+    /// A handle that reads this torrent's progress while it runs, for callers that don't own it.
+    #[must_use]
+    pub fn watch(&self) -> Watch {
+        Watch {
+            handle: Arc::clone(&self.handle),
+        }
+    }
+
     /// Waits until every piece is on disk and checked.
     ///
     /// # Errors
@@ -367,6 +375,41 @@ impl Download {
     pub async fn stop(mut self) {
         self.stopped = true;
         let _ = self.session.delete(self.handle.id().into(), false).await;
+    }
+}
+
+/// Where a running torrent stands.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Progress {
+    /// Bytes on disk that passed the hash check.
+    pub have_bytes: u64,
+    /// Bytes sent to peers since the torrent started in this run.
+    pub uploaded_bytes: u64,
+    /// Bytes per second over the last few seconds; 0 while not exchanging data.
+    pub download_bps: u64,
+    pub upload_bps: u64,
+}
+
+/// Reads a running torrent's [`Progress`]. It holds the engine's handle to the torrent, so drop it
+/// when the torrent stops.
+#[derive(Clone)]
+pub struct Watch {
+    handle: Arc<ManagedTorrent>,
+}
+
+impl Watch {
+    #[must_use]
+    pub fn progress(&self) -> Progress {
+        let stats = self.handle.stats();
+        let (download_bps, upload_bps) = stats.live.as_ref().map_or((0, 0), |live| {
+            (live.download_speed.as_bytes(), live.upload_speed.as_bytes())
+        });
+        Progress {
+            have_bytes: stats.progress_bytes,
+            uploaded_bytes: stats.uploaded_bytes,
+            download_bps,
+            upload_bps,
+        }
     }
 }
 

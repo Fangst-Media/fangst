@@ -1,0 +1,20 @@
+{
+  "source": "derived",
+  "client": "sonarr",
+  "note": "Sonarr leaves deleteFiles out when keeping the data. Real qBittorrent answers 400 to that; Fangst keeps the files and removes the job.",
+  "request": {
+    "method": "POST",
+    "path": "/torrents/delete",
+    "headers": [
+      ["cookie", "SID=fixture-session-0000"],
+      ["content-type", "application/x-www-form-urlencoded"]
+    ],
+    "body": "hashes=4444444444444444444444444444444444444444"
+  },
+  "response": {
+    "status": 200,
+    "content_type": "text",
+    "body": ""
+  },
+  "gone": [4]
+}

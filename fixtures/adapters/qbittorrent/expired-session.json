@@ -1,0 +1,15 @@
+{
+  "source": "derived",
+  "client": "sonarr",
+  "note": "An unknown or expired SID is 403; Sonarr then signs in once and retries.",
+  "request": {
+    "method": "GET",
+    "path": "/torrents/info",
+    "headers": [["cookie", "SID=expired-session"]]
+  },
+  "response": {
+    "status": 403,
+    "content_type": "text",
+    "body": "Forbidden"
+  }
+}

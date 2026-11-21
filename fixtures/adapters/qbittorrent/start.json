@@ -1,0 +1,22 @@
+{
+  "source": "derived",
+  "client": "holyarrs",
+  "note": "API 2.11 renamed resume to start.",
+  "request": {
+    "method": "POST",
+    "path": "/torrents/start",
+    "headers": [
+      ["cookie", "SID=fixture-session-0000"],
+      ["content-type", "application/x-www-form-urlencoded"]
+    ],
+    "body": "hashes=2222222222222222222222222222222222222222"
+  },
+  "response": {
+    "status": 200,
+    "content_type": "text",
+    "body": ""
+  },
+  "statuses": {
+    "2": "queued"
+  }
+}

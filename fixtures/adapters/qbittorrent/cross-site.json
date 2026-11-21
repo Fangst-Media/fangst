@@ -1,0 +1,21 @@
+{
+  "source": "derived",
+  "client": "browser",
+  "note": "qBittorrent's CSRF check: an Origin (or else Referer) whose host differs from Host is 401, before credentials are looked at.",
+  "request": {
+    "method": "POST",
+    "path": "/torrents/delete",
+    "headers": [
+      ["cookie", "SID=fixture-session-0000"],
+      ["content-type", "application/x-www-form-urlencoded"],
+      ["host", "nas:7740"],
+      ["origin", "http://evil.example"]
+    ],
+    "body": "hashes=1111111111111111111111111111111111111111&deleteFiles=true"
+  },
+  "response": {
+    "status": 401,
+    "content_type": "text",
+    "body": "Unauthorized"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "source": "derived",
+  "client": "holyarrs",
+  "note": "The 4.x name, kept for clients that still send it. A finished torrent in the list is left alone, as qBittorrent does.",
+  "request": {
+    "method": "POST",
+    "path": "/torrents/pause",
+    "headers": [
+      ["cookie", "SID=fixture-session-0000"],
+      ["content-type", "application/x-www-form-urlencoded"]
+    ],
+    "body": "hashes=1111111111111111111111111111111111111111|4444444444444444444444444444444444444444"
+  },
+  "response": {
+    "status": 200,
+    "content_type": "text",
+    "body": ""
+  },
+  "statuses": {
+    "1": "paused",
+    "4": "completed"
+  }
+}

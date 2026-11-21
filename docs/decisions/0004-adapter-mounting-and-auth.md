@@ -49,4 +49,35 @@ NZB without each adapter growing its own HTTP client.
 - A second adapter at `/api/...` (qBittorrent at `/api/v2`) works beside SABnzbd, since the more
   specific mount wins.
 - Revisit when a protocol needs a login flow (qBittorrent's `/auth/login`): `credential()` may
-  need a session variant.
+  need a session variant. Done in #26, below.
+
+## Amendment (#26): adapters with a login
+
+qBittorrent clients sign in with a username and password and then send a `SID` cookie.
+
+- **Two more credentials.** `Credential::Login { username, password }` is a sign-in request;
+  `Credential::Session(token)` is a token from an earlier one. The daemon checks a login and hands
+  the adapter a `LoginOutcome` (`Accepted { session, lifetime_secs }`, `Refused`, `RetryLater`),
+  which `ApiAdapter::logged_in` turns into the protocol's answer (`Ok.` with `Set-Cookie: SID=...`,
+  `Fails.`, or qBittorrent's 403 for a banned address).
+- **Shared user store.** The password is checked like `POST /api/v1/auth/login`: the same users,
+  the same Argon2 limits and the same per-address rate limit. One of the user's API keys is also
+  accepted as the password, with any username, since Sonarr and Radarr offer only username and
+  password fields and a fresh install has no password until one is set. The session is an
+  ordinary Fangst session (30 days), so `SID` and `fangst_session` hold the same kind of token.
+- **API keys directly.** `Authorization: Bearer <key>` and `X-API-Key: <key>` work as on
+  qBittorrent 5.2 and later, without signing in.
+- **Cross-site requests.** The adapter applies qBittorrent's own check: an `Origin`, or else a
+  `Referer`, must name the host the request was sent to, or the answer is 401. Clients that send
+  neither, such as Sonarr, pass. This is what keeps a cookie-carrying browser on another port of
+  the same host from adding or deleting torrents, which the native API's `fangst_session` check
+  covers there.
+
+Alternatives: a separate adapter password in the config file (another secret to manage, and #31
+isn't there yet); only API keys (Sonarr's API-key mode needs qBittorrent 5.2 detection, older
+clients and HolyArrs's login path would not work); sessions scoped to the adapter (a schema change
+for no gain, since the session already belongs to a user who may use the native API).
+
+Consequences: a `SID` cookie works as `fangst_session` on the native API and the other way round.
+`auth/logout` answers 200 but leaves the session until it expires, because adapters cannot end
+sessions; `POST /api/v1/auth/logout` with the token ends it.

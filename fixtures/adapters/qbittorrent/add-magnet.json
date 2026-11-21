@@ -1,0 +1,25 @@
+{
+  "source": "derived",
+  "client": "sonarr",
+  "note": "Sonarr: urls=<magnet>, category, stopped=False (API 2.11+), booleans capitalised. No savepath. The reply only has to not be Fails.",
+  "request": {
+    "method": "POST",
+    "path": "/torrents/add",
+    "headers": [
+      ["cookie", "SID=fixture-session-0000"],
+      ["content-type", "application/x-www-form-urlencoded"]
+    ],
+    "body": "urls=magnet%3A%3Fxt%3Durn%3Abtih%3A7777777777777777777777777777777777777777%26dn%3DShow.S01E05.1080p.WEB-DL&category=tv-sonarr&stopped=False"
+  },
+  "response": {
+    "status": 200,
+    "content_type": "text",
+    "body": "Ok."
+  },
+  "added": {
+    "name": "Show.S01E05.1080p.WEB-DL",
+    "category": "tv-sonarr",
+    "status": "queued",
+    "kind": "torrent"
+  }
+}

@@ -116,3 +116,108 @@ SABnzbd gives a retried job a new id; Fangst resumes the job in place and return
 Not implemented (answer `not implemented`): global `mode=pause`/`resume`, `name=priority`,
 `mode=switch`, `mode=config`, `mode=server_stats`. HolyArrs treats these as a refusal.
 **Fixture:** `queue-pause.json`, `queue-resume.json`, `retry.json`.
+
+## qBittorrent
+
+Read from Sonarr and Radarr `develop` (`src/NzbDrone.Core/Download/Clients/QBittorrent/`), HolyArrs
+`main` (`app/backend/internal/downloads/client_qbit*.go`) and qBittorrent `v4_6_x`, `v5_0_x` and
+`master` (`src/webui/webapplication.cpp`, `api/authcontroller.cpp`, `api/torrentscontroller.cpp`,
+`api/serialize/serialize_torrent.cpp`) in November 2026. Radarr sends the same requests as Sonarr,
+without tags and without the inactive seeding limit. Every fixture is derived, not recorded; see
+`fixtures/adapters/qbittorrent/README.md`. Handled in `crates/fangst-adapter-qbittorrent/src/api.rs`
+unless named otherwise.
+
+### All clients: signing in and what a failure looks like
+
+**Request:** `POST /api/v2/auth/login`, form fields `username` and `password`. Sonarr sends it
+url-encoded, keeps every `Set-Cookie` pair and sends no `Origin` or `Referer`; HolyArrs adds
+`Referer: <base URL>` to every request and keeps cookies in a jar, so `Path` must be `/`. Sonarr's
+API-key mode (qBittorrent 5.2 and later) sends `Authorization: Bearer <key>` and never signs in.
+**Expects:** success: 200 `Ok.` with `Set-Cookie: SID=...`. Wrong password: **200** `Fails.`, not
+401 or 403; HolyArrs reads 403 as a banned address and stops trying for 5 minutes. A request
+without a valid session: 403 `Forbidden`; Sonarr then signs in once and retries. An `Origin`, or
+else `Referer`, naming another host than `Host`: 401. Fangst takes a user's password, or any
+username with one of the user's API keys as the password, and the `SID` is a Fangst session.
+**Fixture:** `login.json`, `login-api-key.json`, `login-fails.json`, `expired-session.json`,
+`cross-site.json`, `bearer-api-key.json`.
+**Handled in:** `crates/fangst-adapter-qbittorrent/src/lib.rs`, `crates/fangst-dl-api/src/adapters.rs` (`login`).
+
+### Sonarr: version probe before signing in
+
+**Request:** `GET /api/v2/app/webapiVersion` with no cookie, cached for 10 minutes; then on every
+poll again with the cookie.
+**Expects:** 404 makes Sonarr fall back to the v1 API and 401 fails its test; 403 counts as v2.
+The body is parsed with .NET `Version.Parse`: digits and dots only, no `v`. `app/version` has the
+`v` (`v5.0.5`); HolyArrs only checks that it is short and does not start with `<` or `{`.
+From 2.11.0 Sonarr sends `stopped` instead of `paused` on add; from 2.11.2 it reads `root_path`.
+Fangst reports `v5.0.5` and `2.11.2`.
+**Fixture:** `forbidden-without-session.json`, `app-version.json`, `app-webapiversion.json`.
+
+### Sonarr: connection test reads preferences and categories
+
+**Request:** `GET app/preferences`, `GET torrents/categories`, then `POST torrents/createCategory`
+with `category` when its category is missing, and the list again.
+**Expects:** the test fails when `max_ratio_enabled` (or `max_seeding_time_enabled` with under
+20160 minutes) meets `max_ratio_act` 1 or 3 (remove), and when priority is "First" while
+`queueing_enabled` is false. With `dht: false` Sonarr refuses magnet links without trackers.
+`createCategory` must make the category appear in the next list; an exception from it is not
+caught. Categories are `{name: {name, savePath}}`; an empty `savePath` makes Sonarr use the
+preferences `save_path`. HolyArrs calls `createCategory` before every add and accepts 409 for an
+existing one, which is what qBittorrent answers.
+**Fixture:** `app-preferences.json`, `categories.json`, `create-category.json`, `create-category-exists.json`.
+
+### Sonarr: adding a torrent
+
+**Request:** `POST torrents/add` with `urls=<magnet>` or a multipart part `torrents` (filename
+`<release>.torrent`, `application/octet-stream`), `category`, `stopped=False` or `True`
+(capitalised: Sonarr formats booleans with .NET), optionally `sequentialDownload`,
+`firstLastPiecePrio`, `contentLayout`, `ratioLimit`, `seedingTimeLimit`. No `savepath`. The whole
+form becomes multipart when any value is over 1024 bytes, so a long magnet link arrives as
+multipart too. HolyArrs sends both `stopped=true` and `paused=true`, plus `savepath`.
+**Expects:** anything but the exact body `Fails.` is success; 409 is "release rejected". Sonarr
+then polls `torrents/properties?hash=` up to ten times, 100 ms apart, until it answers 200, before
+optional follow-ups (`setShareLimits`, `topPrio`, `setForceStart`, `addTags`) whose failures it
+only logs. An uploaded file that is not a torrent is 415. Fangst ignores `savepath` (every job
+has its own folder) and answers 404 to the follow-ups.
+**Fixture:** `add-magnet.json`, `add-magnet-multipart.json`, `add-file.json`, `add-stopped-holyarrs.json`,
+`add-fails.json`, `add-invalid-file.json`, `properties-unknown.json`, `unknown-endpoint.json`.
+
+### Sonarr and HolyArrs: polling torrents
+
+**Request:** Sonarr: `GET torrents/info?category=<cat>` (left out when blank). HolyArrs: `GET
+sync/maindata?rid=N` for everything, `torrents/info?hashes=<a|b>` for one torrent.
+**Expects:** Sonarr keys downloads by the hash in upper case and reads `hash`, `name`, `size`,
+`progress`, `eta`, `state`, `category`, `save_path`, `content_path`, `root_path`, `ratio`,
+`ratio_limit`, `seeding_time_limit`, `last_activity`. `eta` 8640000 means unknown. States:
+`stoppedDL`/`pausedDL` paused; `queuedDL` and `checking*` queued; `metaDL` queued when `dht` is
+on; `stoppedUP`, `uploading`, `stalledUP` and the other `*UP` states completed; `stalledDL`,
+`missingFiles` and `error` a warning; anything else downloading. For a completed torrent Sonarr
+imports `root_path` (2.11.2+) or `content_path`, and flags it when that equals `save_path`. It
+removes a completed torrent after import only when the state is `stoppedUP` or `pausedUP` and its
+ratio or seeding-time limit is reached. HolyArrs decodes strictly: `size`, `eta`, `added_on`,
+`dlspeed` and the other counts must be JSON integers; a float such as `1.0` in an integer field
+fails the whole poll. `sync/maindata` gives `torrents` as a map of hash to fields without `hash`;
+`full_update: true` is always valid. An empty `category=` asks for torrents without a category.
+Fangst maps queued to `queuedDL`, downloading to `downloading` (`metaDL` while a magnet link waits
+for metadata), paused to `stoppedDL`, completed to `stoppedUP` and failed to `error`. `progress`,
+`downloaded`, `amount_left`, `dlspeed` and `eta` come from the job's `downloaded_bytes`,
+`rate_bytes_per_sec` and `eta_seconds` (8640000 when unknown). A finished
+job has stopped seeding, so it reports `ratio_limit` 0 and `seeding_time_limit` 0, which lets
+Sonarr and Radarr remove it after import when "remove completed" is on. Paths: a single-file
+torrent's `save_path` is its job folder and `content_path` the file; a multi-file torrent's
+`save_path` is the download root and `content_path` and `root_path` the job folder.
+**Fixture:** `info-category.json`, `info-hashes.json`, `info-empty-category.json`, `maindata.json`,
+`properties.json`, `files.json`.
+**Handled in:** `crates/fangst-adapter-qbittorrent/src/torrent.rs`.
+
+### Sonarr and HolyArrs: removing, pausing and recategorising
+
+**Request:** `POST torrents/delete` with `hashes=<a|b>` and `deleteFiles=true`; Sonarr leaves
+`deleteFiles` out when keeping the data, HolyArrs always sends it. `torrents/stop` and `start`
+(HolyArrs falls back to `pause` and `resume` on 404). After import, when a post-import category is
+set: `torrents/setCategory` with `hashes` and `category`.
+**Expects:** 200 with an empty body. Real qBittorrent answers 400 to a delete without
+`deleteFiles`; Fangst treats it as false, so Sonarr's "remove, keep files" works. Stopping a
+finished torrent is not an error. `setCategory` to a category that does not exist is 409.
+**Fixture:** `delete.json`, `delete-without-deletefiles.json`, `stop.json`, `start.json`,
+`pause-legacy.json`, `resume-legacy.json`, `set-category.json`, `set-category-unknown.json`.

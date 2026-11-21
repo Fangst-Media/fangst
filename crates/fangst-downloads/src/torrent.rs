@@ -1,11 +1,13 @@
 //! Torrent jobs: what the store keeps about them and how one runs.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
-use fangst_torrent::{Engine, Metadata};
+use fangst_torrent::{Engine, Metadata, Watch};
 
 use crate::progress::Meter;
-use crate::{Error, Job, Status, Store, now};
+use crate::{Error, Job, Kind, Status, Store, now};
 
 /// What a user hands in to start a torrent job.
 #[derive(Debug, Clone, Copy)]
@@ -13,6 +15,118 @@ pub enum TorrentSource<'a> {
     Magnet(&'a str),
     /// The bytes of a `.torrent` file.
     File(&'a [u8]),
+}
+
+/// Where a torrent job stands, for callers that show torrents the way torrent clients do.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TorrentStatus {
+    /// Lowercase hex of the v1 info hash.
+    pub info_hash: String,
+    /// Empty until the metadata is known, which for a magnet link means until a peer sends it.
+    pub files: Vec<TorrentFile>,
+    /// Bytes on disk that passed the hash check: live while running, all of them once completed.
+    pub have_bytes: u64,
+    /// Bytes sent to peers in the current run; 0 when not running.
+    pub uploaded_bytes: u64,
+    pub download_bps: u64,
+    pub upload_bps: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TorrentFile {
+    /// Relative to the job folder, with `/` between folders on every platform.
+    pub path: String,
+    pub bytes: u64,
+}
+
+/// Running torrents by job id, so their progress can be read while they download.
+#[derive(Clone, Default)]
+pub(crate) struct Live(Arc<Mutex<HashMap<i64, Watch>>>);
+
+/// Removes its job from [`Live`] when dropped, which also covers a job task that is aborted.
+struct Watching {
+    live: Live,
+    id: i64,
+}
+
+impl Drop for Watching {
+    fn drop(&mut self) {
+        self.live.0.lock().expect("live lock").remove(&self.id);
+    }
+}
+
+impl Live {
+    fn watch(&self, id: i64, watch: Watch) -> Watching {
+        self.0.lock().expect("live lock").insert(id, watch);
+        Watching {
+            live: self.clone(),
+            id,
+        }
+    }
+
+    pub(crate) fn progress(&self, id: i64) -> Option<fangst_torrent::Progress> {
+        self.0
+            .lock()
+            .expect("live lock")
+            .get(&id)
+            .map(Watch::progress)
+    }
+}
+
+/// The status of a torrent job, or `None` for an unknown id or a usenet job.
+pub(crate) async fn status(
+    store: &Store,
+    live: Option<&Live>,
+    id: i64,
+) -> Result<Option<TorrentStatus>, Error> {
+    let job = match store.get(id).await {
+        Ok(job) => job,
+        Err(Error::NotFound(_)) => return Ok(None),
+        Err(e) => return Err(e),
+    };
+    if job.kind != Kind::Torrent {
+        return Ok(None);
+    }
+    let info_hash = store.torrent_info_hash(id).await?;
+    let row = store.torrent(id).await?;
+    // The metadata was checked when it was stored; a row that no longer parses lists no files.
+    let files = row
+        .metainfo
+        .and_then(|bytes| fangst_torrent::inspect(&bytes).ok())
+        .map(|meta| {
+            meta.files
+                .into_iter()
+                .map(|file| TorrentFile {
+                    path: file
+                        .path
+                        .iter()
+                        .map(|part| part.to_string_lossy())
+                        .collect::<Vec<_>>()
+                        .join("/"),
+                    bytes: file.len,
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    let total = u64::try_from(job.total_bytes).unwrap_or(0);
+    let progress = live.and_then(|live| live.progress(id));
+    Ok(Some(TorrentStatus {
+        info_hash,
+        files,
+        have_bytes: progress.map_or_else(
+            || {
+                if job.status == Status::Completed {
+                    total
+                } else {
+                    0
+                }
+            },
+            |p| p.have_bytes,
+        ),
+        uploaded_bytes: progress.map_or(0, |p| p.uploaded_bytes),
+        download_bps: progress.map_or(0, |p| p.download_bps),
+        upload_bps: progress.map_or(0, |p| p.upload_bps),
+    }))
 }
 
 struct TorrentRow {
@@ -153,6 +267,7 @@ pub struct TorrentRunner {
     pub engine: Engine,
     /// Folder each job gets a subfolder in.
     pub root: PathBuf,
+    pub(crate) live: Live,
 }
 
 impl TorrentRunner {
@@ -211,6 +326,7 @@ impl TorrentRunner {
             Ok(download) => download,
             Err(e) => return Ok(Some(e.to_string())),
         };
+        let _watching = self.live.watch(job.id, download.watch());
         let kept = download.kept_bytes();
         let total = download.total_bytes();
         meter.set_target(total);

@@ -1,0 +1,15 @@
+{
+  "source": "derived",
+  "client": "holyarrs",
+  "note": "HolyArrs' connection test: the body must be short and not start with < or {.",
+  "request": {
+    "method": "GET",
+    "path": "/app/version",
+    "headers": [["cookie", "SID=fixture-session-0000"]]
+  },
+  "response": {
+    "status": 200,
+    "content_type": "text",
+    "body": "v5.0.5"
+  }
+}

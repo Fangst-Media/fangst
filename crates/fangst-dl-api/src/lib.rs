@@ -43,8 +43,8 @@ struct ApiState {
 #[derive(OpenApi)]
 #[openapi(
     info(title = "Fangst download daemon", description = "Native API of fangst-dl."),
-    paths(health, auth::login, auth::logout, auth::me, auth::change_password, list_jobs, add_job, get_job, pause_job, resume_job, delete_job, job_timeline, events, test_server),
-    components(schemas(Health, JobDto, EventDto, ApiError, ChangeDto, JobStatus, JobKind, AddJobLink, AddJobUrl, AddJobMagnet, ServerTestRequest, ServerTestResult, UserDto, LoginRequest, PasswordChange)),
+    paths(health, auth::login, auth::logout, auth::me, auth::change_password, list_jobs, add_job, get_job, pause_job, resume_job, delete_job, job_timeline, job_torrent, set_job_category, list_categories, create_category, events, test_server),
+    components(schemas(Health, JobDto, EventDto, ApiError, ChangeDto, JobStatus, JobKind, TorrentStatusDto, TorrentFileDto, CategoryChange, AddJobLink, AddJobUrl, AddJobMagnet, ServerTestRequest, ServerTestResult, UserDto, LoginRequest, PasswordChange)),
     modifiers(&ApiKeyScheme),
     security(("api_key" = []), ("session" = []))
 )]
@@ -118,6 +118,10 @@ pub fn router_with_adapters(
         .route("/api/v1/jobs/{id}/pause", post(pause_job))
         .route("/api/v1/jobs/{id}/resume", post(resume_job))
         .route("/api/v1/jobs/{id}/timeline", get(job_timeline))
+        .route("/api/v1/jobs/{id}/torrent", get(job_torrent))
+        .route("/api/v1/jobs/{id}/category", put(set_job_category))
+        .route("/api/v1/categories", get(list_categories))
+        .route("/api/v1/categories/{name}", put(create_category))
         .route("/api/v1/events", get(events))
         .route("/api/v1/servers/test", post(test_server))
         .route("/api/v1/auth/me", get(auth::me))
@@ -456,25 +460,26 @@ async fn add_job(
                 .await
         }
         Input::Torrent { bytes, file_name } => {
-            let name = query
-                .name
-                .or_else(|| fangst_torrent::inspect(&bytes).ok()?.name)
-                .or(file_name)
-                .unwrap_or_else(|| UNTITLED.to_owned());
-            state
-                .service
-                .add_torrent(&name, category, priority, TorrentSource::File(&bytes))
-                .await
+            add_torrent(
+                &state.service,
+                query.name,
+                file_name,
+                category,
+                priority,
+                TorrentSource::File(&bytes),
+            )
+            .await
         }
         Input::Magnet(link) => {
-            let name = query
-                .name
-                .or_else(|| fangst_torrent::parse_magnet(&link).ok()?.name)
-                .unwrap_or_else(|| UNTITLED.to_owned());
-            state
-                .service
-                .add_torrent(&name, category, priority, TorrentSource::Magnet(&link))
-                .await
+            add_torrent(
+                &state.service,
+                query.name,
+                None,
+                category,
+                priority,
+                TorrentSource::Magnet(&link),
+            )
+            .await
         }
     };
     match added {
@@ -487,6 +492,28 @@ async fn add_job(
 }
 
 const UNTITLED: &str = "Untitled";
+
+/// Queues a torrent named `name`, else after the torrent or the magnet link's `dn`, else after
+/// `file_name`, the file in the URL it came from.
+pub(crate) async fn add_torrent(
+    service: &Service,
+    name: Option<String>,
+    file_name: Option<String>,
+    category: Option<&str>,
+    priority: i64,
+    source: TorrentSource<'_>,
+) -> Result<i64, QueueError> {
+    let from_source = match source {
+        TorrentSource::File(bytes) => fangst_torrent::inspect(bytes).ok().and_then(|m| m.name),
+        TorrentSource::Magnet(link) => fangst_torrent::parse_magnet(link).ok().and_then(|m| m.name),
+    };
+    let name = name
+        .filter(|n| !n.trim().is_empty())
+        .or(from_source)
+        .or(file_name)
+        .unwrap_or_else(|| UNTITLED.to_owned());
+    service.add_torrent(&name, category, priority, source).await
+}
 
 async fn link_input(state: &ApiState, body: &[u8]) -> Result<Input, Box<Response>> {
     let request: AddJobLink = serde_json::from_slice(body).map_err(|_| {
@@ -614,6 +641,121 @@ async fn job_timeline(State(state): State<ApiState>, Path(id): Path<i64>) -> Res
         Ok(events) => {
             Json(events.into_iter().map(EventDto::from).collect::<Vec<_>>()).into_response()
         }
+        Err(e) => queue_error(&e),
+    }
+}
+
+/// A torrent job's hash, files and live progress.
+#[derive(Serialize, Deserialize, ToSchema, Debug, Clone, PartialEq, Eq)]
+pub struct TorrentStatusDto {
+    /// Lowercase hex of the v1 info hash.
+    pub info_hash: String,
+    /// Empty until the metadata is known, which for a magnet link means until a peer sends it.
+    pub files: Vec<TorrentFileDto>,
+    /// Bytes on disk that passed the hash check.
+    pub have_bytes: u64,
+    /// Bytes sent to peers since the torrent started in this run.
+    pub uploaded_bytes: u64,
+    /// Bytes per second; 0 while not running.
+    pub download_bps: u64,
+    pub upload_bps: u64,
+}
+
+#[derive(Serialize, Deserialize, ToSchema, Debug, Clone, PartialEq, Eq)]
+pub struct TorrentFileDto {
+    /// Relative to the job folder, with `/` between folders.
+    pub path: String,
+    pub bytes: u64,
+}
+
+impl From<fangst_downloads::TorrentStatus> for TorrentStatusDto {
+    fn from(status: fangst_downloads::TorrentStatus) -> Self {
+        Self {
+            info_hash: status.info_hash,
+            files: status
+                .files
+                .into_iter()
+                .map(|f| TorrentFileDto {
+                    path: f.path,
+                    bytes: f.bytes,
+                })
+                .collect(),
+            have_bytes: status.have_bytes,
+            uploaded_bytes: status.uploaded_bytes,
+            download_bps: status.download_bps,
+            upload_bps: status.upload_bps,
+        }
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/jobs/{id}/torrent",
+    params(("id" = i64, Path)),
+    responses((status = 200, body = TorrentStatusDto), (status = 404, body = ApiError, description = "No such job, or not a torrent job"))
+)]
+async fn job_torrent(State(state): State<ApiState>, Path(id): Path<i64>) -> Response {
+    match state.service.torrent_status(id).await {
+        Ok(Some(status)) => Json(TorrentStatusDto::from(status)).into_response(),
+        Ok(None) => error(
+            StatusCode::NOT_FOUND,
+            format!("job {id} is not a torrent job"),
+        ),
+        Err(e) => queue_error(&e),
+    }
+}
+
+/// The category to move a job to; `null` for none.
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct CategoryChange {
+    pub category: Option<String>,
+}
+
+#[utoipa::path(
+    put,
+    path = "/api/v1/jobs/{id}/category",
+    params(("id" = i64, Path)),
+    request_body = CategoryChange,
+    responses((status = 200, body = JobDto), (status = 400, body = ApiError), (status = 404, body = ApiError))
+)]
+async fn set_job_category(
+    State(state): State<ApiState>,
+    Path(id): Path<i64>,
+    Json(body): Json<CategoryChange>,
+) -> Response {
+    match state
+        .service
+        .set_category(id, body.category.as_deref())
+        .await
+    {
+        Ok(job) => Json(JobDto::from(job)).into_response(),
+        Err(e) => queue_error(&e),
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/categories",
+    description = "Every category: those created ahead of any job and those jobs carry, sorted.",
+    responses((status = 200, body = [String]), (status = 401, body = ApiError))
+)]
+async fn list_categories(State(state): State<ApiState>) -> Response {
+    match state.service.categories().await {
+        Ok(categories) => Json(categories).into_response(),
+        Err(e) => queue_error(&e),
+    }
+}
+
+#[utoipa::path(
+    put,
+    path = "/api/v1/categories/{name}",
+    params(("name" = String, Path)),
+    description = "Creates a category; one that exists already is left as it is.",
+    responses((status = 204), (status = 400, body = ApiError), (status = 401, body = ApiError))
+)]
+async fn create_category(State(state): State<ApiState>, Path(name): Path<String>) -> Response {
+    match state.service.create_category(&name).await {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
         Err(e) => queue_error(&e),
     }
 }

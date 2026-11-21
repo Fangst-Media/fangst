@@ -1,0 +1,19 @@
+{
+  "source": "derived",
+  "client": "holyarrs",
+  "note": "An existing category is 409; HolyArrs creates before every add and tolerates it.",
+  "request": {
+    "method": "POST",
+    "path": "/torrents/createCategory",
+    "headers": [
+      ["cookie", "SID=fixture-session-0000"],
+      ["content-type", "application/x-www-form-urlencoded"]
+    ],
+    "body": "category=tv-sonarr"
+  },
+  "response": {
+    "status": 409,
+    "content_type": "text",
+    "body": "Unable to create category"
+  }
+}

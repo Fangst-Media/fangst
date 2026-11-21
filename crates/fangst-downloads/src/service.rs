@@ -13,7 +13,7 @@ use tokio::sync::{Notify, Semaphore, broadcast};
 use tokio::task::AbortHandle;
 
 use crate::notify::{self, Notifications};
-use crate::torrent::{TorrentRunner, TorrentSource};
+use crate::torrent::{TorrentRunner, TorrentSource, TorrentStatus};
 use crate::{Error, Job, Kind, Progress, Runner, Status, Store};
 
 /// A fallback poll covers jobs queued by another process sharing the database.
@@ -80,6 +80,7 @@ impl Service {
             store: self.runner.store.clone(),
             engine,
             root: self.runner.root.clone(),
+            live: crate::torrent::Live::default(),
         });
         self
     }
@@ -170,6 +171,46 @@ impl Service {
         self.changed(id);
         self.wake_torrents.notify_one();
         Ok(id)
+    }
+
+    /// Where a torrent job stands, including live progress while it runs. `None` for an unknown
+    /// id or a usenet job.
+    ///
+    /// # Errors
+    /// When the database read fails.
+    pub async fn torrent_status(&self, id: i64) -> Result<Option<TorrentStatus>, Error> {
+        crate::torrent::status(
+            &self.runner.store,
+            self.torrents.as_ref().map(|t| &t.live),
+            id,
+        )
+        .await
+    }
+
+    /// Every category, created or in use by a job.
+    ///
+    /// # Errors
+    /// When the database read fails.
+    pub async fn categories(&self) -> Result<Vec<String>, Error> {
+        self.runner.store.categories().await
+    }
+
+    /// Creates a category ahead of any job using it; an existing one is left alone.
+    ///
+    /// # Errors
+    /// [`Error::Invalid`] for an empty or multi-line name.
+    pub async fn create_category(&self, name: &str) -> Result<(), Error> {
+        self.runner.store.create_category(name).await
+    }
+
+    /// Moves a job to another category, or to none.
+    ///
+    /// # Errors
+    /// [`Error::NotFound`] for an unknown job, [`Error::Invalid`] for a bad name.
+    pub async fn set_category(&self, id: i64, category: Option<&str>) -> Result<Job, Error> {
+        self.runner.store.set_category(id, category).await?;
+        self.changed(id);
+        self.runner.store.get(id).await
     }
 
     /// Stops a queued or running job until it is resumed. Finished segments and pieces are kept.

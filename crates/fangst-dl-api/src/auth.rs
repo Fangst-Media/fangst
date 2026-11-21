@@ -185,7 +185,7 @@ fn set_cookie(settings: &AuthSettings, token: &str, max_age: Duration) -> Header
     .expect("cookie is ASCII")
 }
 
-fn client(connect: Option<&ConnectInfo<SocketAddr>>) -> IpAddr {
+pub(crate) fn client(connect: Option<&ConnectInfo<SocketAddr>>) -> IpAddr {
     // Without connection info (in-process tests) every caller shares one bucket.
     connect.map_or(IpAddr::V4(Ipv4Addr::UNSPECIFIED), |c| c.0.ip())
 }

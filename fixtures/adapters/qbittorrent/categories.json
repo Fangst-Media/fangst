@@ -1,0 +1,25 @@
+{
+  "source": "derived",
+  "client": "sonarr",
+  "note": "A map of name to {name, savePath}. An empty savePath makes Sonarr use the preferences save_path.",
+  "request": {
+    "method": "GET",
+    "path": "/torrents/categories",
+    "headers": [["cookie", "SID=fixture-session-0000"]]
+  },
+  "response": {
+    "status": 200,
+    "content_type": "json",
+    "body": {
+      "radarr": {
+        "name": "radarr",
+        "savePath": ""
+      },
+      "tv-sonarr": {
+        "name": "tv-sonarr",
+        "savePath": ""
+      }
+    }
+  },
+  "exact": ["/radarr", "/tv-sonarr"]
+}

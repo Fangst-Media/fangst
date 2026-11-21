@@ -14,8 +14,8 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::any;
 use fangst_downloads::{Error as QueueError, Job, Kind, Service, Status};
 use fangst_providers::{
-    AddNzb, AddNzbUrl, ApiAdapter, BoxFuture, Credential, HttpRequest, HttpResponse, JobSummary,
-    Jobs, ProviderError,
+    AddNzb, AddNzbUrl, AddTorrent, ApiAdapter, BoxFuture, Credential, HttpRequest, HttpResponse,
+    JobSummary, Jobs, LoginOutcome, ProviderError, TorrentFile, TorrentInput, TorrentStatus,
 };
 
 use crate::fetch::{FetchError, Fetcher};
@@ -48,7 +48,10 @@ pub(crate) fn summary(job: Job) -> JobSummary {
         }
         .to_owned(),
         error: job.error,
-        output_path: job.output_path,
+        // Clients compare it with paths on their side, which only works when it is absolute.
+        output_path: job
+            .output_path
+            .map(|p| std::path::absolute(&p).unwrap_or(p)),
         total_bytes: job.total_bytes,
         downloaded_bytes: job.downloaded_bytes,
         rate_bytes_per_sec: job.rate_bytes_per_sec,
@@ -197,6 +200,109 @@ impl Jobs for ServiceJobs {
         // Clients compare it with paths on their side, which only works when it is absolute.
         std::path::absolute(root).unwrap_or_else(|_| root.to_path_buf())
     }
+
+    fn add_torrent(&self, request: AddTorrent) -> BoxFuture<Result<JobSummary, ProviderError>> {
+        let this = self.clone();
+        Box::pin(async move {
+            let (input, file_name) = match request.input {
+                TorrentInput::Url(url) => {
+                    let fetched = this
+                        .fetcher
+                        .fetch(&url)
+                        .await
+                        .map_err(|e| fetch_error(&e))?;
+                    if let Some(link) = fetched.magnet {
+                        (TorrentInput::Magnet(link), None)
+                    } else if fetched.is_torrent() {
+                        (TorrentInput::File(fetched.bytes), fetched.file_name)
+                    } else {
+                        return Err(ProviderError::new(
+                            "the URL answered with something that is not a torrent",
+                            false,
+                        ));
+                    }
+                }
+                other => (other, None),
+            };
+            let source = match &input {
+                TorrentInput::Magnet(link) => fangst_downloads::TorrentSource::Magnet(link),
+                TorrentInput::File(bytes) => fangst_downloads::TorrentSource::File(bytes),
+                TorrentInput::Url(_) => unreachable!("fetched above"),
+            };
+            let id = crate::add_torrent(
+                &this.service,
+                request.name,
+                file_name,
+                request.category.as_deref(),
+                request.priority,
+                source,
+            )
+            .await
+            .map_err(|e| provider_error(&e))?;
+            let job = this
+                .service
+                .store()
+                .get(id)
+                .await
+                .map_err(|e| provider_error(&e))?;
+            Ok(summary(job))
+        })
+    }
+
+    fn torrent(&self, job_id: i64) -> BoxFuture<Result<Option<TorrentStatus>, ProviderError>> {
+        let service = self.service.clone();
+        Box::pin(async move {
+            let status = service
+                .torrent_status(job_id)
+                .await
+                .map_err(|e| provider_error(&e))?;
+            Ok(status.map(|s| TorrentStatus {
+                info_hash: s.info_hash,
+                files: s
+                    .files
+                    .into_iter()
+                    .map(|f| TorrentFile {
+                        path: f.path,
+                        bytes: f.bytes,
+                    })
+                    .collect(),
+                have_bytes: s.have_bytes,
+                uploaded_bytes: s.uploaded_bytes,
+                download_bps: s.download_bps,
+                upload_bps: s.upload_bps,
+            }))
+        })
+    }
+
+    fn categories(&self) -> BoxFuture<Result<Vec<String>, ProviderError>> {
+        let service = self.service.clone();
+        Box::pin(async move { service.categories().await.map_err(|e| provider_error(&e)) })
+    }
+
+    fn create_category(&self, name: String) -> BoxFuture<Result<(), ProviderError>> {
+        let service = self.service.clone();
+        Box::pin(async move {
+            service
+                .create_category(&name)
+                .await
+                .map_err(|e| provider_error(&e))
+        })
+    }
+
+    fn set_category(
+        &self,
+        job_id: i64,
+        category: Option<String>,
+    ) -> BoxFuture<Result<JobSummary, ProviderError>> {
+        let service = self.service.clone();
+        Box::pin(async move {
+            service
+                .set_category(job_id, category.as_deref())
+                .await
+                .map(summary)
+                .map_err(|e| provider_error(&e))
+        })
+    }
 }
 
 /// Routes `mount_path` and everything below it to `adapter`.
@@ -224,6 +330,11 @@ pub(crate) fn mount(router: Router<ApiState>, adapter: &Arc<dyn ApiAdapter>) -> 
 async fn serve(state: ApiState, adapter: Arc<dyn ApiAdapter>, request: Request) -> Response {
     let mount = adapter.mount_path();
     let (parts, body) = request.into_parts();
+    let client = crate::auth::client(
+        parts
+            .extensions
+            .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>(),
+    );
     let Ok(body) = axum::body::to_bytes(body, MAX_NZB_BYTES).await else {
         return StatusCode::PAYLOAD_TOO_LARGE.into_response();
     };
@@ -249,20 +360,67 @@ async fn serve(state: ApiState, adapter: Arc<dyn ApiAdapter>, request: Request) 
             .collect(),
         body: body.to_vec(),
     };
-    let key = match adapter.credential(&request) {
-        Credential::NotNeeded => None,
-        Credential::ApiKey(key) => Some(key),
+    let known = match adapter.credential(&request) {
+        Credential::NotNeeded => Ok(Some(())),
         Credential::Missing => return into_response(adapter.rejected(&request, true)),
-    };
-    if let Some(key) = key {
-        match state.auth.user_for_api_key(&key).await {
-            Ok(Some(_)) => {}
-            Ok(None) => return into_response(adapter.rejected(&request, false)),
-            Err(e) => return crate::internal(&e),
+        Credential::ApiKey(key) => state.auth.user_for_api_key(&key).await.map(|u| u.map(drop)),
+        Credential::Session(token) => state
+            .auth
+            .user_for_session(&token)
+            .await
+            .map(|u| u.map(drop)),
+        Credential::Login { username, password } => {
+            return match login(&state, client, &username, &password).await {
+                Ok(outcome) => into_response(adapter.logged_in(&request, outcome)),
+                Err(e) => crate::internal(&e),
+            };
         }
+    };
+    match known {
+        Ok(Some(())) => {}
+        Ok(None) => return into_response(adapter.rejected(&request, false)),
+        Err(e) => return crate::internal(&e),
     }
     let jobs: Arc<dyn Jobs> = Arc::new(state.jobs.clone());
     into_response(adapter.handle(request, jobs).await)
+}
+
+/// A protocol's sign-in, under the same rate limit as the native login. The password may be a
+/// user's password or one of their API keys, since many clients offer only username and password
+/// fields. A key works whatever the username says, because the key alone identifies its owner.
+async fn login(
+    state: &ApiState,
+    client: std::net::IpAddr,
+    username: &str,
+    password: &str,
+) -> Result<LoginOutcome, QueueError> {
+    let now = std::time::Instant::now;
+    if let Err(wait) = state.limiter.attempt(client, username, now()) {
+        // Round up so a client that waits exactly this long is let through.
+        let seconds = wait.as_secs() + u64::from(wait.subsec_nanos() > 0);
+        return Ok(LoginOutcome::RetryLater { seconds });
+    }
+    let user = match state.auth.user_for_api_key(password).await? {
+        Some(user) => Some(user),
+        None => match state.auth.login(username, password).await {
+            Ok(user) => user,
+            Err(QueueError::Busy) => {
+                state.limiter.not_checked(client, username, now());
+                return Ok(LoginOutcome::RetryLater { seconds: 1 });
+            }
+            Err(e) => return Err(e),
+        },
+    };
+    let Some(user) = user else {
+        return Ok(LoginOutcome::Refused);
+    };
+    state.limiter.succeeded(client, username, now());
+    let lifetime = state.settings.session_lifetime;
+    let session = state.auth.start_session(user.id, lifetime).await?;
+    Ok(LoginOutcome::Accepted {
+        session,
+        lifetime_secs: lifetime.as_secs(),
+    })
 }
 
 fn into_response(response: HttpResponse) -> Response {

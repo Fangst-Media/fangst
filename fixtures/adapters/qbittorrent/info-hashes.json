@@ -1,0 +1,82 @@
+{
+  "source": "derived",
+  "client": "holyarrs",
+  "note": "HolyArrs looks a torrent up by hashes= (|-separated) and expects exactly one row whose hash matches in lower case. Go decodes strictly: every count an integer.",
+  "request": {
+    "method": "GET",
+    "path": "/torrents/info",
+    "query": [
+      [
+        "hashes",
+        "3333333333333333333333333333333333333333|6666666666666666666666666666666666666666"
+      ]
+    ],
+    "headers": [["cookie", "SID=fixture-session-0000"]]
+  },
+  "response": {
+    "status": 200,
+    "content_type": "json",
+    "body": [
+      {
+        "hash": "3333333333333333333333333333333333333333",
+        "infohash_v1": "3333333333333333333333333333333333333333",
+        "infohash_v2": "",
+        "name": "Movie.2020.1080p.BluRay",
+        "magnet_uri": "magnet:?xt=urn:btih:3333333333333333333333333333333333333333&dn=Movie.2020.1080p.BluRay",
+        "size": 0,
+        "total_size": 0,
+        "progress": 0.0,
+        "dlspeed": 0,
+        "upspeed": 0,
+        "priority": 0,
+        "num_seeds": 0,
+        "num_complete": 12,
+        "num_leechs": 0,
+        "num_incomplete": 3,
+        "ratio": 0.0,
+        "popularity": 0.0,
+        "eta": 8640000,
+        "state": "queuedDL",
+        "seq_dl": false,
+        "f_l_piece_prio": false,
+        "category": "radarr",
+        "tags": "",
+        "super_seeding": false,
+        "force_start": false,
+        "save_path": "/data/downloads",
+        "download_path": "",
+        "content_path": "/data/downloads/Movie.2020.1080p.BluRay",
+        "root_path": "/data/downloads/Movie.2020.1080p.BluRay",
+        "added_on": 1732190000,
+        "completion_on": -1,
+        "tracker": "",
+        "trackers_count": 1,
+        "dl_limit": 0,
+        "up_limit": 0,
+        "downloaded": 0,
+        "uploaded": 0,
+        "downloaded_session": 734003200,
+        "uploaded_session": 0,
+        "amount_left": 0,
+        "completed": 0,
+        "max_ratio": -1,
+        "max_seeding_time": -1,
+        "max_inactive_seeding_time": -1,
+        "ratio_limit": -2.0,
+        "seeding_time_limit": -2,
+        "inactive_seeding_time_limit": -2,
+        "seen_complete": 0,
+        "last_activity": 1732190000,
+        "auto_tmm": false,
+        "time_active": 120,
+        "seeding_time": 0,
+        "availability": -1.0,
+        "reannounce": 0,
+        "comment": "",
+        "private": false,
+        "has_metadata": false
+      }
+    ]
+  },
+  "exact": ["/0/hash", "/0/state", "/0/category", "/0/has_metadata", "/1"]
+}
