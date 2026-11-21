@@ -7,7 +7,7 @@ let _db: BunSQLiteDatabase<typeof schema> | null = null
 
 export function getDb(): BunSQLiteDatabase<typeof schema> {
   if (!_db) {
-    const sqlite = new Database(process.env.DATABASE_URL || './data/jaeger.db')
+    const sqlite = new Database(process.env.DATABASE_URL || './data/fangst.db')
     _db = drizzle(sqlite, { schema })
   }
   return _db

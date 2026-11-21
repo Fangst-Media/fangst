@@ -1,5 +1,5 @@
 ---
-"@jaeger/web": none
+"@fangst/web": none
 type: chore
 ---
 

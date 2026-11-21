@@ -1,6 +1,6 @@
 import { basename, extname } from 'node:path'
-import { parseReleaseName } from '@jaeger/parser'
-import type { MetadataProvider, MetadataResult } from '@jaeger/shared/clients/metadata-provider'
+import { parseReleaseName } from '@fangst/parser'
+import type { MetadataProvider, MetadataResult } from '@fangst/shared/clients/metadata-provider'
 import type { IFilesystem } from './filesystem'
 
 export type ScannedFile = {

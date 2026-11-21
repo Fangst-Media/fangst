@@ -3,7 +3,7 @@ import { createMiddleware } from 'hono/factory'
 import { type User, type UserRole, authService } from '../services/auth'
 import { configService } from '../services/config'
 
-const SESSION_COOKIE = 'jaeger_session'
+const SESSION_COOKIE = 'fangst_session'
 
 type AuthEnv = {
   Variables: {

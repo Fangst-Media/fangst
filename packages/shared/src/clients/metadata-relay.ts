@@ -159,7 +159,7 @@ export class MetadataRelayClient {
   private baseUrl: string
   private userAgent: string
 
-  constructor(baseUrl = 'https://metadata-relay.dorninger.co', userAgent = 'Jaeger/0.1.0') {
+  constructor(baseUrl = 'https://metadata-relay.dorninger.co', userAgent = 'Fangst/0.1.0') {
     this.baseUrl = baseUrl
     this.userAgent = userAgent
   }

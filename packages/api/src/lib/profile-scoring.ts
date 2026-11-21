@@ -1,5 +1,5 @@
-import type { ParsedRelease } from '@jaeger/parser'
-import type { QualityProfile } from '@jaeger/shared/types/profiles'
+import type { ParsedRelease } from '@fangst/parser'
+import type { QualityProfile } from '@fangst/shared/types/profiles'
 
 const RESOLUTION_ORDER = ['2160p', '1080p', '720p', '480p']
 

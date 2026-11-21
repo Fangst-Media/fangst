@@ -1,6 +1,6 @@
 # Fangst
 
-Self-hosted media platform in Rust. Milestone 1 is one download daemon for torrent and usenet that speaks the qBittorrent and SABnzbd APIs. Milestone 2 is a media manager on top that keeps files as they are, writes NFO and JSON sidecars, and serves a headless OpenAPI backend. The repo is mid-transition: the old Jæger TypeScript packages (`packages/api`, `packages/shared`, `packages/parser`) stay until milestone 2 replaces them.
+Self-hosted media platform in Rust. Milestone 1 is one download daemon for torrent and usenet that speaks the qBittorrent and SABnzbd APIs. Milestone 2 is a media manager on top that keeps files as they are, writes NFO and JSON sidecars, and serves a headless OpenAPI backend. The repo is mid-transition: the old TypeScript packages (`packages/api`, `packages/shared`, `packages/parser`) stay until milestone 2 replaces them.
 
 This file is for every coding agent (Claude Code, Codex, Cursor, Copilot, Gemini CLI, Aider and the rest) and for people. Playbooks for known traps live in `.claude/skills/` (Claude Code loads them as skills; other agents read them as Markdown):
 

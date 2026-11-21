@@ -1,5 +1,5 @@
 ---
-"@jaeger/web": minor
+"@fangst/web": minor
 type: feat
 ---
 

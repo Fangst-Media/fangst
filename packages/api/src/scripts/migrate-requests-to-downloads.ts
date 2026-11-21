@@ -1,4 +1,4 @@
-import { parseReleaseName } from '@jaeger/parser'
+import { parseReleaseName } from '@fangst/parser'
 import { isNotNull } from 'drizzle-orm'
 import { db } from '../db'
 import { downloads, episodes, requests } from '../db/schema'

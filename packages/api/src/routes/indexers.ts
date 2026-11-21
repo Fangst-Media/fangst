@@ -1,7 +1,7 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
-import { NewznabClient } from '@jaeger/shared/clients/newznab'
-import { getIndexerList } from '@jaeger/shared/data/indexer-registry'
-import { createIndexerSchema, updateIndexerSchema } from '@jaeger/shared/types/indexer'
+import { NewznabClient } from '@fangst/shared/clients/newznab'
+import { getIndexerList } from '@fangst/shared/data/indexer-registry'
+import { createIndexerSchema, updateIndexerSchema } from '@fangst/shared/types/indexer'
 import type { User } from '../services/auth'
 import { configService } from '../services/config'
 

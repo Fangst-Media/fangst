@@ -1,6 +1,6 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
-import { SABnzbdClient } from '@jaeger/shared/clients/sabnzbd'
-import { createDownloaderSchema, updateDownloaderSchema } from '@jaeger/shared/types/settings'
+import { SABnzbdClient } from '@fangst/shared/clients/sabnzbd'
+import { createDownloaderSchema, updateDownloaderSchema } from '@fangst/shared/types/settings'
 import type { User } from '../services/auth'
 import { configService } from '../services/config'
 

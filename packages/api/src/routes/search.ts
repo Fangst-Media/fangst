@@ -1,6 +1,6 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
-import { SABnzbdClient } from '@jaeger/shared/clients/sabnzbd'
-import { searchRequestSchema } from '@jaeger/shared/types/indexer'
+import { SABnzbdClient } from '@fangst/shared/clients/sabnzbd'
+import { searchRequestSchema } from '@fangst/shared/types/indexer'
 import type { User } from '../services/auth'
 import { configService } from '../services/config'
 import { downloadService } from '../services/downloads'

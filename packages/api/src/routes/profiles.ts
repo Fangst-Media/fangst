@@ -1,5 +1,5 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
-import type { CreateProfile, UpdateProfile } from '@jaeger/shared/types/profiles'
+import type { CreateProfile, UpdateProfile } from '@fangst/shared/types/profiles'
 import type { User } from '../services/auth'
 import { profileService } from '../services/profiles'
 

@@ -1,5 +1,5 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
-import { bookDetailsSchema } from '@jaeger/shared/schemas/metadata'
+import { bookDetailsSchema } from '@fangst/shared/schemas/metadata'
 import { createDetailRoute, createLaneRoute, createSearchRoute } from '../lib/openapi-helpers'
 import type { User } from '../services/auth'
 import { configService } from '../services/config'

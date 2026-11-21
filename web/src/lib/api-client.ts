@@ -4,7 +4,7 @@ import type {
   LaneResponse,
   MovieDetails,
   TvSeriesDetails,
-} from '@jaeger/shared/schemas/metadata'
+} from '@fangst/shared/schemas/metadata'
 import { Books, Collections, IndexerTrending, Movies, Tv } from '../api'
 import { client } from '../api/client.gen'
 

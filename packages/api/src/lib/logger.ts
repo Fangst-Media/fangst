@@ -48,7 +48,7 @@ export const logger = pino(
   {
     level: logLevel,
     transport: getTransport(),
-    base: { app: 'jaeger' },
+    base: { app: 'fangst' },
     redact: ['apiKey', 'password', '*.apiKey', '*.password'],
   },
   // In production with logging enabled, write to both stdout and file

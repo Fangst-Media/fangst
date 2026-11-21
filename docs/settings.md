@@ -1,6 +1,6 @@
-# Jaeger Settings Guide
+# Fangst Settings Guide
 
-Jaeger uses a layered configuration system that supports both file-based and environment variable configuration.
+Fangst uses a layered configuration system that supports both file-based and environment variable configuration.
 
 ## Configuration Priority
 
@@ -14,7 +14,7 @@ Settings are loaded in this order (later overrides earlier):
 
 The settings file is located at `./data/settings.yaml` relative to the API package working directory.
 
-On first run, Jaeger will:
+On first run, Fangst will:
 1. Create the `data/` directory if it doesn't exist
 2. Generate an API key and save it to `settings.yaml`
 
@@ -26,8 +26,8 @@ Environment variables take precedence over the YAML file and **lock** the corres
 |---------------------|---------------|------|---------|
 | `PORT` | `server.port` | number | 5001 |
 | `CORS_ORIGIN` | `server.corsOrigin` | string | http://localhost:5173 |
-| `DATABASE_URL` | `database.url` | string | ./data/jaeger.db |
-| `JAEGER_API_KEY` | `security.apiKey` | string | (auto-generated) |
+| `DATABASE_URL` | `database.url` | string | ./data/fangst.db |
+| `FANGST_LEGACY_API_KEY` | `security.apiKey` | string | (auto-generated) |
 | `SESSION_EXPIRY_DAYS` | `security.sessionExpiryDays` | number | 30 |
 | `JELLYFIN_URL` | `auth.jellyfin.url` | string | http://localhost:8096 |
 | `SYNC_ADMIN_FROM_PROVIDER` | `auth.jellyfin.syncAdminFromProvider` | boolean | true |
@@ -41,9 +41,9 @@ Environment variables take precedence over the YAML file and **lock** the corres
 
 ## API Key
 
-The API key is used for external integrations and programmatic access to the Jaeger API.
+The API key is used for external integrations and programmatic access to the Fangst API.
 
-**Automatic Generation**: If no API key is provided via environment variable, Jaeger generates one automatically on first startup and saves it to `settings.yaml`.
+**Automatic Generation**: If no API key is provided via environment variable, Fangst generates one automatically on first startup and saves it to `settings.yaml`.
 
 **Regeneration**: Admins can regenerate the API key from the Settings page (unless locked by ENV).
 
@@ -68,7 +68,7 @@ server:
   corsOrigin: "http://localhost:5173"
 
 database:
-  url: "./data/jaeger.db"
+  url: "./data/fangst.db"
 
 security:
   apiKey: "your-api-key-here"
@@ -108,8 +108,8 @@ ui:
 
 ```yaml
 services:
-  jaeger:
-    image: jaeger:latest
+  fangst:
+    image: fangst:latest
     ports:
       - "5001:5001"
     environment:

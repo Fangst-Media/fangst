@@ -2,9 +2,9 @@ import { describe, expect, test } from 'bun:test'
 import {
   MetadataProvider,
   type MetadataProviderConfig,
-} from '@jaeger/shared/clients/metadata-provider'
-import { MetadataRelayClient } from '@jaeger/shared/clients/metadata-relay'
-import { TmdbClient } from '@jaeger/shared/clients/tmdb'
+} from '@fangst/shared/clients/metadata-provider'
+import { MetadataRelayClient } from '@fangst/shared/clients/metadata-relay'
+import { TmdbClient } from '@fangst/shared/clients/tmdb'
 import { MockFilesystem } from '../services/filesystem'
 import { MediaScanner } from '../services/scanner'
 

@@ -8,7 +8,7 @@ export const serverSettingsSchema = z.object({
 
 // Database settings
 export const databaseSettingsSchema = z.object({
-  url: z.string().default('./data/jaeger.db'),
+  url: z.string().default('./data/fangst.db'),
 })
 
 // Security settings
@@ -188,7 +188,7 @@ export const externalLinksSettingsSchema = z.object({
 // Complete settings schema
 export const settingsSchema = z.object({
   server: serverSettingsSchema.default({ port: 5001, corsOrigin: 'http://localhost:5173' }),
-  database: databaseSettingsSchema.default({ url: './data/jaeger.db' }),
+  database: databaseSettingsSchema.default({ url: './data/fangst.db' }),
   security: securitySettingsSchema,
   auth: authSettingsSchema.default({
     provider: 'jellyfin',

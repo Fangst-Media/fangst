@@ -1,4 +1,4 @@
-import type { MetadataRelayResult, TvSeriesDetails } from '@jaeger/shared/clients/metadata-relay'
+import type { MetadataRelayResult, TvSeriesDetails } from '@fangst/shared/clients/metadata-relay'
 import { eq } from 'drizzle-orm'
 import { db } from '../db'
 import { bookMetadata, metadataLists, movieMetadata, tvMetadata } from '../db/schema'

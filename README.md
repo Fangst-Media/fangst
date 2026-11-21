@@ -1,54 +1,50 @@
-# Jæger
+# Fangst
 
-**The media hunter that respects your files.**
+**Self-hosted media tools that bring in the catch and leave your files alone.**
 
-Jæger (Danish for "hunter") is a unified media management system that consolidates the fragmented \*arr ecosystem into a single, modern application — without forcing you to abandon your existing setup.
+Fangst is Danish for "the catch". It's a self-hosted media platform written in Rust, built in two parts:
 
+- **A download daemon** (`fangst-dl`) for usenet and torrents in one process. It speaks the qBittorrent and SABnzbd APIs, so Sonarr, Radarr and similar apps can use it without changes, replacing two separate download clients.
+- **A media manager** for movies and TV on top of it, with a headless API that any frontend can use.
 
-## Why Jæger?
+> Fangst is in early development and not ready for general use.
 
-The self-hosted media stack is powerful but fragmented. Running Sonarr, Radarr, Prowlarr, and Overseerr means managing 4+ separate apps, each with their own database, configuration, and quirks.
+## Your files stay yours
 
-## Philosophy
+- **Original filenames are kept.** Imports use hardlinks where possible, so seeding keeps working. Renaming is optional.
+- **Your folder structure stays.** Adopting an existing library moves and renames nothing.
+- **Metadata travels with the files.** Kodi/Jellyfin NFO and Fangst JSON sidecars sit next to your media, so a lost database or a switch to another app costs you nothing.
 
-### Your Files, Your Way
+## Status
 
-Jæger doesn't rename your files or force a folder structure. Quality and metadata are tracked in the database, not encoded in filenames.
+| Part | State |
+|---|---|
+| Usenet downloads (NNTP, yEnc, NZB, resume after restart, job timeline) | working |
+| Native HTTP API with OpenAPI, live event stream, web queue page | working |
+| Torrents | in progress |
+| PAR2 repair, unpacking, qBittorrent and SABnzbd compatibility | planned |
+| Media manager | planned |
 
-- **Keep original filenames** — Seeding keeps working
-- **Flexible folder structure** — We adapt to you, not the other way around
-- **Optional renaming** — If you want it, it's there
-
-### Portable Metadata
-
-Jæger exports metadata as sidecar files alongside your media:
-
-- **Kodi/Jellyfin NFO** — Industry standard, works everywhere
-- **Jæger JSON** — Full metadata including quality, source, and release info
-
-Lose your database? Your sidecars have you covered. Switch apps? Everything just works.
-
-## Tech Stack
-
-Bun, Hono, React. In the future we might add some rust services to keep things super performant while saving your RAM for something else. Maybe even an entire rust backend, but for now we keep it simple.
-
-## Installation
-
-> ⚠️ Jæger is in early development. Not ready for general use.
+The plan lives in the [issues](https://github.com/Fangst-Media/fangst/issues) and milestones.
 
 ## Development
 
-```bash
-# Install dependencies
-bun install
+You need Rust (the pinned version installs itself through `rust-toolchain.toml`), Bun, `just`, `cargo-nextest`, `cargo-deny` and `changesetter`.
 
-# Start development servers
-bun run dev
+```bash
+just setup        # install JS dependencies and fetch crates
+just check-full   # the gate: lint, tests, layer and licence checks, generated files
+just web-dev      # web app with hot refresh
+
+# the download daemon, API on 127.0.0.1:7740
+FANGST_API_KEY=<16 or more characters> cargo run -p fangst-dl -- serve --data-dir data --host news.example.com
 ```
+
+[AGENTS.md](AGENTS.md) has every command, the architecture rules and the code style.
 
 ## Contributing
 
-Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) before submitting a PR. Coding agents and people working with them start at [AGENTS.md](AGENTS.md). By opening a pull request you agree to the [contributor licence agreement](CLA.md).
+Contributions are welcome, written by hand or with a coding agent. Start at [AGENTS.md](AGENTS.md) and the [Contributing Guide](CONTRIBUTING.md). By opening a pull request you agree to the [contributor licence agreement](CLA.md).
 
 ## Licence
 
@@ -56,23 +52,18 @@ The application is under the [GNU Affero General Public License v3.0 or later](L
 
 ## Alternatives
 
-Looking for something different? Check out these projects:
-
+- **[HolyArrs](https://github.com/HolyArrs/HolyArrs)**
 - **[MediaManager](https://github.com/maxdorninger/MediaManager/)**
 - **[Cinephage](https://github.com/MoldyTaint/Cinephage)**
+- **[Scryer](https://github.com/scryer-media/scryer)**
 
 ## Acknowledgments
 
-Jæger stands on the shoulders of giants:
-
-- [Sonarr](https://sonarr.tv) / [Radarr](https://radarr.video) — The originals
-- [Prowlarr](https://prowlarr.com) — Indexer management
-- [The Movie Database (TMDB)](https://www.themoviedb.org/) — Movie and TV show metadata
-- This product uses the TMDB API but is not endorsed or certified by TMDB
-- [Dictionarry](https://dictionarry.dev/) — Quality scoring and release group tier data
-- The entire \*arr community
-
----
+- [Sonarr](https://sonarr.tv) and [Radarr](https://radarr.video), the originals
+- [Prowlarr](https://prowlarr.com) for indexer management
+- [The Movie Database (TMDB)](https://www.themoviedb.org/) for movie and TV metadata. This product uses the TMDB API but is not endorsed or certified by TMDB.
+- [Dictionarry](https://dictionarry.dev/) for quality scoring and release group tier data
+- The whole \*arr community
 
 <p align="center">
   <sub>Built with ☕ in Copenhagen</sub>

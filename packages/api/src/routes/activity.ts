@@ -1,5 +1,5 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
-import { SABnzbdClient } from '@jaeger/shared/clients/sabnzbd'
+import { SABnzbdClient } from '@fangst/shared/clients/sabnzbd'
 import type { User } from '../services/auth'
 import { configService } from '../services/config'
 

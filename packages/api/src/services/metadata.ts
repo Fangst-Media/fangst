@@ -1,9 +1,9 @@
-import { MetadataRelayClient } from '@jaeger/shared/clients/metadata-relay'
+import { MetadataRelayClient } from '@fangst/shared/clients/metadata-relay'
 import type {
   MetadataRelayResult,
   SeasonDetails,
   TvSeriesDetails,
-} from '@jaeger/shared/clients/metadata-relay'
+} from '@fangst/shared/clients/metadata-relay'
 import { logger } from '../lib/logger'
 import { OpenLibraryProvider } from './openlibrary'
 

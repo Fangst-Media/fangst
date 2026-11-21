@@ -28,10 +28,10 @@ export type JellyfinUser = {
 
 export class JellyfinClient {
   private baseUrl: string
-  private clientName = 'Jaeger'
+  private clientName = 'Fangst'
   private clientVersion = '0.1.0'
-  private deviceId = 'jaeger-server'
-  private deviceName = 'Jaeger Server'
+  private deviceId = 'fangst-server'
+  private deviceName = 'Fangst Server'
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl.replace(/\/$/, '')

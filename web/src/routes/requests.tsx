@@ -1,4 +1,4 @@
-import type { MetadataResult } from '@jaeger/shared/schemas/metadata'
+import type { MetadataResult } from '@fangst/shared/schemas/metadata'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { SimpleRequestModal } from '../components/SimpleRequestModal'
