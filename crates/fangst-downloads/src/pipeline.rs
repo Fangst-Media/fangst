@@ -30,6 +30,14 @@ fn index_by_name(names: &[String]) -> HashMap<&str, usize> {
         .collect()
 }
 
+/// The archive password a job name ends with as `{{password}}`, the form clients and indexers use
+/// to hand one over with the name. It wins over the NZB's, since someone set it for this job.
+fn password_in_name(name: &str) -> Option<&str> {
+    let inner = name.trim_end().strip_suffix("}}")?;
+    let (_, password) = inner.rsplit_once("{{")?;
+    (!password.is_empty()).then_some(password)
+}
+
 /// Runs PAR2 work on a blocking thread; a panic inside the PAR2 code fails the job, not the runner.
 async fn blocking<T: Send + 'static>(
     work: impl FnOnce() -> Result<T, par2::Error> + Send + 'static,
@@ -224,7 +232,9 @@ impl Runner {
                 name: job.name.clone(),
                 category: job.category.clone(),
                 folder: out.to_owned(),
-                password: nzb.password().map(str::to_owned),
+                password: password_in_name(&job.name)
+                    .or_else(|| nzb.password())
+                    .map(str::to_owned),
             };
             match processor.process(context).await {
                 Ok(PostProcessOutcome::Continue { message }) => {
@@ -239,5 +249,19 @@ impl Runner {
             }
         }
         Ok(None)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::password_in_name;
+
+    #[test]
+    fn password_comes_from_a_trailing_pair_of_braces() {
+        assert_eq!(password_in_name("Show.S01E01{{secret}}"), Some("secret"));
+        assert_eq!(password_in_name("Show {{a}} b{{c d}} "), Some("c d"));
+        assert_eq!(password_in_name("Show.S01E01"), None);
+        assert_eq!(password_in_name("Show{{}}"), None);
+        assert_eq!(password_in_name("Show{{x}}.nzb"), None);
     }
 }

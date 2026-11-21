@@ -1,0 +1,15 @@
+# Writes the archives in fixtures/archives. Not part of the workspace: it is run by hand when a
+# fixture changes, and it pulls in a RAR writer that Fangst itself never ships.
+[package]
+name = "fangst-archive-fixtures"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+license = "AGPL-3.0-or-later"
+publish = false
+
+[workspace]
+
+[dependencies]
+rar-rs = "=0.15.3"
+sevenz-rust2 = { version = "=0.25.0", default-features = false, features = ["aes256", "compress"] }

@@ -8,7 +8,7 @@
 ignore = ["", "fangst", "layercheck", "fangst-bench", "@fangst/api", "@fangst/shared", "@fangst/parser"]
 
 [groups.fangst]
-fixed = ["fangst-adapter-qbittorrent", "fangst-adapter-sabnzbd", "fangst-core", "fangst-dl", "fangst-dl-api", "fangst-downloads", "fangst-nntp", "fangst-notify-discord", "fangst-notify-ntfy", "fangst-notify-webhook", "fangst-nzb", "fangst-postproc-par2", "fangst-providers", "fangst-release", "fangst-torrent", "fangst-usenet", "fangst-yenc", "@fangst/web"]
+fixed = ["fangst-adapter-qbittorrent", "fangst-adapter-sabnzbd", "fangst-core", "fangst-dl", "fangst-dl-api", "fangst-downloads", "fangst-nntp", "fangst-notify-discord", "fangst-notify-ntfy", "fangst-notify-webhook", "fangst-nzb", "fangst-postproc-extract", "fangst-postproc-par2", "fangst-providers", "fangst-release", "fangst-torrent", "fangst-usenet", "fangst-yenc", "@fangst/web"]
 
 [changelog]
 file = "CHANGELOG.md"
