@@ -1,5 +1,5 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
-import type { SettingsResponse, SettingsUpdate } from '@jaeger/shared/types/settings'
+import type { SettingsResponse, SettingsUpdate } from '@fangst/shared/types/settings'
 import { logger } from '../lib/logger'
 import type { User } from '../services/auth'
 import { configService } from '../services/config'

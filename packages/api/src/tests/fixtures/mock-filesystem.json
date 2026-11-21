@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "description": "Mock filesystem structure for Jaeger media scanning tests",
+  "description": "Mock filesystem structure for Fangst media scanning tests",
   "root": "/media",
   "structure": {
     "Movies": {

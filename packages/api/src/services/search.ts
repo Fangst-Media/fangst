@@ -1,13 +1,13 @@
-import { parseReleaseName } from '@jaeger/parser'
-import { NewznabClient, type NewznabSearchParams } from '@jaeger/shared/clients/newznab'
-import { isReleaseTooSmall } from '@jaeger/shared/lib/size-filter'
+import { parseReleaseName } from '@fangst/parser'
+import { NewznabClient, type NewznabSearchParams } from '@fangst/shared/clients/newznab'
+import { isReleaseTooSmall } from '@fangst/shared/lib/size-filter'
 import type {
   Indexer,
   ParsedReleaseInfo,
   SearchRequest,
   SearchResponse,
   SearchResult,
-} from '@jaeger/shared/types/indexer'
+} from '@fangst/shared/types/indexer'
 import { configService } from './config'
 
 interface SearchError {

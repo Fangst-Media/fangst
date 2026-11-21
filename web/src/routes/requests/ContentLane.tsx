@@ -1,4 +1,4 @@
-import type { LaneResponse, MetadataResult } from '@jaeger/shared/schemas/metadata'
+import type { LaneResponse, MetadataResult } from '@fangst/shared/schemas/metadata'
 import { TrendingLane } from './TrendingLane'
 
 export type { LaneResponse }

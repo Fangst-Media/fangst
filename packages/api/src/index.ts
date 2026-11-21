@@ -47,7 +47,7 @@ app.use('*', authMiddleware)
 
 app.get('/', (c) => {
   return c.json({
-    message: 'Jaeger API',
+    message: 'Fangst API',
     version: '0.1.0',
     mockFilesystem: configService.isMockFilesystem(),
     mockAuth: configService.isMockAuth(),
@@ -62,7 +62,7 @@ app.get('/health', (c) => {
 app.doc('/api/openapi.json', {
   openapi: '3.1.0',
   info: {
-    title: 'Jæger API',
+    title: 'Fangst API',
     version: '0.1.0',
     description: 'Media management and acquisition API',
   },
@@ -72,7 +72,7 @@ app.get(
   '/api/docs',
   apiReference({
     url: '/api/openapi.json',
-    pageTitle: 'Jæger API',
+    pageTitle: 'Fangst API',
   })
 )
 

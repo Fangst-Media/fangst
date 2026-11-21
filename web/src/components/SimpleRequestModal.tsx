@@ -1,4 +1,4 @@
-import type { TvSeriesDetails } from '@jaeger/shared/schemas/metadata'
+import type { TvSeriesDetails } from '@fangst/shared/schemas/metadata'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { apiPost, collections, movieLanes, tvLanes } from '../lib/api-client'

@@ -7,7 +7,7 @@ import { $ } from 'bun'
  * Runs automatically on application startup.
  */
 export async function initializeDatabase(): Promise<void> {
-  const dbPath = resolve(process.cwd(), process.env.DATABASE_URL || './data/jaeger.db')
+  const dbPath = resolve(process.cwd(), process.env.DATABASE_URL || './data/fangst.db')
   const dataDir = dirname(dbPath)
 
   // Create data directory if it doesn't exist

@@ -1,4 +1,4 @@
-import type { MetadataResult } from '@jaeger/shared/schemas/metadata'
+import type { MetadataResult } from '@fangst/shared/schemas/metadata'
 import { useNavigate } from '@tanstack/react-router'
 import { useRef } from 'react'
 

@@ -7,7 +7,7 @@ import { configService } from '../services/config'
 
 const auth = new OpenAPIHono()
 
-const SESSION_COOKIE = 'jaeger_session'
+const SESSION_COOKIE = 'fangst_session'
 
 const loginSchema = z.object({
   provider: z.enum(['jellyfin', 'plex']),

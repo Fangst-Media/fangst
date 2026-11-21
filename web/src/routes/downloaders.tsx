@@ -1,4 +1,4 @@
-import type { CreateDownloader, Downloader } from '@jaeger/shared/types/settings'
+import type { CreateDownloader, Downloader } from '@fangst/shared/types/settings'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { apiFetch, apiPost } from '../lib/api-client'

@@ -1,6 +1,6 @@
-import { type ParsedRelease, parseReleaseName } from '@jaeger/parser'
-import type { SearchResult } from '@jaeger/shared/types/indexer'
-import type { QualityProfile } from '@jaeger/shared/types/profiles'
+import { type ParsedRelease, parseReleaseName } from '@fangst/parser'
+import type { SearchResult } from '@fangst/shared/types/indexer'
+import type { QualityProfile } from '@fangst/shared/types/profiles'
 import { logger } from '../lib/logger'
 import { meetsCutoff, scoreReleaseWithProfile } from '../lib/profile-scoring'
 import { configService } from '../services/config'
@@ -20,7 +20,7 @@ async function fetchRuntime(request: RequestWithUser): Promise<number | undefine
 
   try {
     const response = await fetch(`${relayUrl}${endpoint}`, {
-      headers: { 'User-Agent': 'Jaeger/0.1.0', Accept: 'application/json' },
+      headers: { 'User-Agent': 'Fangst/0.1.0', Accept: 'application/json' },
     })
     if (!response.ok) return undefined
 

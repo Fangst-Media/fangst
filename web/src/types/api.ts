@@ -15,4 +15,4 @@ export type {
   BookDetails,
   IndexerTrendingItem,
   IndexerTrendingResponse,
-} from '@jaeger/shared/schemas/metadata'
+} from '@fangst/shared/schemas/metadata'

@@ -1,4 +1,4 @@
-import { MetadataRelayClient } from '@jaeger/shared/clients/metadata-relay'
+import { MetadataRelayClient } from '@fangst/shared/clients/metadata-relay'
 import { configService } from '../services/config'
 import { type RequestWithUser, requestService } from '../services/requests'
 

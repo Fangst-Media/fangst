@@ -5,7 +5,7 @@ import {
   type Indexer,
   type UpdateIndexer,
   indexerSchema,
-} from '@jaeger/shared/types/indexer'
+} from '@fangst/shared/types/indexer'
 import {
   type CreateDownloader,
   type Downloader,
@@ -15,7 +15,7 @@ import {
   type UpdateDownloader,
   downloaderSchema,
   settingsSchema,
-} from '@jaeger/shared/types/settings'
+} from '@fangst/shared/types/settings'
 import YAML from 'yaml'
 
 // ENV variable to settings path mapping
@@ -23,7 +23,7 @@ const ENV_MAPPING: Record<string, string> = {
   PORT: 'server.port',
   CORS_ORIGIN: 'server.corsOrigin',
   DATABASE_URL: 'database.url',
-  JAEGER_API_KEY: 'security.apiKey',
+  FANGST_LEGACY_API_KEY: 'security.apiKey',
   SESSION_EXPIRY_DAYS: 'security.sessionExpiryDays',
   JELLYFIN_URL: 'auth.jellyfin.url',
   SYNC_ADMIN_FROM_PROVIDER: 'auth.jellyfin.syncAdminFromProvider',

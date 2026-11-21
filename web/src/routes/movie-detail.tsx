@@ -1,4 +1,4 @@
-import type { QualityProfile } from '@jaeger/shared/types/profiles'
+import type { QualityProfile } from '@fangst/shared/types/profiles'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { DownloadStatus } from '../components/DownloadStatus'

@@ -21,7 +21,7 @@ type OpenLibraryWorkDetails = {
   first_publish_date?: string
 }
 
-import type { MetadataRelayResult } from '@jaeger/shared/clients/metadata-relay'
+import type { MetadataRelayResult } from '@fangst/shared/clients/metadata-relay'
 
 type MetadataResult = MetadataRelayResult
 

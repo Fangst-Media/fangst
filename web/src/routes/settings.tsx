@@ -1,5 +1,5 @@
-import type { CreateProfile, QualityProfile } from '@jaeger/shared/types/profiles'
-import type { ExternalLink, SettingsResponse, SettingsUpdate } from '@jaeger/shared/types/settings'
+import type { CreateProfile, QualityProfile } from '@fangst/shared/types/profiles'
+import type { ExternalLink, SettingsResponse, SettingsUpdate } from '@fangst/shared/types/settings'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { apiFetch, apiPost } from '../lib/api-client'
@@ -791,7 +791,7 @@ export default function Settings() {
     <div className="min-h-screen p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground">Settings</h1>
-        <p className="text-sm text-muted">Configure your Jaeger instance</p>
+        <p className="text-sm text-muted">Configure your Fangst instance</p>
       </div>
 
       <div className="max-w-3xl">

@@ -1,5 +1,5 @@
-import type { TvSeriesDetails } from '@jaeger/shared/schemas/metadata'
-import type { ParsedReleaseInfo } from '@jaeger/shared/types/indexer'
+import type { TvSeriesDetails } from '@fangst/shared/schemas/metadata'
+import type { ParsedReleaseInfo } from '@fangst/shared/types/indexer'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import {

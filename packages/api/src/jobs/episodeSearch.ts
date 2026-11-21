@@ -1,5 +1,5 @@
-import { parseReleaseName } from '@jaeger/parser'
-import type { SearchResult } from '@jaeger/shared/types/indexer'
+import { parseReleaseName } from '@fangst/parser'
+import type { SearchResult } from '@fangst/shared/types/indexer'
 import { logger } from '../lib/logger'
 import { configService } from '../services/config'
 import { downloadService } from '../services/downloads'

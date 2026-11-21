@@ -4,7 +4,7 @@ export default function Index() {
   return (
     <div className="flex min-h-screen items-center justify-center">
       <div className="text-center">
-        <h1 className="text-6xl font-bold text-accent mb-4">Jæger</h1>
+        <h1 className="text-6xl font-bold text-accent mb-4">Fangst</h1>
         <p className="text-xl text-muted mb-8">Unified Media Management</p>
 
         <Link

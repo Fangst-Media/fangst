@@ -1,5 +1,5 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
-import { MetadataRelayClient } from '@jaeger/shared/clients/metadata-relay'
+import { MetadataRelayClient } from '@fangst/shared/clients/metadata-relay'
 import { runAirDateMonitor } from '../jobs/airDateMonitor'
 import { runDownloadMonitor } from '../jobs/downloadMonitor'
 import { runEpisodeSearchJob } from '../jobs/episodeSearch'

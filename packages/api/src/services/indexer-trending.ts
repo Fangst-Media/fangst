@@ -1,6 +1,6 @@
-import { parseReleaseName } from '@jaeger/parser'
-import { NewznabClient } from '@jaeger/shared/clients/newznab'
-import type { Indexer, SearchResult } from '@jaeger/shared/types/indexer'
+import { parseReleaseName } from '@fangst/parser'
+import { NewznabClient } from '@fangst/shared/clients/newznab'
+import type { Indexer, SearchResult } from '@fangst/shared/types/indexer'
 import { logger } from '../lib/logger'
 import { configService } from './config'
 

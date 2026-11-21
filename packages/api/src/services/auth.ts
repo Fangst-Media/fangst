@@ -1,4 +1,4 @@
-import { JellyfinClient, type JellyfinUser } from '@jaeger/shared/clients/jellyfin'
+import { JellyfinClient, type JellyfinUser } from '@fangst/shared/clients/jellyfin'
 import { and, eq } from 'drizzle-orm'
 import { db } from '../db'
 import { sessions, users } from '../db/schema'

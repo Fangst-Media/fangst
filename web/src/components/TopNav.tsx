@@ -30,7 +30,7 @@ export function TopNav() {
         {/* Left: Logo + Links */}
         <div className="flex items-center gap-8">
           <Link to="/" className="text-xl font-bold text-accent shrink-0">
-            Jæger
+            Fangst
           </Link>
 
           {/* Desktop nav links */}

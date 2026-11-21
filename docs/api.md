@@ -1,4 +1,4 @@
-# Jaeger API Documentation
+# Fangst API Documentation
 
 Base URL: `http://localhost:5001`
 
@@ -10,7 +10,7 @@ There are two ways to authenticate:
 Login via `/api/auth/login` to obtain a session cookie.
 
 ### 2. API Key (for programmatic access)
-Use the Jaeger API key for scripts, integrations, and testing. The API key grants admin access.
+Use the Fangst API key for scripts, integrations, and testing. The API key grants admin access.
 
 **Header method (recommended):**
 ```bash
@@ -166,7 +166,7 @@ Sensitive values (API keys) are masked in the response.
       "corsOrigin": "http://localhost:5173"
     },
     "database": {
-      "url": "./data/jaeger.db"
+      "url": "./data/fangst.db"
     },
     "security": {
       "apiKey": "abcd********wxyz",

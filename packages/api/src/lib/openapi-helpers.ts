@@ -1,5 +1,5 @@
 import { createRoute, z } from '@hono/zod-openapi'
-import { errorResponseSchema, laneResponseSchema } from '@jaeger/shared/schemas/metadata'
+import { errorResponseSchema, laneResponseSchema } from '@fangst/shared/schemas/metadata'
 
 const errorContent = { 'application/json': { schema: errorResponseSchema } }
 

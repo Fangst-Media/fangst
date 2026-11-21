@@ -1,5 +1,5 @@
 {
-  "name": "@jaeger/web",
+  "name": "@fangst/web",
   "version": "0.1.0",
   "type": "module",
   "scripts": {
@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@hey-api/client-fetch": "^0.13.1",
-    "@jaeger/shared": "workspace:*",
+    "@fangst/shared": "workspace:*",
     "@tanstack/react-query": "^5.62.8",
     "@tanstack/react-router": "^1.91.5",
     "pino": "^10.1.0",

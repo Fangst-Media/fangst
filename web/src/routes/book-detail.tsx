@@ -1,5 +1,5 @@
-import type { BookDetails } from '@jaeger/shared/schemas/metadata'
-import type { ExternalLink } from '@jaeger/shared/types/settings'
+import type { BookDetails } from '@fangst/shared/schemas/metadata'
+import type { ExternalLink } from '@fangst/shared/types/settings'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { DownloadStatus } from '../components/DownloadStatus'
 import { useBookRequestStatus } from '../hooks/useRequestStatus'

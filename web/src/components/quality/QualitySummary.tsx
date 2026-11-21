@@ -1,4 +1,4 @@
-import type { ParsedReleaseInfo } from '@jaeger/shared/types/indexer'
+import type { ParsedReleaseInfo } from '@fangst/shared/types/indexer'
 import { QualityBadges } from './QualityBadges'
 import { QualityScore } from './QualityScore'
 import { TierBadge } from './TierBadge'

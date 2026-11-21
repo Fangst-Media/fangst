@@ -1,4 +1,4 @@
-import { SABnzbdClient, type SABnzbdHistorySlot } from '@jaeger/shared/clients/sabnzbd'
+import { SABnzbdClient, type SABnzbdHistorySlot } from '@fangst/shared/clients/sabnzbd'
 import { logger } from '../lib/logger'
 import { runLibraryScan } from '../routes/media'
 import { configService } from '../services/config'

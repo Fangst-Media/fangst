@@ -3,7 +3,7 @@ import {
   collectionDetailsSchema,
   movieDetailsSchema,
   tvSeriesDetailsSchema,
-} from '@jaeger/shared/schemas/metadata'
+} from '@fangst/shared/schemas/metadata'
 import { createDetailRoute, createLaneRoute, createSearchRoute } from '../lib/openapi-helpers'
 import type { User } from '../services/auth'
 import { configService } from '../services/config'

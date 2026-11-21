@@ -1,4 +1,4 @@
-import type { CreateProfile, QualityProfile, UpdateProfile } from '@jaeger/shared/types/profiles'
+import type { CreateProfile, QualityProfile, UpdateProfile } from '@fangst/shared/types/profiles'
 import { eq } from 'drizzle-orm'
 import { db } from '../db'
 import { qualityProfiles } from '../db/schema'
