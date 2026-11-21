@@ -1,0 +1,15 @@
+{
+  "source": "derived",
+  "client": "sonarr",
+  "note": "Parsed with .NET Version.Parse: digits only, no v. 2.11.2 makes Sonarr send stopped instead of paused and read root_path.",
+  "request": {
+    "method": "GET",
+    "path": "/app/webapiVersion",
+    "headers": [["cookie", "SID=fixture-session-0000"]]
+  },
+  "response": {
+    "status": 200,
+    "content_type": "text",
+    "body": "2.11.2"
+  }
+}

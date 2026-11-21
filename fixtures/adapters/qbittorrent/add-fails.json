@@ -1,0 +1,19 @@
+{
+  "source": "derived",
+  "client": "qbittorrent",
+  "note": "Nothing added (here: a magnet link without a v1 hash) is Fails.; Sonarr and HolyArrs treat only that exact body as failure.",
+  "request": {
+    "method": "POST",
+    "path": "/torrents/add",
+    "headers": [
+      ["cookie", "SID=fixture-session-0000"],
+      ["content-type", "application/x-www-form-urlencoded"]
+    ],
+    "body": "urls=magnet%3A%3Fdn%3Dno-hash"
+  },
+  "response": {
+    "status": 200,
+    "content_type": "text",
+    "body": "Fails."
+  }
+}

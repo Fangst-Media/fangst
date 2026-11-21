@@ -1078,6 +1078,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "fangst-adapter-qbittorrent"
+version = "0.1.0"
+dependencies = [
+ "fangst-providers",
+ "form_urlencoded",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "fangst-adapter-sabnzbd"
 version = "0.1.0"
 dependencies = [
@@ -1122,6 +1132,7 @@ dependencies = [
  "anyhow",
  "axum",
  "clap",
+ "fangst-adapter-qbittorrent",
  "fangst-adapter-sabnzbd",
  "fangst-bench",
  "fangst-core",

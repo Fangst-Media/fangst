@@ -187,6 +187,59 @@ pub trait Jobs: Send + Sync {
     fn delete(&self, job_id: i64, delete_files: bool) -> BoxFuture<Result<(), ProviderError>>;
     /// The absolute folder job folders are created in; protocols report it as their output folder.
     fn download_root(&self) -> PathBuf;
+    /// Queues a torrent from a magnet link, a `.torrent` file, or a URL that answers with either.
+    fn add_torrent(&self, request: AddTorrent) -> BoxFuture<Result<JobSummary, ProviderError>>;
+    /// A torrent job's hash, files and progress; `None` for an unknown id or a usenet job.
+    fn torrent(&self, job_id: i64) -> BoxFuture<Result<Option<TorrentStatus>, ProviderError>>;
+    /// Every category: created ones and those jobs carry, sorted.
+    fn categories(&self) -> BoxFuture<Result<Vec<String>, ProviderError>>;
+    /// Creates a category; an existing one is left alone.
+    fn create_category(&self, name: String) -> BoxFuture<Result<(), ProviderError>>;
+    /// Moves a job to another category, or to none.
+    fn set_category(
+        &self,
+        job_id: i64,
+        category: Option<String>,
+    ) -> BoxFuture<Result<JobSummary, ProviderError>>;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", content = "value", rename_all = "snake_case")]
+pub enum TorrentInput {
+    Magnet(String),
+    /// The bytes of a `.torrent` file.
+    File(Vec<u8>),
+    /// `http` or `https`; the answer may be a `.torrent` or a redirect to a magnet link.
+    Url(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AddTorrent {
+    pub input: TorrentInput,
+    /// Defaults to the torrent's name, then the magnet link's `dn`.
+    pub name: Option<String>,
+    pub category: Option<String>,
+    pub priority: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TorrentStatus {
+    /// Lowercase hex of the v1 info hash.
+    pub info_hash: String,
+    /// Empty until the metadata is known.
+    pub files: Vec<TorrentFile>,
+    /// Bytes on disk that passed the hash check.
+    pub have_bytes: u64,
+    pub uploaded_bytes: u64,
+    pub download_bps: u64,
+    pub upload_bps: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TorrentFile {
+    /// Relative to the job folder, with `/` between folders.
+    pub path: String,
+    pub bytes: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -240,6 +293,30 @@ pub enum Credential {
     NotNeeded,
     ApiKey(String),
     Missing,
+    /// A token from an earlier [`Credential::Login`], such as a login cookie.
+    Session(String),
+    /// A sign-in request. The daemon checks it against user passwords and API keys, applies the
+    /// login rate limit, and answers through [`ApiAdapter::logged_in`].
+    Login {
+        username: String,
+        password: String,
+    },
+}
+
+/// How the daemon decided a [`Credential::Login`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "outcome", rename_all = "snake_case")]
+pub enum LoginOutcome {
+    /// Signed in; `session` comes back as [`Credential::Session`] until `lifetime_secs` pass.
+    Accepted {
+        session: String,
+        lifetime_secs: u64,
+    },
+    Refused,
+    /// Too many failed attempts from this address, or too many password checks at once.
+    RetryLater {
+        seconds: u64,
+    },
 }
 
 /// Speaks another product's API (qBittorrent, SABnzbd, Sonarr) by translating onto [`Jobs`].
@@ -253,6 +330,11 @@ pub trait ApiAdapter: Send + Sync {
     fn credential(&self, request: &HttpRequest) -> Credential;
     /// The protocol's own answer to a request whose key is missing (`missing`) or wrong.
     fn rejected(&self, request: &HttpRequest, missing: bool) -> HttpResponse;
+    /// The protocol's answer to a [`Credential::Login`]. Only protocols with a login need it.
+    fn logged_in(&self, request: &HttpRequest, outcome: LoginOutcome) -> HttpResponse {
+        let _ = outcome;
+        self.rejected(request, false)
+    }
     fn handle(
         &self,
         request: HttpRequest,

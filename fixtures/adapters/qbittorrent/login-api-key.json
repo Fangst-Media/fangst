@@ -1,0 +1,17 @@
+{
+  "source": "derived",
+  "client": "sonarr",
+  "note": "Fangst accepts one of the user's API keys as the password, whatever the username, so clients with only username and password fields can use a key.",
+  "request": {
+    "method": "POST",
+    "path": "/auth/login",
+    "headers": [["content-type", "application/x-www-form-urlencoded"]],
+    "body": "username=sonarr&password=fixture-api-key-0000"
+  },
+  "response": {
+    "status": 200,
+    "content_type": "text",
+    "body": "Ok.",
+    "headers": [["set-cookie", "SID=fixture-session-0000"]]
+  }
+}

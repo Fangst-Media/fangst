@@ -358,9 +358,10 @@ fn builtin_providers(
     timeout: Duration,
     env: impl Fn(&str) -> Option<String>,
 ) -> anyhow::Result<Vec<fangst_providers::Provider>> {
-    let mut providers = vec![fangst_providers::Provider::ApiAdapter(Arc::new(
-        fangst_adapter_sabnzbd::Sabnzbd,
-    ))];
+    let mut providers = vec![
+        fangst_providers::Provider::ApiAdapter(Arc::new(fangst_adapter_sabnzbd::Sabnzbd)),
+        fangst_providers::Provider::ApiAdapter(Arc::new(fangst_adapter_qbittorrent::Qbittorrent)),
+    ];
     providers.extend(notify.providers(enabled, timeout, env)?);
     Ok(providers)
 }
@@ -647,10 +648,10 @@ mod tests {
 
     #[test]
     fn notifier_settings_alone_build_no_notifier() {
-        // The SABnzbd adapter needs no settings, so it's always compiled in; notifiers only when enabled.
+        // Adapters need no settings, so they're always built; notifiers only when enabled.
         assert_eq!(
             provider_ids(ALL_SETTINGS, ALL_ENV).unwrap(),
-            ["adapter-sabnzbd"]
+            ["adapter-sabnzbd", "adapter-qbittorrent"]
         );
     }
 
@@ -669,6 +670,7 @@ mod tests {
             provider_ids(&flags, ALL_ENV).unwrap(),
             [
                 "adapter-sabnzbd",
+                "adapter-qbittorrent",
                 "notify-webhook",
                 "notify-ntfy",
                 "notify-discord"
@@ -676,7 +678,10 @@ mod tests {
         );
 
         let ntfy_only = provider_ids(&["--ntfy-topic", "fangst", "--enable", "notify-ntfy"], &[]);
-        assert_eq!(ntfy_only.unwrap(), ["adapter-sabnzbd", "notify-ntfy"]);
+        assert_eq!(
+            ntfy_only.unwrap(),
+            ["adapter-sabnzbd", "adapter-qbittorrent", "notify-ntfy"]
+        );
     }
 
     #[test]

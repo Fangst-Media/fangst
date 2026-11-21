@@ -1,0 +1,15 @@
+{
+  "source": "derived",
+  "client": "sonarr",
+  "note": "Sonarr probes app/webapiVersion before signing in and treats 403 as API v2; a 404 would make it fall back to API v1, a 401 fail the test.",
+  "request": {
+    "method": "GET",
+    "path": "/app/webapiVersion",
+    "headers": []
+  },
+  "response": {
+    "status": 403,
+    "content_type": "text",
+    "body": "Forbidden"
+  }
+}

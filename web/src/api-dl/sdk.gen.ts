@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddJobData, AddJobErrors, AddJobResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, DeleteJobData, DeleteJobErrors, DeleteJobResponses, EventsData, EventsErrors, GetJobData, GetJobErrors, GetJobResponses, HealthData, HealthResponses, JobTimelineData, JobTimelineErrors, JobTimelineResponses, ListJobsData, ListJobsErrors, ListJobsResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutResponses, MeData, MeErrors, MeResponses, PauseJobData, PauseJobErrors, PauseJobResponses, ResumeJobData, ResumeJobErrors, ResumeJobResponses, TestServerData, TestServerErrors, TestServerResponses } from './types.gen';
+import type { AddJobData, AddJobErrors, AddJobResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, CreateCategoryData, CreateCategoryErrors, CreateCategoryResponses, DeleteJobData, DeleteJobErrors, DeleteJobResponses, EventsData, EventsErrors, GetJobData, GetJobErrors, GetJobResponses, HealthData, HealthResponses, JobTimelineData, JobTimelineErrors, JobTimelineResponses, JobTorrentData, JobTorrentErrors, JobTorrentResponses, ListCategoriesData, ListCategoriesErrors, ListCategoriesResponses, ListJobsData, ListJobsErrors, ListJobsResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutResponses, MeData, MeErrors, MeResponses, PauseJobData, PauseJobErrors, PauseJobResponses, ResumeJobData, ResumeJobErrors, ResumeJobResponses, SetJobCategoryData, SetJobCategoryErrors, SetJobCategoryResponses, TestServerData, TestServerErrors, TestServerResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -60,6 +60,32 @@ export const changePassword = <ThrowOnError extends boolean = false>(options: Op
         'Content-Type': 'application/json',
         ...options.headers
     }
+});
+
+/**
+ * Every category: those created ahead of any job and those jobs carry, sorted.
+ */
+export const listCategories = <ThrowOnError extends boolean = false>(options?: Options<ListCategoriesData, ThrowOnError>) => (options?.client ?? client).get<ListCategoriesResponses, ListCategoriesErrors, ThrowOnError>({
+    security: [{ name: 'X-Api-Key', type: 'apiKey' }, {
+            in: 'cookie',
+            name: 'fangst_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/categories',
+    ...options
+});
+
+/**
+ * Creates a category; one that exists already is left as it is.
+ */
+export const createCategory = <ThrowOnError extends boolean = false>(options: Options<CreateCategoryData, ThrowOnError>) => (options.client ?? client).put<CreateCategoryResponses, CreateCategoryErrors, ThrowOnError>({
+    security: [{ name: 'X-Api-Key', type: 'apiKey' }, {
+            in: 'cookie',
+            name: 'fangst_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/categories/{name}',
+    ...options
 });
 
 /**
@@ -121,6 +147,20 @@ export const getJob = <ThrowOnError extends boolean = false>(options: Options<Ge
     ...options
 });
 
+export const setJobCategory = <ThrowOnError extends boolean = false>(options: Options<SetJobCategoryData, ThrowOnError>) => (options.client ?? client).put<SetJobCategoryResponses, SetJobCategoryErrors, ThrowOnError>({
+    security: [{ name: 'X-Api-Key', type: 'apiKey' }, {
+            in: 'cookie',
+            name: 'fangst_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/jobs/{id}/category',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
 export const pauseJob = <ThrowOnError extends boolean = false>(options: Options<PauseJobData, ThrowOnError>) => (options.client ?? client).post<PauseJobResponses, PauseJobErrors, ThrowOnError>({
     security: [{ name: 'X-Api-Key', type: 'apiKey' }, {
             in: 'cookie',
@@ -148,6 +188,16 @@ export const jobTimeline = <ThrowOnError extends boolean = false>(options: Optio
             type: 'apiKey'
         }],
     url: '/api/v1/jobs/{id}/timeline',
+    ...options
+});
+
+export const jobTorrent = <ThrowOnError extends boolean = false>(options: Options<JobTorrentData, ThrowOnError>) => (options.client ?? client).get<JobTorrentResponses, JobTorrentErrors, ThrowOnError>({
+    security: [{ name: 'X-Api-Key', type: 'apiKey' }, {
+            in: 'cookie',
+            name: 'fangst_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/jobs/{id}/torrent',
     ...options
 });
 

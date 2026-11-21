@@ -1,0 +1,23 @@
+{
+  "source": "derived",
+  "client": "holyarrs",
+  "note": "The 4.x name for start.",
+  "request": {
+    "method": "POST",
+    "path": "/torrents/resume",
+    "headers": [
+      ["cookie", "SID=fixture-session-0000"],
+      ["content-type", "application/x-www-form-urlencoded"]
+    ],
+    "body": "hashes=all"
+  },
+  "response": {
+    "status": 200,
+    "content_type": "text",
+    "body": ""
+  },
+  "statuses": {
+    "2": "queued",
+    "5": "queued"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "source": "derived",
+  "client": "qbittorrent",
+  "note": "Endpoints Fangst doesn't implement (setShareLimits, topPrio, setForceStart, addTags and others) are 404; Sonarr and Radarr only log a warning for those after an add.",
+  "request": {
+    "method": "POST",
+    "path": "/torrents/topPrio",
+    "headers": [
+      ["cookie", "SID=fixture-session-0000"],
+      ["content-type", "application/x-www-form-urlencoded"]
+    ],
+    "body": "hashes=1111111111111111111111111111111111111111"
+  },
+  "response": {
+    "status": 404,
+    "content_type": "text",
+    "body": "Not Found"
+  }
+}

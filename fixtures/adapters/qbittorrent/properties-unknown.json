@@ -1,0 +1,16 @@
+{
+  "source": "derived",
+  "client": "sonarr",
+  "note": "An unknown hash is 404; Sonarr retries ten times, 100 ms apart, after an add.",
+  "request": {
+    "method": "GET",
+    "path": "/torrents/properties",
+    "query": [["hash", "7777777777777777777777777777777777777777"]],
+    "headers": [["cookie", "SID=fixture-session-0000"]]
+  },
+  "response": {
+    "status": 404,
+    "content_type": "text",
+    "body": "Not Found"
+  }
+}

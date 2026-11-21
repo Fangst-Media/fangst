@@ -1,0 +1,22 @@
+{
+  "source": "derived",
+  "client": "sonarr",
+  "note": "After import, when a post-import category is set: hashes and category.",
+  "request": {
+    "method": "POST",
+    "path": "/torrents/setCategory",
+    "headers": [
+      ["cookie", "SID=fixture-session-0000"],
+      ["content-type", "application/x-www-form-urlencoded"]
+    ],
+    "body": "hashes=4444444444444444444444444444444444444444&category=radarr"
+  },
+  "response": {
+    "status": 200,
+    "content_type": "text",
+    "body": ""
+  },
+  "job_categories": {
+    "4": "radarr"
+  }
+}

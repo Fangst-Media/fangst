@@ -1,0 +1,104 @@
+{
+  "source": "derived",
+  "client": "holyarrs",
+  "note": "HolyArrs polls sync/maindata?rid=N and merges torrents (hash to fields without hash). Fangst always sends a full update, which is valid for any rid.",
+  "request": {
+    "method": "GET",
+    "path": "/sync/maindata",
+    "query": [["rid", "7"]],
+    "headers": [["cookie", "SID=fixture-session-0000"]]
+  },
+  "response": {
+    "status": 200,
+    "content_type": "json",
+    "body": {
+      "rid": 8,
+      "full_update": true,
+      "torrents": {
+        "1111111111111111111111111111111111111111": {
+          "infohash_v1": "1111111111111111111111111111111111111111",
+          "infohash_v2": "",
+          "name": "Show.S01E01.1080p.WEB-DL",
+          "magnet_uri": "magnet:?xt=urn:btih:1111111111111111111111111111111111111111&dn=Show.S01E01.1080p.WEB-DL",
+          "size": 1468006400,
+          "total_size": 1468006400,
+          "progress": 0.5,
+          "dlspeed": 2097152,
+          "upspeed": 0,
+          "priority": 0,
+          "num_seeds": 0,
+          "num_complete": 12,
+          "num_leechs": 0,
+          "num_incomplete": 3,
+          "ratio": 0.0,
+          "popularity": 0.0,
+          "eta": 350,
+          "state": "downloading",
+          "seq_dl": false,
+          "f_l_piece_prio": false,
+          "category": "tv-sonarr",
+          "tags": "",
+          "super_seeding": false,
+          "force_start": false,
+          "save_path": "/data/downloads/1-Show.S01E01.1080p.WEB-DL",
+          "download_path": "",
+          "content_path": "/data/downloads/1-Show.S01E01.1080p.WEB-DL/Show.S01E01.1080p.WEB-DL.mkv",
+          "root_path": "",
+          "added_on": 1732190000,
+          "completion_on": -1,
+          "tracker": "",
+          "trackers_count": 1,
+          "dl_limit": 0,
+          "up_limit": 0,
+          "downloaded": 734003200,
+          "uploaded": 0,
+          "downloaded_session": 734003200,
+          "uploaded_session": 0,
+          "amount_left": 734003200,
+          "completed": 734003200,
+          "max_ratio": -1,
+          "max_seeding_time": -1,
+          "max_inactive_seeding_time": -1,
+          "ratio_limit": -2.0,
+          "seeding_time_limit": -2,
+          "inactive_seeding_time_limit": -2,
+          "seen_complete": 0,
+          "last_activity": 1732190000,
+          "auto_tmm": false,
+          "time_active": 120,
+          "seeding_time": 0,
+          "availability": -1.0,
+          "reannounce": 0,
+          "comment": "",
+          "private": false,
+          "has_metadata": true
+        }
+      },
+      "torrents_removed": [],
+      "categories": {
+        "radarr": {
+          "name": "radarr",
+          "savePath": ""
+        },
+        "tv-sonarr": {
+          "name": "tv-sonarr",
+          "savePath": ""
+        }
+      },
+      "server_state": {
+        "alltime_dl": 0,
+        "alltime_ul": 0,
+        "dl_info_data": 0,
+        "up_info_data": 0,
+        "dl_info_speed": 0,
+        "up_info_speed": 0,
+        "dl_rate_limit": 0,
+        "up_rate_limit": 0,
+        "free_space_on_disk": 0,
+        "connection_status": "connected",
+        "use_alt_speed_limits": false
+      }
+    }
+  },
+  "exact": ["/rid", "/full_update"]
+}

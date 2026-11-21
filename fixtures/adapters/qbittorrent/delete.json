@@ -1,0 +1,20 @@
+{
+  "source": "derived",
+  "client": "holyarrs",
+  "note": "hashes=a|b and deleteFiles=true or false, always sent by HolyArrs. Unknown hashes are skipped.",
+  "request": {
+    "method": "POST",
+    "path": "/torrents/delete",
+    "headers": [
+      ["cookie", "SID=fixture-session-0000"],
+      ["content-type", "application/x-www-form-urlencoded"]
+    ],
+    "body": "hashes=4444444444444444444444444444444444444444|6666666666666666666666666666666666666666&deleteFiles=true"
+  },
+  "response": {
+    "status": 200,
+    "content_type": "text",
+    "body": ""
+  },
+  "gone": [4]
+}

@@ -1,0 +1,42 @@
+{
+  "source": "derived",
+  "client": "sonarr",
+  "note": "Sonarr's test fails when max_ratio_enabled (or a short max_seeding_time) meets max_ratio_act 1 or 3, and when queueing is off with priority First; dht false makes it refuse magnet links without trackers.",
+  "request": {
+    "method": "GET",
+    "path": "/app/preferences",
+    "headers": [["cookie", "SID=fixture-session-0000"]]
+  },
+  "response": {
+    "status": 200,
+    "content_type": "json",
+    "body": {
+      "save_path": "/data/downloads",
+      "temp_path_enabled": false,
+      "temp_path": "",
+      "max_ratio_enabled": false,
+      "max_ratio": -1,
+      "max_seeding_time_enabled": false,
+      "max_seeding_time": -1,
+      "max_inactive_seeding_time_enabled": false,
+      "max_inactive_seeding_time": -1,
+      "max_ratio_act": 0,
+      "queueing_enabled": true,
+      "dht": true,
+      "auto_tmm_enabled": false,
+      "torrent_content_layout": "Original",
+      "add_stopped_enabled": false,
+      "web_ui_csrf_protection_enabled": true,
+      "bypass_local_auth": false,
+      "bypass_auth_subnet_whitelist_enabled": false
+    }
+  },
+  "exact": [
+    "/save_path",
+    "/max_ratio_enabled",
+    "/max_seeding_time_enabled",
+    "/max_ratio_act",
+    "/queueing_enabled",
+    "/dht"
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "source": "derived",
+  "client": "sonarr",
+  "note": "Form fields username and password. Sonarr accepts an empty body or Ok. and keeps every Set-Cookie; HolyArrs also sends Referer: <base URL>. Here the password is a Fangst user's password.",
+  "request": {
+    "method": "POST",
+    "path": "/auth/login",
+    "headers": [
+      ["content-type", "application/x-www-form-urlencoded"],
+      ["host", "nas:7740"],
+      ["referer", "http://nas:7740/"]
+    ],
+    "body": "username=admin&password=fixture-password-0000"
+  },
+  "response": {
+    "status": 200,
+    "content_type": "text",
+    "body": "Ok.",
+    "headers": [["set-cookie", "SID=fixture-session-0000; HttpOnly; Path=/"]]
+  }
+}

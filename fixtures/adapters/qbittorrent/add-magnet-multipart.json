@@ -1,0 +1,25 @@
+{
+  "source": "derived",
+  "client": "sonarr",
+  "note": "Sonarr switches the whole form to multipart when any value is longer than 1024 bytes, which long magnet links are.",
+  "request": {
+    "method": "POST",
+    "path": "/torrents/add",
+    "headers": [
+      ["cookie", "SID=fixture-session-0000"],
+      ["content-type", "multipart/form-data; boundary=\"fixtureboundary\""]
+    ],
+    "body": "--fixtureboundary\r\nContent-Disposition: form-data; name=\"urls\"\r\n\r\nmagnet:?xt=urn:btih:7777777777777777777777777777777777777777&dn=Show.S01E05.1080p.WEB-DL&tr=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\r\n--fixtureboundary\r\nContent-Disposition: form-data; name=\"category\"\r\n\r\ntv-sonarr\r\n--fixtureboundary\r\nContent-Disposition: form-data; name=\"stopped\"\r\n\r\nFalse\r\n--fixtureboundary--\r\n"
+  },
+  "response": {
+    "status": 200,
+    "content_type": "text",
+    "body": "Ok."
+  },
+  "added": {
+    "name": "Show.S01E05.1080p.WEB-DL",
+    "category": "tv-sonarr",
+    "status": "queued",
+    "kind": "torrent"
+  }
+}

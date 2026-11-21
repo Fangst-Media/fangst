@@ -1,0 +1,27 @@
+{
+  "source": "derived",
+  "client": "holyarrs",
+  "note": "HolyArrs sends both stopped=true and paused=true to add stopped, plus savepath, which Fangst ignores: every job gets its own folder.",
+  "request": {
+    "method": "POST",
+    "path": "/torrents/add",
+    "headers": [
+      ["cookie", "SID=fixture-session-0000"],
+      ["content-type", "application/x-www-form-urlencoded"],
+      ["referer", "http://nas:7740/"],
+      ["host", "nas:7740"]
+    ],
+    "body": "urls=magnet%3A%3Fxt%3Durn%3Abtih%3A7777777777777777777777777777777777777777%26dn%3DMovie.2021&category=radarr&savepath=%2Fmovies&stopped=true&paused=true"
+  },
+  "response": {
+    "status": 200,
+    "content_type": "text",
+    "body": "Ok."
+  },
+  "added": {
+    "name": "Movie.2021",
+    "category": "radarr",
+    "status": "paused",
+    "kind": "torrent"
+  }
+}

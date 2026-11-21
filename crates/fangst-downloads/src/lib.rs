@@ -17,6 +17,7 @@ use sqlx::sqlite::{
 use sqlx::{FromRow, Row};
 
 mod auth;
+mod categories;
 mod notify;
 mod pipeline;
 mod progress;
@@ -27,7 +28,7 @@ pub use notify::Notifications;
 use progress::Meter;
 pub use progress::Progress;
 pub use service::{Change, Service};
-pub use torrent::{TorrentRunner, TorrentSource};
+pub use torrent::{TorrentFile, TorrentRunner, TorrentSource, TorrentStatus};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Kind {

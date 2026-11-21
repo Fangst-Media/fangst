@@ -1,0 +1,17 @@
+{
+  "source": "derived",
+  "client": "qbittorrent",
+  "note": "category= with an empty value asks for torrents without a category, unlike leaving it out.",
+  "request": {
+    "method": "GET",
+    "path": "/torrents/info",
+    "query": [["category", ""]],
+    "headers": [["cookie", "SID=fixture-session-0000"]]
+  },
+  "response": {
+    "status": 200,
+    "content_type": "json",
+    "body": []
+  },
+  "exact": ["/0"]
+}

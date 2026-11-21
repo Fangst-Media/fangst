@@ -147,11 +147,13 @@ fn assert_same_files(a: &Path, b: &Path) {
 }
 
 async fn finish(download: Download) {
+    let watch = download.watch();
     tokio::time::timeout(TIMEOUT, download.wait())
         .await
         .expect("finished in time")
         .unwrap();
     assert_eq!(download.have_bytes(), download.total_bytes());
+    assert_eq!(watch.progress().have_bytes, download.total_bytes());
     download.stop().await;
 }
 

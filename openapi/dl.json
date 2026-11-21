@@ -182,6 +182,74 @@
         }
       }
     },
+    "/api/v1/categories": {
+      "get": {
+        "tags": [],
+        "description": "Every category: those created ahead of any job and those jobs carry, sorted.",
+        "operationId": "list_categories",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/categories/{name}": {
+      "put": {
+        "tags": [],
+        "description": "Creates a category; one that exists already is left as it is.",
+        "operationId": "create_category",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {},
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/events": {
       "get": {
         "tags": [],
@@ -465,6 +533,62 @@
         }
       }
     },
+    "/api/v1/jobs/{id}/category": {
+      "put": {
+        "tags": [],
+        "operationId": "set_job_category",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoryChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/jobs/{id}/pause": {
       "post": {
         "tags": [],
@@ -597,6 +721,44 @@
         }
       }
     },
+    "/api/v1/jobs/{id}/torrent": {
+      "get": {
+        "tags": [],
+        "operationId": "job_torrent",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TorrentStatusDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such job, or not a torrent job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/servers/test": {
       "post": {
         "tags": [],
@@ -692,6 +854,18 @@
         "properties": {
           "error": {
             "type": "string"
+          }
+        }
+      },
+      "CategoryChange": {
+        "type": "object",
+        "description": "The category to move a job to; `null` for none.",
+        "properties": {
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -1015,6 +1189,72 @@
           },
           "ok": {
             "type": "boolean"
+          }
+        }
+      },
+      "TorrentFileDto": {
+        "type": "object",
+        "required": [
+          "path",
+          "bytes"
+        ],
+        "properties": {
+          "bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "path": {
+            "type": "string",
+            "description": "Relative to the job folder, with `/` between folders."
+          }
+        }
+      },
+      "TorrentStatusDto": {
+        "type": "object",
+        "description": "A torrent job's hash, files and live progress.",
+        "required": [
+          "info_hash",
+          "files",
+          "have_bytes",
+          "uploaded_bytes",
+          "download_bps",
+          "upload_bps"
+        ],
+        "properties": {
+          "download_bps": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Bytes per second; 0 while not running.",
+            "minimum": 0
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TorrentFileDto"
+            },
+            "description": "Empty until the metadata is known, which for a magnet link means until a peer sends it."
+          },
+          "have_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Bytes on disk that passed the hash check.",
+            "minimum": 0
+          },
+          "info_hash": {
+            "type": "string",
+            "description": "Lowercase hex of the v1 info hash."
+          },
+          "upload_bps": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "uploaded_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Bytes sent to peers since the torrent started in this run.",
+            "minimum": 0
           }
         }
       },

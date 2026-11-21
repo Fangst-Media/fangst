@@ -1,0 +1,20 @@
+{
+  "source": "derived",
+  "client": "sonarr",
+  "note": "Sonarr's test creates its category when torrents/categories lacks it, then reads the list again.",
+  "request": {
+    "method": "POST",
+    "path": "/torrents/createCategory",
+    "headers": [
+      ["cookie", "SID=fixture-session-0000"],
+      ["content-type", "application/x-www-form-urlencoded"]
+    ],
+    "body": "category=tv-imported&savePath="
+  },
+  "response": {
+    "status": 200,
+    "content_type": "text",
+    "body": ""
+  },
+  "categories": ["radarr", "tv-imported", "tv-sonarr"]
+}

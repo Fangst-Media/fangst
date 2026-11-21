@@ -32,6 +32,13 @@ export type ApiError = {
 };
 
 /**
+ * The category to move a job to; `null` for none.
+ */
+export type CategoryChange = {
+    category?: string | null;
+};
+
+/**
  * A message on the event stream.
  */
 export type ChangeDto = {
@@ -145,6 +152,41 @@ export type ServerTestResult = {
     ok: boolean;
 };
 
+export type TorrentFileDto = {
+    bytes: number;
+    /**
+     * Relative to the job folder, with `/` between folders.
+     */
+    path: string;
+};
+
+/**
+ * A torrent job's hash, files and live progress.
+ */
+export type TorrentStatusDto = {
+    /**
+     * Bytes per second; 0 while not running.
+     */
+    download_bps: number;
+    /**
+     * Empty until the metadata is known, which for a magnet link means until a peer sends it.
+     */
+    files: Array<TorrentFileDto>;
+    /**
+     * Bytes on disk that passed the hash check.
+     */
+    have_bytes: number;
+    /**
+     * Lowercase hex of the v1 info hash.
+     */
+    info_hash: string;
+    upload_bps: number;
+    /**
+     * Bytes sent to peers since the torrent started in this run.
+     */
+    uploaded_bytes: number;
+};
+
 export type UserDto = {
     /**
      * False for a user who can only sign in with an API key so far.
@@ -235,6 +277,47 @@ export type ChangePasswordResponses = {
 };
 
 export type ChangePasswordResponse = ChangePasswordResponses[keyof ChangePasswordResponses];
+
+export type ListCategoriesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/categories';
+};
+
+export type ListCategoriesErrors = {
+    401: ApiError;
+};
+
+export type ListCategoriesError = ListCategoriesErrors[keyof ListCategoriesErrors];
+
+export type ListCategoriesResponses = {
+    200: Array<string>;
+};
+
+export type ListCategoriesResponse = ListCategoriesResponses[keyof ListCategoriesResponses];
+
+export type CreateCategoryData = {
+    body?: never;
+    path: {
+        name: string;
+    };
+    query?: never;
+    url: '/api/v1/categories/{name}';
+};
+
+export type CreateCategoryErrors = {
+    400: ApiError;
+    401: ApiError;
+};
+
+export type CreateCategoryError = CreateCategoryErrors[keyof CreateCategoryErrors];
+
+export type CreateCategoryResponses = {
+    204: void;
+};
+
+export type CreateCategoryResponse = CreateCategoryResponses[keyof CreateCategoryResponses];
 
 export type EventsData = {
     body?: never;
@@ -380,6 +463,28 @@ export type GetJobResponses = {
 
 export type GetJobResponse = GetJobResponses[keyof GetJobResponses];
 
+export type SetJobCategoryData = {
+    body: CategoryChange;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/api/v1/jobs/{id}/category';
+};
+
+export type SetJobCategoryErrors = {
+    400: ApiError;
+    404: ApiError;
+};
+
+export type SetJobCategoryError = SetJobCategoryErrors[keyof SetJobCategoryErrors];
+
+export type SetJobCategoryResponses = {
+    200: JobDto;
+};
+
+export type SetJobCategoryResponse = SetJobCategoryResponses[keyof SetJobCategoryResponses];
+
 export type PauseJobData = {
     body?: never;
     path: {
@@ -444,6 +549,30 @@ export type JobTimelineResponses = {
 };
 
 export type JobTimelineResponse = JobTimelineResponses[keyof JobTimelineResponses];
+
+export type JobTorrentData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/api/v1/jobs/{id}/torrent';
+};
+
+export type JobTorrentErrors = {
+    /**
+     * No such job, or not a torrent job
+     */
+    404: ApiError;
+};
+
+export type JobTorrentError = JobTorrentErrors[keyof JobTorrentErrors];
+
+export type JobTorrentResponses = {
+    200: TorrentStatusDto;
+};
+
+export type JobTorrentResponse = JobTorrentResponses[keyof JobTorrentResponses];
 
 export type TestServerData = {
     body: ServerTestRequest;
