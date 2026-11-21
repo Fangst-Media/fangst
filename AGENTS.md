@@ -10,7 +10,7 @@ This file is for every coding agent (Claude Code, Codex, Cursor, Copilot, Gemini
 ## Pinned versions
 
 - Rust 1.95.0, pinned in `rust-toolchain.toml`.
-- Dev tools: `just`, `cargo-nextest`, `cargo-deny`, Bun; later `changesetter` (#5).
+- Dev tools: `just`, `cargo-nextest`, `cargo-deny`, `changesetter`, Bun.
 - Bun for the JS side; the web app is React 19, TanStack Router and Query, Tailwind, TypeScript strict.
 
 When an API detail of a crate or upstream protocol is uncertain, check its docs or source instead of guessing, and say so.
@@ -23,10 +23,10 @@ Commands marked "planned" arrive with the issue named; until then they do not ex
 | --- | --- |
 | First setup | `just setup` |
 | Fast gate (while coding) | `just check`: fmt, clippy, tests |
-| Full gate (before every commit and merge) | `just check-full`: adds `layercheck`, `cargo deny`, regenerate-and-diff (empty so far); the changeset check joins with #5 |
+| Full gate (before every commit and merge) | `just check-full`: adds `layercheck`, `cargo deny`, regenerate-and-diff (empty so far), changeset check |
 | Layer rules only | `just layercheck` (layer map in `layers.toml`) |
 | Tests | `just test` (`cargo nextest run --workspace`) |
-| Add a changeset | `changesetter add` (planned, #5) |
+| Add a changeset | `changesetter add --package fangst-core --bump patch --type fix -m "What changed, for users"` (`--no-bump` for tooling, docs and tests; `--bump minor` for new features). Packages share one version, so any package in the group works |
 | Old TS stack | `bun run dev`; `just ts-check` for typecheck and lint, which fails on main until #66 (until milestone 2) |
 
 CI (`.github/workflows/check.yml`) runs `just check-full` on Linux, macOS and Windows for every push and for pull requests from forks. Run `just check-full` before committing. If you touched TypeScript, also run `just ts-check` and make sure you added no new errors (main fails it until #66).
@@ -66,7 +66,7 @@ CI (`.github/workflows/check.yml`) runs `just check-full` on Linux, macOS and Wi
 - **Ideas are issues.** Anything outside the current issue becomes a new issue labeled `idea`, with no milestone. Don't build it until it has been triaged into a milestone.
 - **Bugs found on the way.** A small fix inside files the current issue already touches may go in the same PR, named in the PR description. Anything else becomes a new issue labeled `bug`.
 - Write a failing test first wherever behaviour is testable.
-- Every branch adds a changeset (once #5 lands). Never edit versions or `CHANGELOG.md` by hand, and never run a release unless the maintainer asks.
+- Every branch adds a changeset in `.changeset/`; the full gate fails without one. Write it for users, as one line of what they will notice, not as a commit message. Never edit versions or `CHANGELOG.md` by hand, and never run `changesetter version` or `release` unless the maintainer asks. New shipped crates join the `fixed` group in `changesetter.toml`.
 - **Fresh eyes.** UI changes are captured as screenshots and judged by a fresh agent that never saw the code. Adapter responses are compared against real responses recorded in `fixtures/adapters/<adapter>/`, captured from local containers with throwaway credentials (#22, #26).
 - **Decision records.** Choices others will copy (job model, adapter boundaries, database ownership, provider traits) get a short record in `docs/decisions/`. Read the ones touching your area first.
 - **Question the current state.** Before copying an existing pattern into a new place, ask whether it is right for this case. If a better way exists, say so: take it, or record why not and open an issue.
